@@ -80,18 +80,6 @@ export default {
       // Safe status check (shows whether the settings exist, never their values).
       return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), sendsTo: (env.TO_EMAIL || DEFAULT_TO) ? (env.TO_EMAIL || DEFAULT_TO).replace(/^(.).*(@.*)$/, "$1***$2") : null });
     }
-    if (url.pathname === "/api/test-email") {
-      // Sends a plain test email and shows exactly what the email service answered (never shows the key).
-      const to = env.TO_EMAIL || DEFAULT_TO;
-      try {
-        const res = await fetch("https://api.resend.com/emails", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-          body: JSON.stringify({ from: env.FROM_EMAIL || "Latta Corp Website <onboarding@resend.dev>", to: [to], subject: "Latta Corp website test email", html: "<p>If you can read this, form emails are working.</p>" }),
-        });
-        return json({ resendStatus: res.status, resendAnswer: await res.text() });
-      } catch (e) { return json({ error: "could not reach the email service" }, 502); }
-    }
     if (url.pathname === "/api/submit") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handleSubmit(request, env);
