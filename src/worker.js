@@ -21,7 +21,7 @@ export async function handleSubmit(request, env) {
   try { form = await request.formData(); } catch { return json({ error: "bad request" }, 400); }
 
   // Spam trap: a hidden box people never fill in.
-  if (String(form.get("lc_trap_7") || "").trim() !== "") return json({ ok: true });
+  if (String(form.get("lc_trap_7") || "").trim() !== "") { console.log("spam trap triggered; message dropped"); return json({ ok: true }); }
 
   const kind = String(form.get("kind") || "");
   if (!KINDS.includes(kind)) return json({ error: "bad kind" }, 400);
@@ -77,6 +77,10 @@ export async function handleSubmit(request, env) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    if (url.pathname === "/api/health") {
+      // Safe status check (shows whether the settings exist, never their values).
+      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), sendsTo: env.TO_EMAIL ? env.TO_EMAIL.replace(/^(.).*(@.*)$/, "$1***$2") : null });
+    }
     if (url.pathname === "/api/submit") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handleSubmit(request, env);
