@@ -6,7 +6,7 @@ globalThis.fetch = async (url, opts) => { sent = { url, opts, body: JSON.parse(o
 const env = { TO_EMAIL: "owner@example.com", RESEND_API_KEY: "re_test" };
 const mk = (extra = {}) => {
   const fd = new FormData();
-  fd.append("kind", "Quote request"); fd.append("lang", "en"); fd.append("website", extra.website ?? ""); delete extra.website;
+  fd.append("kind", "Quote request"); fd.append("lang", "en"); fd.append("lc_trap_7", extra.lc_trap_7 ?? ""); delete extra.lc_trap_7;
   fd.append("fields", JSON.stringify([{ label: "Full name", value: "Jane <b>Doe</b>" }, { label: "Email", value: "jane@example.com" }, { label: "Service", value: "Mulching" }]));
   for (const [k, v] of Object.entries(extra)) fd.append(k, v);
   return new Request("https://x.test/api/submit", { method: "POST", body: fd });
@@ -19,7 +19,7 @@ assert.equal(sent.body.attachments.length, 1);
 assert(sent.body.html.includes("Jane &lt;b&gt;Doe&lt;/b&gt;"), "html is escaped");
 assert(sent.body.subject.startsWith("Quote request from Jane"));
 sent = null;
-r = await worker.fetch(mk({ website: "spam" }), env); // spam trap: pretend success, send nothing
+r = await worker.fetch(mk({ lc_trap_7: "spam" }), env); // spam trap: pretend success, send nothing
 assert.equal(r.status, 200); assert.equal(sent, null);
 r = await worker.fetch(new Request("https://x.test/api/submit", { method: "GET" }), env); assert.equal(r.status, 405);
 const bad = new FormData(); bad.append("kind", "Hack"); bad.append("fields", "[]");

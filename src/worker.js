@@ -21,7 +21,7 @@ export async function handleSubmit(request, env) {
   try { form = await request.formData(); } catch { return json({ error: "bad request" }, 400); }
 
   // Spam trap: a hidden box people never fill in.
-  if (String(form.get("website") || "").trim() !== "") return json({ ok: true });
+  if (String(form.get("lc_trap_7") || "").trim() !== "") return json({ ok: true });
 
   const kind = String(form.get("kind") || "");
   if (!KINDS.includes(kind)) return json({ error: "bad kind" }, 400);

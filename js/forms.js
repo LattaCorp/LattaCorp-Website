@@ -11,7 +11,7 @@ function formLabel(el){
 function formCollect(f){
   var out=[],groups={};
   [].forEach.call(f.querySelectorAll("input,select,textarea"),function(el){
-    if(el.type==="file"||el.type==="hidden"||el.type==="submit"||el.name==="website")return;
+    if(el.type==="file"||el.type==="hidden"||el.type==="submit"||el.name==="lc_trap_7")return;
     if(el.type==="checkbox"){
       if(!el.checked)return;
       var fs=el.closest("fieldset"),key=fs?(fs.querySelector("legend")||{}).textContent||"Options":formLabel(el);
@@ -56,7 +56,7 @@ function submitForm(f,th,ev){
   var fd=new FormData();
   fd.append("kind",FORM_KINDS[f.id]||"Form");
   fd.append("lang",lang);
-  fd.append("website",(f.querySelector('input[name=website]')||{}).value||"");
+  fd.append("lc_trap_7",(f.querySelector('input[name=lc_trap_7]')||{}).value||"");
   fd.append("fields",JSON.stringify(formCollect(f)));
   Promise.all(formPhotos(f).map(shrinkImage)).then(function(files){
     files.forEach(function(x,i){fd.append("photo"+i,x,x.name||("photo"+i+".jpg"))});
@@ -69,4 +69,4 @@ function submitForm(f,th,ev){
 }
 
 // Hidden spam trap: real people never see or fill this box; bots usually do.
-["qf","cf","ctf","hf"].forEach(function(id){var f=document.getElementById(id);if(!f)return;var d=document.createElement("div");d.className="hp";d.setAttribute("aria-hidden","true");d.innerHTML='<input name="website" tabindex="-1" autocomplete="off">';f.appendChild(d)});
+["qf","cf","ctf","hf"].forEach(function(id){var f=document.getElementById(id);if(!f)return;var d=document.createElement("div");d.className="hp";d.setAttribute("aria-hidden","true");d.innerHTML='<input name="lc_trap_7" tabindex="-1" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other">';f.appendChild(d)});
