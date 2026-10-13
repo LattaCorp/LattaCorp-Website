@@ -20,7 +20,7 @@ assert(sent.body.html.includes("Jane &lt;b&gt;Doe&lt;/b&gt;"), "html is escaped"
 assert(sent.body.subject.startsWith("Quote request from Jane"));
 sent = null;
 r = await worker.fetch(mk({ lc_trap_7: "spam" }), env); // spam trap: pretend success, send nothing
-assert.equal(r.status, 200); assert.equal(sent, null);
+assert.equal(r.status, 400); assert.equal(sent, null);
 r = await worker.fetch(new Request("https://x.test/api/submit", { method: "GET" }), env); assert.equal(r.status, 405);
 const bad = new FormData(); bad.append("kind", "Hack"); bad.append("fields", "[]");
 r = await worker.fetch(new Request("https://x.test/api/submit", { method: "POST", body: bad }), env); assert.equal(r.status, 400);
