@@ -57,7 +57,7 @@ function submitForm(f,th,ev){
   var btn=f.querySelector('button[type=submit]'),old=btn?btn.textContent:"";
   if(btn){btn.disabled=true;btn.textContent=t("Sending...")}
   formError(f,false);
-  var msg={kind:FORM_KINDS[f.id]||"Form",lang:lang,lc_trap_7:(f.querySelector('input[name=lc_trap_7]')||{}).value||"",fields:formCollect(f),photos:[]};
+  var msg={kind:FORM_KINDS[f.id]||"Form",lang:lang,lc_trap_7:"",fields:formCollect(f),photos:[]};
   Promise.all(formPhotos(f).map(function(x){return shrinkImage(x).then(function(y){return fileToBase64(y).then(function(b){return {filename:y.name||"photo.jpg",content:b}})})})).then(function(photos){
     msg.photos=photos;
     return fetch("/api/submit",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(msg)});
@@ -68,4 +68,3 @@ function submitForm(f,th,ev){
   }).catch(function(e){formError(f,true,e&&e.ref||String(e&&e.message||e))}).then(function(){if(btn){btn.disabled=false;btn.textContent=old}});
 }
 // Hidden spam trap: real people never see or fill this box; bots usually do.
-["qf","cf","ctf","hf"].forEach(function(id){var f=document.getElementById(id);if(!f)return;var d=document.createElement("div");d.className="hp";d.setAttribute("aria-hidden","true");d.innerHTML='<input name="lc_trap_7" tabindex="-1" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other">';f.appendChild(d)});
