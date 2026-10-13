@@ -425,3 +425,7 @@ header .wrap.hgrid{gap:clamp(18px,2.4vw,36px);padding-left:20px;padding-right:20
 #bgfx .bgf.c{left:-2vw;top:60px;transform:scaleY(-1);width:min(34vw,380px);height:min(34vw,380px)}#bgfx .bgf.d{right:-2vw;top:60px;transform:scale(-1,-1);width:min(46vw,540px);height:min(46vw,540px)}
 @media (max-width:700px){#bgfx .bgf{opacity:.09}}
 #services .mint{background:transparent}
+
+.hp{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
+.ferr{display:none;margin:12px 0 0;padding:10px 14px;border-radius:8px;background:#fdecea;color:#8a1c14;font-weight:600}
+html.live .draftn{display:none}

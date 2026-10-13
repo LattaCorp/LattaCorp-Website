@@ -1,7 +1,13 @@
 {
   "name": "lattacorp-website",
+  "main": "src/worker.js",
   "compatibility_date": "2025-09-01",
   "assets": {
-    "directory": "./"
+    "directory": "./",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"]
+  },
+  "vars": {
+    "TO_EMAIL": "lattacorpofcentralfl@gmail.com"
   }
 }

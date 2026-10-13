@@ -1,5 +1,7 @@
 README.md
 tools
+src
+test
 wrangler.jsonc
 .assetsignore
 .git

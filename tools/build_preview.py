@@ -16,9 +16,9 @@ h=h.replace('<link rel="stylesheet" href="css/style.css">','<style>'+css+'</styl
 # scripts
 imgmap=json.loads(re.search(r'var IMG=(\{.*?\});',open(src+'/js/images.js').read(),re.S).group(1))
 imgjs='var IMG='+json.dumps({k:uri(v) for k,v in imgmap.items()})+';\n'
-js=imgjs+''.join(open(f'{src}/js/{n}.js').read()+'\n' for n in ('i18n','data','app'))
+js=imgjs+''.join(open(f'{src}/js/{n}.js').read()+'\n' for n in ('i18n','data','forms','app'))
 js=js.replace('assets/LattaCorp','site/LattaCorp')
-h=re.sub(r'<script src="js/images.js"></script>\s*<script src="js/i18n.js"></script>\s*<script src="js/data.js"></script>\s*<script src="js/app.js"></script>',lambda m:'<script>'+js+'</script>',h)
+h=re.sub(r'<script src="js/images.js"></script>\s*<script src="js/i18n.js"></script>\s*<script src="js/data.js"></script>\s*<script src="js/forms.js"></script>\s*<script src="js/app.js"></script>',lambda m:'<script>'+js+'</script>',h)
 h=re.sub(r'(src|href)="images/([^"]+)"',lambda m:'%s="%s"'%(m.group(1),uri('images/'+m.group(2))),h)
 h=h.replace('src="assets/','src="site/').replace('href="assets/','href="site/')
 open(out+'/index.html','w').write(h)
