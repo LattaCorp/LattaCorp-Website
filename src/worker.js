@@ -3,6 +3,8 @@
 // it emails them to the business through Resend. Settings: TO_EMAIL (wrangler.jsonc) and RESEND_API_KEY (a secret
 // set in the Cloudflare dashboard: Workers & Pages > lattacorp-website > Settings > Variables and Secrets).
 
+// Used if the TO_EMAIL setting is missing in Cloudflare.
+const DEFAULT_TO = "lattacorpofcentralfl@gmail.com";
 const KINDS = ["Quote request", "Service request", "Contact message", "Proposal request"];
 const MAX_FIELDS = 60, MAX_VALUE = 5000, MAX_PHOTOS = 8, MAX_PHOTO_BYTES = 4 * 1024 * 1024, MAX_TOTAL_BYTES = 24 * 1024 * 1024;
 
@@ -55,7 +57,7 @@ export async function handleSubmit(request, env) {
 
   const payload = {
     from: env.FROM_EMAIL || "Latta Corp Website <onboarding@resend.dev>",
-    to: [env.TO_EMAIL],
+    to: [env.TO_EMAIL || DEFAULT_TO],
     subject: `${kind}${name ? " from " + name.slice(0, 80) : ""}`.replace(/[\r\n]/g, " "),
     html,
   };
@@ -79,7 +81,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/api/health") {
       // Safe status check (shows whether the settings exist, never their values).
-      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), sendsTo: env.TO_EMAIL ? env.TO_EMAIL.replace(/^(.).*(@.*)$/, "$1***$2") : null });
+      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), sendsTo: (env.TO_EMAIL || DEFAULT_TO) ? (env.TO_EMAIL || DEFAULT_TO).replace(/^(.).*(@.*)$/, "$1***$2") : null });
     }
     if (url.pathname === "/api/submit") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
