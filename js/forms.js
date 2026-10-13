@@ -41,11 +41,15 @@ function shrinkImage(file){
   });
 }
 function formShowThanks(f,t){f.style.display="none";t.style.display="block";t.scrollIntoView({block:"center"});t.focus({preventScroll:true})}
-function formError(f,show){
+function formError(f,show,ref){
   var e=f.querySelector(".ferr");
   if(!e){e=document.createElement("p");e.className="ferr";e.setAttribute("role","alert");f.appendChild(e)}
   e.textContent=show?t("Sorry, something went wrong. Please try again or call or text 407-470-5309."):"";
+  if(show&&ref){var sm=document.createElement("small");sm.style.cssText="display:block;font-weight:400;opacity:.8;margin-top:4px";sm.textContent="Ref: "+ref;e.appendChild(sm)}
   e.style.display=show?"block":"none";
+}
+function fileToBase64(file){
+  return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(String(r.result).split(",")[1]||"")};r.onerror=rej;r.readAsDataURL(file)});
 }
 function submitForm(f,th,ev){
   ev.preventDefault();
@@ -53,20 +57,15 @@ function submitForm(f,th,ev){
   var btn=f.querySelector('button[type=submit]'),old=btn?btn.textContent:"";
   if(btn){btn.disabled=true;btn.textContent=t("Sending...")}
   formError(f,false);
-  var fd=new FormData();
-  fd.append("kind",FORM_KINDS[f.id]||"Form");
-  fd.append("lang",lang);
-  fd.append("lc_trap_7",(f.querySelector('input[name=lc_trap_7]')||{}).value||"");
-  fd.append("fields",JSON.stringify(formCollect(f)));
-  Promise.all(formPhotos(f).map(shrinkImage)).then(function(files){
-    files.forEach(function(x,i){fd.append("photo"+i,x,x.name||("photo"+i+".jpg"))});
-    return fetch("/api/submit",{method:"POST",body:fd});
+  var msg={kind:FORM_KINDS[f.id]||"Form",lang:lang,lc_trap_7:(f.querySelector('input[name=lc_trap_7]')||{}).value||"",fields:formCollect(f),photos:[]};
+  Promise.all(formPhotos(f).map(function(x){return shrinkImage(x).then(function(y){return fileToBase64(y).then(function(b){return {filename:y.name||"photo.jpg",content:b}})})})).then(function(photos){
+    msg.photos=photos;
+    return fetch("/api/submit",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(msg)});
   }).then(function(r){
-    if(!r.ok)throw new Error("send failed");
+    if(!r.ok)return r.text().then(function(tx){var e=new Error("send failed");e.ref=r.status+" "+tx.replace(/[\r\n]+/g," ").slice(0,80);throw e});
     if(f.id==="qf"){phs.forEach(function(o){URL.revokeObjectURL(o.u)});phs.length=0;renderPh()}
     formShowThanks(f,th);
-  }).catch(function(){formError(f,true)}).then(function(){if(btn){btn.disabled=false;btn.textContent=old}});
+  }).catch(function(e){formError(f,true,e&&e.ref||String(e&&e.message||e))}).then(function(){if(btn){btn.disabled=false;btn.textContent=old}});
 }
-
 // Hidden spam trap: real people never see or fill this box; bots usually do.
 ["qf","cf","ctf","hf"].forEach(function(id){var f=document.getElementById(id);if(!f)return;var d=document.createElement("div");d.className="hp";d.setAttribute("aria-hidden","true");d.innerHTML='<input name="lc_trap_7" tabindex="-1" autocomplete="off" data-lpignore="true" data-1p-ignore="true" data-form-type="other">';f.appendChild(d)});

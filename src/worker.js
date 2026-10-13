@@ -11,38 +11,35 @@ const MAX_FIELDS = 60, MAX_VALUE = 5000, MAX_PHOTOS = 8, MAX_PHOTO_BYTES = 4 * 1
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
 
-function toBase64(buf) {
-  const bytes = new Uint8Array(buf);
-  let bin = "";
-  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-  return btoa(bin);
-}
-
 export async function handleSubmit(request, env) {
-  let form;
-  try { form = await request.formData(); } catch { return json({ error: "bad request" }, 400); }
+  // The browser sends one JSON message: { kind, lang, lc_trap_7, fields: [...], photos: [{ filename, content (base64) }] }.
+  // Photos are encoded to base64 in the visitor's browser so this server code stays very light.
+  let data;
+  try { data = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  if (!data || typeof data !== "object") return json({ error: "bad request" }, 400);
 
   // Spam trap: a hidden box people never fill in.
-  if (String(form.get("lc_trap_7") || "").trim() !== "") { console.log("spam trap triggered; message dropped"); return json({ error: "rejected" }, 400); }
+  if (String(data.lc_trap_7 || "").trim() !== "") { console.log("spam trap triggered; message dropped"); return json({ error: "rejected" }, 400); }
 
-  const kind = String(form.get("kind") || "");
+  const kind = String(data.kind || "");
   if (!KINDS.includes(kind)) return json({ error: "bad kind" }, 400);
 
-  let fields;
-  try { fields = JSON.parse(String(form.get("fields") || "[]")); } catch { return json({ error: "bad fields" }, 400); }
+  let fields = data.fields;
   if (!Array.isArray(fields) || fields.length === 0 || fields.length > MAX_FIELDS) return json({ error: "bad fields" }, 400);
-  fields = fields.map((f) => ({ label: String(f.label || "").slice(0, 200), value: String(f.value || "").slice(0, MAX_VALUE) }));
+  fields = fields.map((f) => ({ label: String((f && f.label) || "").slice(0, 200), value: String((f && f.value) || "").slice(0, MAX_VALUE) }));
 
   const attachments = [];
   let total = 0;
-  for (const [key, val] of form.entries()) {
-    if (!/^photo\d+$/.test(key) || typeof val === "string") continue;
+  for (const ph of Array.isArray(data.photos) ? data.photos : []) {
     if (attachments.length >= MAX_PHOTOS) break;
-    if (!String(val.type).startsWith("image/") || val.size > MAX_PHOTO_BYTES) continue;
-    total += val.size;
+    const content = String((ph && ph.content) || "");
+    if (!/^[A-Za-z0-9+/=]+$/.test(content.slice(0, 200))) continue;
+    const bytes = Math.floor(content.length * 0.75);
+    if (bytes > MAX_PHOTO_BYTES) continue;
+    total += bytes;
     if (total > MAX_TOTAL_BYTES) break;
-    const name = (val.name || "photo.jpg").replace(/[^\w.\- ]/g, "_").slice(0, 80);
-    attachments.push({ filename: name, content: toBase64(await val.arrayBuffer()) });
+    const name = String((ph && ph.filename) || "photo.jpg").replace(/[^\w.\- ]/g, "_").slice(0, 80);
+    attachments.push({ filename: name, content });
   }
 
   const pick = (re) => (fields.find((f) => re.test(f.label)) || {}).value || "";
@@ -52,7 +49,7 @@ export async function handleSubmit(request, env) {
 
   const rows = fields.map((f) => `<tr><td style="padding:6px 12px 6px 0;vertical-align:top;color:#555"><b>${esc(f.label)}</b></td><td style="padding:6px 0;white-space:pre-wrap">${esc(f.value)}</td></tr>`).join("");
   const html = `<div style="font-family:Arial,sans-serif;font-size:15px"><h2 style="color:#1b552b;margin:0 0 12px">${esc(kind)}</h2><table>${rows}</table>`
-    + `<p style="color:#777;margin-top:16px">Sent from the Latta Corp website (${esc(String(form.get("lang") || "en") === "es" ? "Spanish" : "English")} page)`
+    + `<p style="color:#777;margin-top:16px">Sent from the Latta Corp website (${esc(String(data.lang || "en") === "es" ? "Spanish" : "English")} page)`
     + `${attachments.length ? `, with ${attachments.length} photo${attachments.length > 1 ? "s" : ""} attached` : ""}.</p></div>`;
 
   const payload = {
