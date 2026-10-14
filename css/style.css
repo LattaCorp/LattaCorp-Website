@@ -146,7 +146,6 @@ header .brand.hc::before,header .brand.hc::after{content:"";position:absolute;to
 header .brand.hc::before{left:calc(-1 * clamp(14px,2vw,32px))}header .brand.hc::after{right:calc(-1 * clamp(14px,2vw,32px))}}
 
 #bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-#bgfx .bgl{position:absolute;inset:0;background:url(../assets/leaves.svg) center/cover no-repeat;opacity:.075}
 #bgfx .bgL{position:absolute;left:50%;top:50%;width:min(110vh,150vw);height:min(110vh,150vw);transform:translate(-50%,-50%);background:url(../assets/bg-L.png) center/contain no-repeat;opacity:.062}
 #sides{background:transparent;position:relative}footer{position:relative;z-index:1}
 .band{background:rgba(239,248,236,.8)}#shell{background:transparent}
