@@ -446,3 +446,16 @@ body{padding-bottom:72px}}
 html.rvon .rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
 html.rvon .rv.in{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.page.on{animation:none}html.rvon .rv{opacity:1;transform:none;transition:none}.btn:hover{transform:none}.pfb:hover img{transform:none}}
+
+/* Hero with slow photo slideshow */
+.hero{position:relative;overflow:hidden;padding:64px 0 72px;background:#cfe6c8}
+.heroslides{position:absolute;inset:0}
+.heroslides i{position:absolute;inset:0;background-size:cover;background-position:center;opacity:0;transform:scale(1.04);transition:opacity 1.6s ease}
+.heroslides i.on{opacity:1;animation:kb 9s ease-out both}
+@keyframes kb{from{transform:scale(1.04)}to{transform:scale(1.12)}}
+.hero .herocard{position:relative;max-width:640px;padding:34px 34px 38px;border-radius:28px;background:rgba(255,255,255,.93);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);box-shadow:0 18px 50px rgba(10,40,20,.28)}
+.hero .herolic{position:static;display:flex;width:max-content;margin:0 auto 14px}
+.hero .herocard p{margin-top:18px}
+@media (max-width:720px){.hero{padding:34px 0 44px}.hero .herocard{margin:0 16px;padding:24px 20px 28px;border-radius:22px}}
+@media (prefers-reduced-motion:reduce){.heroslides i{transition:none}.heroslides i.on{animation:none;transform:none}}
+.hero .herocard p{color:#3f4d43}.hero .herocard p.sm a{color:var(--forest)}

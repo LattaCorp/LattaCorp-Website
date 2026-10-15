@@ -118,3 +118,13 @@ var els=document.querySelectorAll("main.page > section, main.page > div > sectio
 for(var i=0;i<els.length;i++){els[i].classList.add("rv");io.observe(els[i])}
 document.documentElement.classList.add("rvon");
 }catch(e){}})();
+
+/* Hero photo slideshow */
+(function(){try{
+var el=document.querySelector(".heroslides");if(!el||typeof IMG==="undefined")return;
+var keys=["wide","fence","street","bed1"],sl=el.children,cur=0;
+for(var i=0;i<sl.length&&i<keys.length;i++){if(IMG[keys[i]])sl[i].style.backgroundImage="url("+IMG[keys[i]]+")"}
+sl[0].className="on";
+if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;
+setInterval(function(){if(document.hidden)return;sl[cur].className="";cur=(cur+1)%sl.length;sl[cur].className="on"},6500);
+}catch(e){}})();
