@@ -1,6 +1,6 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
-"Live in a community whose HOA hires us?": "¿Vive en una comunidad cuya HOA nos contrata?",
+"Live in a community we service?": "¿Vive en una comunidad que atendemos?",
 "For questions, comments, or concerns about the lawn service we provide for your community, please use our Service Requests page.": "Para preguntas, comentarios o inquietudes sobre el servicio de césped que brindamos a su comunidad, use nuestra página de Solicitudes de servicio.",
 "Go to Service Requests": "Ir a Solicitudes de servicio",
 "A note from Matteo": "Una nota de Matteo",
