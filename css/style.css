@@ -477,7 +477,6 @@ html.rvon .rv.in{opacity:1;transform:none}
 .sidegrid .sgmain{grid-area:main;max-width:none}.sidegrid .skipmid{grid-area:skip}.sidegrid .mnote{grid-area:note}
 .sidegrid .skipmid{padding:22px 24px}.sidegrid .skipmid h2{font-size:clamp(1.4rem,2.4vw,1.8rem)}
 .mnote.mside{margin:26px 0 0}
-@media (min-width:901px){.sidegrid .skipmid,.sidegrid .mnote{position:sticky;top:96px}.sidegrid .mnote{top:auto;position:static}}
 @media (max-width:900px){.sidegrid{grid-template-columns:1fr;grid-template-areas:"skip" "main" "note";gap:20px}}
 .sidegrid{grid-template-rows:auto 1fr}
 @media (max-width:900px){.sidegrid{grid-template-rows:none}.sidegrid .skipmid{padding:14px 16px}.sidegrid .skipmid h2{font-size:1.4rem}.sidegrid .skipmid .skipi{width:34px;height:34px;font-size:1.1rem}.sidegrid .skipmid .skipl{font-size:1rem;margin-top:.4em}.sidegrid .skipmid .skipl+p{display:none}}
