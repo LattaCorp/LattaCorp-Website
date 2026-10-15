@@ -1,5 +1,8 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"Live in a community whose HOA hires us?": "¿Vive en una comunidad cuya HOA nos contrata?",
+"For questions, comments, or concerns about the lawn service we provide for your community, please use our Service Requests page.": "Para preguntas, comentarios o inquietudes sobre el servicio de césped que brindamos a su comunidad, use nuestra página de Solicitudes de servicio.",
+"Go to Service Requests": "Ir a Solicitudes de servicio",
 "A note from Matteo": "Una nota de Matteo",
 "At LattaCorp, we pride ourselves on good communication and happy customers.": "En LattaCorp, nos enorgullecemos de la buena comunicación y de tener clientes satisfechos.",
 "When you reach out, you'll hear back from me directly. We'll tell you what we're going to do and when we'll be there, and we'll keep you in the loop if anything changes.": "Cuando se comunique con nosotros, yo mismo le responderé. Le diremos qué vamos a hacer y cuándo llegaremos, y le mantendremos informado si algo cambia.",
