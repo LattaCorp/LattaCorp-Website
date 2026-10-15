@@ -1,6 +1,7 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
 "Call": "Llamar",
+"Photos of our work": "Fotos de nuestro trabajo",
 "Text": "Enviar texto",
 "Sorry, something went wrong. Please try again or call or text 407-470-5309.": "Lo sentimos, algo salió mal. Inténtelo de nuevo o llame o envíe un mensaje de texto al 407-470-5309.",
 "Sending...": "Enviando...",

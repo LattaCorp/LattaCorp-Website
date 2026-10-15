@@ -119,12 +119,18 @@ for(var i=0;i<els.length;i++){els[i].classList.add("rv");io.observe(els[i])}
 document.documentElement.classList.add("rvon");
 }catch(e){}})();
 
-/* Hero photo slideshow */
+/* Cycling photo banner on the home page */
 (function(){try{
-var el=document.querySelector(".heroslides");if(!el||typeof IMG==="undefined")return;
-var keys=["wide","fence","street","bed1"],sl=el.children,cur=0;
-for(var i=0;i<sl.length&&i<keys.length;i++){if(IMG[keys[i]])sl[i].style.backgroundImage="url("+IMG[keys[i]]+")"}
-sl[0].className="on";
-if(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches)return;
-setInterval(function(){if(document.hidden)return;sl[cur].className="";cur=(cur+1)%sl.length;sl[cur].className="on"},6500);
+var c=document.getElementById("cyc");if(!c)return;
+var im=c.querySelectorAll("img"),dots=c.querySelectorAll(".cdots i"),cur=0,timer=null,paused=false;
+function show(n){im[cur].classList.remove("on");dots[cur].classList.remove("on");cur=(n+im.length)%im.length;im[cur].classList.add("on");dots[cur].classList.add("on")}
+c.querySelector(".cprev").addEventListener("click",function(){show(cur-1);restart()});
+c.querySelector(".cnext").addEventListener("click",function(){show(cur+1);restart()});
+function restart(){clearInterval(timer);if(reduce)return;timer=setInterval(function(){if(!paused&&!document.hidden)show(cur+1)},5500)}
+var reduce=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;
+c.addEventListener("mouseenter",function(){paused=true});c.addEventListener("mouseleave",function(){paused=false});
+c.addEventListener("focusin",function(){paused=true});c.addEventListener("focusout",function(){paused=false});
+var x0=null;c.addEventListener("touchstart",function(e){x0=e.touches[0].clientX},{passive:true});
+c.addEventListener("touchend",function(e){if(x0===null)return;var d=e.changedTouches[0].clientX-x0;if(Math.abs(d)>40){show(cur+(d<0?1:-1));restart()}x0=null});
+restart();
 }catch(e){}})();
