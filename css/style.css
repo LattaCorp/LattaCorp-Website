@@ -481,3 +481,9 @@ html.rvon .rv.in{opacity:1;transform:none}
 @media (max-width:900px){.sidegrid{grid-template-columns:1fr;grid-template-areas:"skip" "main" "note";gap:20px}}
 .sidegrid{grid-template-rows:auto 1fr}
 @media (max-width:900px){.sidegrid{grid-template-rows:none}.sidegrid .skipmid{padding:14px 16px}.sidegrid .skipmid h2{font-size:1.4rem}.sidegrid .skipmid .skipi{width:34px;height:34px;font-size:1.1rem}.sidegrid .skipmid .skipl{font-size:1rem;margin-top:.4em}.sidegrid .skipmid .skipl+p{display:none}}
+
+/* Contact: info + note | form (centered) | service area */
+.cgrid3{max-width:1260px;grid-template-columns:minmax(0,1fr) minmax(0,1.15fr) minmax(0,1fr);gap:36px}
+.cgrid3 .carea .smap{margin:0}
+.cgrid3 .mnote.mside{margin-top:22px}
+@media (max-width:1050px){.cgrid3{grid-template-columns:1fr;max-width:640px;gap:28px}}
