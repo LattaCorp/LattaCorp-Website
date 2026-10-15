@@ -459,3 +459,15 @@ html.rvon .rv.in{opacity:1;transform:none}
 .cdots i.on{background:#fff;transform:scale(1.25)}
 @media (max-width:720px){.cyc{aspect-ratio:4/3}.cyc button{opacity:.9;width:36px;height:36px;font-size:24px}.banner img{aspect-ratio:auto}}
 @media (prefers-reduced-motion:reduce){.cyc img{transition:none}}
+
+/* Note from Matteo + "Skip the middle man" callout */
+.mnotes{padding:36px 0 0}.skipsec{padding:36px 0 0}
+.mnote{background:#fff;border:1px solid var(--line);border-left:6px solid var(--leaf);border-radius:10px;padding:22px 26px;box-shadow:0 6px 20px rgba(27,85,43,.08)}
+.mnote h2{font-size:1.25rem;margin:0 0 .5em;color:var(--forest)}
+.mnote p{margin:0 0 .7em}.mnote .msig{margin:.9em 0 0;font-style:italic;color:var(--forest);font-weight:600}
+.skipmid{background:var(--forest);color:#fff;border-radius:14px;padding:26px 30px;text-align:center;box-shadow:0 10px 28px rgba(27,85,43,.3);border:3px solid #f2c94c}
+.skiph{display:flex;align-items:center;justify-content:center;gap:12px}
+.skipmid h2{color:#fff;font-size:clamp(1.6rem,5vw,2.2rem);margin:0;line-height:1.15}
+.skipi{display:inline-flex;width:44px;height:44px;border-radius:50%;background:#f2c94c;color:var(--forest);align-items:center;justify-content:center;font-size:1.4rem}
+.skipmid p{margin:.6em auto 0;max-width:44ch;font-size:1.05rem;color:#fff}.skipmid .skipl{font-weight:700;font-size:1.2rem;color:#f2c94c}
+@media (max-width:720px){.mnote{padding:18px 18px}.skipmid{padding:22px 18px}}

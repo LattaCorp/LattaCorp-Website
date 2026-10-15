@@ -1,5 +1,13 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"A note from Matteo": "Una nota de Matteo",
+"At LattaCorp, we pride ourselves on good communication and happy customers.": "En LattaCorp, nos enorgullecemos de la buena comunicación y de tener clientes satisfechos.",
+"When you reach out, you'll hear back from me directly. We'll tell you what we're going to do and when we'll be there, and we'll keep you in the loop if anything changes.": "Cuando se comunique con nosotros, yo mismo le responderé. Le diremos qué vamos a hacer y cuándo llegaremos, y le mantendremos informado si algo cambia.",
+"If something isn't right, tell us and we'll make it right.": "Si algo no está bien, díganoslo y lo corregiremos.",
+"Matteo Latalladi, Owner": "Matteo Latalladi, Propietario",
+"Skip the middle man": "Sin intermediarios",
+"No lengthy, time-consuming HOA service requests.": "Sin largas solicitudes de servicio a la HOA que consumen tiempo.",
+"Send your issue straight to us and we'll handle it directly, hassle-free.": "Envíenos su problema directamente y nosotros lo resolveremos, sin complicaciones.",
 "Call": "Llamar",
 "Photos of our work": "Fotos de nuestro trabajo",
 "Text": "Enviar texto",
