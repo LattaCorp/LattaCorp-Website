@@ -428,3 +428,10 @@ header .wrap.hgrid{gap:clamp(18px,2.4vw,36px);padding-left:20px;padding-right:20
 .hp{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
 .ferr{display:none;margin:12px 0 0;padding:10px 14px;border-radius:8px;background:#fdecea;color:#8a1c14;font-weight:600}
 html.live .draftn{display:none}
+
+.stickycall{display:none}
+@media (max-width:700px){
+.stickycall{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:900;gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:rgba(255,255,255,.96);box-shadow:0 -2px 14px rgba(0,0,0,.14)}
+.stickycall a{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border-radius:999px;font:700 17px/1 Lora,Georgia,serif;text-decoration:none}
+.sc-call{background:var(--forest);color:#fff}.sc-text{background:#fff;color:var(--forest);border:2px solid var(--forest)}
+body{padding-bottom:72px}}
