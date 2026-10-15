@@ -109,3 +109,12 @@ t.querySelector("[data-again]").addEventListener("click",function(){f.reset();t.
 [["hf","t-hf"]].forEach(function(a){var f=document.getElementById(a[0]),t=document.getElementById(a[1]);f.addEventListener("submit",function(e){submitForm(f,t,e)});t.querySelector("[data-again]").addEventListener("click",function(){f.reset();t.style.display="none";f.style.display="";var x=f.querySelector("input,select,textarea");if(x)x.focus()})});
 document.querySelector("#hf select").addEventListener("change",function(){this.dataset.manual="1"});
 document.getElementById("hf").addEventListener("reset",function(){var sl=this.querySelector("select");if(sl)delete sl.dataset.manual});
+
+/* Fade sections in as they scroll into view (skipped if the browser can't do it or the visitor prefers less motion) */
+(function(){try{
+if(!("IntersectionObserver" in window)||(window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches))return;
+var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add("in");io.unobserve(e.target)}})},{threshold:.08,rootMargin:"0px 0px -4% 0px"});
+var els=document.querySelectorAll("main.page > section, main.page > div > section, footer");
+for(var i=0;i<els.length;i++){els[i].classList.add("rv");io.observe(els[i])}
+document.documentElement.classList.add("rvon");
+}catch(e){}})();

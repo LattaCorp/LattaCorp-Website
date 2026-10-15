@@ -435,3 +435,14 @@ html.live .draftn{display:none}
 .stickycall a{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;min-height:48px;border-radius:999px;font:700 17px/1 Lora,Georgia,serif;text-decoration:none}
 .sc-call{background:var(--forest);color:#fff}.sc-text{background:#fff;color:var(--forest);border:2px solid var(--forest)}
 body{padding-bottom:72px}}
+
+/* Smooth transitions */
+@keyframes pgin{from{opacity:0}to{opacity:1}}
+.page.on{animation:pgin .4s ease both}
+.btn,.storycard,.card,.pfb,.hnav a,footer a{transition:background-color .25s ease,color .25s ease,border-color .25s ease,box-shadow .25s ease,transform .25s ease,opacity .25s ease}
+.btn:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(27,85,43,.22)}
+.btn:active{transform:translateY(0);box-shadow:none}
+.pfb img{transition:transform .5s ease,opacity .25s ease}.pfb:hover img{transform:scale(1.04)}
+html.rvon .rv{opacity:0;transform:translateY(22px);transition:opacity .7s ease,transform .7s ease}
+html.rvon .rv.in{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.page.on{animation:none}html.rvon .rv{opacity:1;transform:none;transition:none}.btn:hover{transform:none}.pfb:hover img{transform:none}}
