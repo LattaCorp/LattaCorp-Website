@@ -459,3 +459,16 @@ html.rvon .rv.in{opacity:1;transform:none}
 @media (max-width:720px){.hero{padding:34px 0 44px}.hero .herocard{margin:0 16px;padding:24px 20px 28px;border-radius:22px}}
 @media (prefers-reduced-motion:reduce){.heroslides i{transition:none}.heroslides i.on{animation:none;transform:none}}
 .hero .herocard p{color:#3f4d43}.hero .herocard p.sm a{color:var(--forest)}
+
+/* Hero v2: compact logo plate, photo stays visible, text sits on the photo */
+.hero{padding:44px 0 52px}
+.hero .herocard{background:none;box-shadow:none;-webkit-backdrop-filter:none;backdrop-filter:none;padding:0;max-width:760px;border-radius:0}
+.hero .herologo{display:block;width:max-content;max-width:100%;margin:0 auto;padding:18px 30px 20px;border-radius:22px;background:rgba(255,255,255,.9);box-shadow:0 14px 40px rgba(10,40,20,.3)}
+.hero .herolic{margin:0 auto 10px}
+.hero .big{width:min(520px,100%)}
+.hero .herocard p{color:#fff;text-shadow:0 1px 3px rgba(0,0,0,.65),0 0 18px rgba(0,0,0,.35);font-weight:500;margin-top:22px}
+.hero .herocard p.sm{color:#fff}.hero .herocard p.sm a{color:#fff;text-decoration:underline}
+.hero .btn.alt{background:rgba(255,255,255,.95)}
+@media (max-width:720px){.hero{padding:26px 0 34px}.hero .herologo{margin:0 16px;width:auto;padding:14px 16px 16px;border-radius:18px}.hero .herocard{margin:0}}
+.hero .herologo{width:min(540px,100%)}.hero .big{width:100%}
+@media (max-width:720px){.hero .herologo{width:auto}}
