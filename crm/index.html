@@ -16,6 +16,7 @@
 <style>
 :root{--forest:#1b552b;--leaf:#4fb85a;--mint:#eff8ec;--ink:#1c2a20;--muted:#58675c;--line:#dfe8dc;--gold:#f2c94c;--red:#b3261e}
 *{box-sizing:border-box}
+[hidden]{display:none!important}
 body{margin:0;background:#f5f8f4;color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 header{background:var(--forest);color:#fff;padding:env(safe-area-inset-top) 16px 0 0;min-height:76px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:15;box-shadow:0 2px 10px rgba(0,0,0,.18)}
 .brandbar{display:flex;align-items:center;gap:0;text-decoration:none;flex:none;align-self:stretch}
@@ -92,6 +93,8 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 .chip.hoa{background:#e3eefc;color:#1d4f91}.chip.commercial{background:#f1e6fa;color:#5b2a86}
 .row.client{border-left-color:var(--forest)}.row.client.archived{opacity:.6;border-left-color:#bbb}
 .top{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.top .bar{flex:1;margin:0;min-width:200px}
+.cwstop{padding:14px 16px}.cwstop.isdone{opacity:.6}.cwtitle{font-weight:800;font-size:1.1rem;color:var(--forest)}.cwaddr{font-size:1.05rem;margin:2px 0 4px}.cwstop .acts .btn{padding:12px 20px;font-size:1.05rem}
+#crewapp h2{margin:4px 0 0;color:var(--forest)}
 .top:has(#topbtns:empty){display:none}
 .calnav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}.calnav b{font-size:1.1rem;color:var(--forest);flex:0 1 auto}
 .daysum{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 10px}
@@ -157,6 +160,8 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
   <div class="list" id="list" style="margin-top:12px"></div>
 </main>
 </div>
+
+<main id="crewapp" hidden></main>
 
 <div id="detail" role="dialog" aria-modal="true"><div class="panel" id="panel"></div></div>
 

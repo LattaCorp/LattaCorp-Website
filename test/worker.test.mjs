@@ -35,4 +35,37 @@ globalThis.fetch = async (url) => String(url).includes("/rest/v1/leads") ? new R
 r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
 globalThis.fetch = async (url) => String(url).includes("/rest/v1/leads") ? new Response("bad", { status: 500 }) : new Response("{}", { status: 200 });
 r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
+
+// ---- crew login endpoint ----
+const CID = "11111111-1111-4111-8111-111111111111", UID = "22222222-2222-4222-8222-222222222222";
+let calls = [], crewRow = { id: CID, user_id: null }, ownerToken = "good-owner", staffEmails = ["owner@example.com"];
+globalThis.fetch = async (url, opts = {}) => {
+  url = String(url); calls.push({ url, opts });
+  if (url.endsWith("/auth/v1/user")) { const t = (opts.headers.Authorization || "").replace("Bearer ", ""); return t === ownerToken ? new Response(JSON.stringify({ email: "Owner@Example.com" })) : t === "crew-token" ? new Response(JSON.stringify({ email: "luis@example.com" })) : new Response("{}", { status: 401 }); }
+  if (url.includes("/rest/v1/staff")) { const e = decodeURIComponent(url.split("email=ilike.")[1]); return new Response(JSON.stringify(staffEmails.filter((x) => x.toLowerCase() === e.toLowerCase()).map((email) => ({ email })))); }
+  if (url.includes("/rest/v1/crew") && (opts.method || "GET") === "GET") return new Response(JSON.stringify(crewRow ? [crewRow] : []));
+  if (url.includes("/rest/v1/crew") && opts.method === "PATCH") return new Response(null, { status: 204 });
+  if (url.endsWith("/auth/v1/admin/users") && opts.method === "POST") { const b = JSON.parse(opts.body); return b.email === "dup@example.com" ? new Response(JSON.stringify({ msg: "A user with this email address has already been registered" }), { status: 422 }) : new Response(JSON.stringify({ id: UID, email: b.email })); }
+  if (url.includes("/auth/v1/admin/users/")) return new Response("{}", { status: 200 });
+  return new Response("{}", { status: 200 });
+};
+const cl = (body, token = ownerToken, method = "POST") => new Request("https://x.test/api/crew-login", { method, headers: { "content-type": "application/json", ...(token ? { authorization: "Bearer " + token } : {}) }, body: method === "POST" ? JSON.stringify(body) : undefined });
+r = await worker.fetch(cl({ action: "create", crew_id: CID, email: "luis@example.com", password: "longenough1" }, null), env); assert.equal(r.status, 403, "no token refused");
+r = await worker.fetch(cl({ action: "create", crew_id: CID, email: "luis@example.com", password: "longenough1" }, "crew-token"), env); assert.equal(r.status, 403, "crew member cannot create logins");
+r = await worker.fetch(cl({}, ownerToken, "GET"), env); assert.equal(r.status, 405);
+r = await worker.fetch(cl({ action: "create", crew_id: "nope", email: "a@b.co", password: "longenough1" }), env); assert.equal(r.status, 400);
+r = await worker.fetch(cl({ action: "create", crew_id: CID, email: "luis@example.com", password: "short" }), env); assert.equal(r.status, 400);
+r = await worker.fetch(cl({ action: "create", crew_id: CID, email: "owner@example.com", password: "longenough1" }), env); assert.equal(r.status, 400, "owner email refused");
+r = await worker.fetch(cl({ action: "create", crew_id: CID, email: "dup@example.com", password: "longenough1" }), env); assert.equal(r.status, 400); assert((await r.json()).error.includes("already"));
+calls = [];
+r = await worker.fetch(cl({ action: "create", crew_id: CID, email: "Luis@Example.com", password: "longenough1" }), env); assert.equal(r.status, 200);
+const mkUser = calls.find((c) => c.url.endsWith("/auth/v1/admin/users")); assert.equal(JSON.parse(mkUser.opts.body).email, "luis@example.com"); assert.equal(JSON.parse(mkUser.opts.body).email_confirm, true);
+const patch = calls.find((c) => c.opts.method === "PATCH"); assert.deepEqual(JSON.parse(patch.opts.body), { kind: "login", user_id: UID, email: "luis@example.com" });
+crewRow = { id: CID, user_id: UID };
+r = await worker.fetch(cl({ action: "create", crew_id: CID, email: "x@y.co", password: "longenough1" }), env); assert.equal(r.status, 409);
+r = await worker.fetch(cl({ action: "reset", crew_id: CID, password: "newpassword9" }), env); assert.equal(r.status, 200);
+calls = []; r = await worker.fetch(cl({ action: "remove", crew_id: CID }), env); assert.equal(r.status, 200);
+assert(calls.some((c) => c.opts.method === "DELETE" && c.url.includes("/auth/v1/admin/users/" + UID)), "auth user deleted");
+assert.deepEqual(JSON.parse(calls.find((c) => c.opts.method === "PATCH").opts.body), { kind: "temp", user_id: null, email: "" });
+crewRow = { id: CID, user_id: null }; r = await worker.fetch(cl({ action: "reset", crew_id: CID, password: "newpassword9" }), env); assert.equal(r.status, 400);
 console.log("all worker checks passed");

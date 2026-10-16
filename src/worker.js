@@ -7,6 +7,8 @@
 const DEFAULT_TO = "lattacorpofcentralfl@gmail.com";
 // The CRM database (Supabase). The URL is public; the secret key SUPABASE_SECRET_KEY is set in Cloudflare (Settings > Variables and Secrets).
 const DEFAULT_SUPABASE_URL = "https://lvaofwtfxwlqwvzesckt.supabase.co";
+// Public (browser-safe) key, the same one in crm/config.js. Used only to ask Supabase who a signed-in person is.
+const PUBLISHABLE_KEY = "sb_publishable_1N8kZ8Zk5YvMA0W8Fzpsnw_jWvkrVlK";
 const KINDS = ["Quote request", "Service request", "Contact message", "Proposal request"];
 const MAX_FIELDS = 60, MAX_VALUE = 5000, MAX_PHOTOS = 8, MAX_PHOTO_BYTES = 4 * 1024 * 1024, MAX_TOTAL_BYTES = 24 * 1024 * 1024;
 
@@ -100,6 +102,72 @@ export async function handleSubmit(request, env) {
   return json({ ok: true });
 }
 
+// ---- Crew logins: the owner creates / resets / removes a crew member's login from inside the CRM. ----
+// The caller must be signed in to the CRM as the owner (their email is on the staff list). The secret key never leaves this server.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const baseUrl = (env) => env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
+const adminHeaders = (env) => ({ apikey: env.SUPABASE_SECRET_KEY, Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`, "content-type": "application/json" });
+const errText = async (res) => { try { const j = await res.json(); return String(j.msg || j.message || j.error_description || j.error || res.status).slice(0, 200); } catch { return String(res.status); } };
+
+async function callerIsOwner(request, env) {
+  const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+  if (!token) return false;
+  try {
+    const u = await fetch(`${baseUrl(env)}/auth/v1/user`, { headers: { apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${token}` } });
+    if (!u.ok) return false;
+    const email = String((await u.json()).email || "").toLowerCase();
+    if (!email) return false;
+    return await emailOnStaff(env, email);
+  } catch { return false; }
+}
+async function emailOnStaff(env, email) {
+  const res = await fetch(`${baseUrl(env)}/rest/v1/staff?select=email&email=ilike.${encodeURIComponent(email)}`, { headers: { apikey: env.SUPABASE_SECRET_KEY } });
+  if (!res.ok) return false;
+  return (await res.json()).some((r) => String(r.email).toLowerCase() === email.toLowerCase());
+}
+
+export async function handleCrewLogin(request, env) {
+  if (!env.SUPABASE_SECRET_KEY) return json({ error: "The CRM key is not set up on the server." }, 500);
+  if (!(await callerIsOwner(request, env))) return json({ error: "Not allowed." }, 403);
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const action = String((d && d.action) || ""), crewId = String((d && d.crew_id) || "");
+  if (!UUID.test(crewId)) return json({ error: "bad crew member" }, 400);
+  const base = baseUrl(env), H = adminHeaders(env);
+  const cr = await fetch(`${base}/rest/v1/crew?select=id,user_id&id=eq.${crewId}`, { headers: { apikey: env.SUPABASE_SECRET_KEY } });
+  if (!cr.ok) return json({ error: "Could not look up that crew member. Did you run the Stage 4 SQL?" }, 502);
+  const row = (await cr.json())[0];
+  if (!row) return json({ error: "Crew member not found." }, 404);
+  const password = String((d && d.password) || "");
+  const setCrew = (patch) => fetch(`${base}/rest/v1/crew?id=eq.${crewId}`, { method: "PATCH", headers: { ...H, Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+
+  if (action === "create") {
+    const email = String(d.email || "").trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "Enter a valid email." }, 400);
+    if (password.length < 8 || password.length > 72) return json({ error: "Password must be 8 to 72 characters." }, 400);
+    if (row.user_id) return json({ error: "This person already has a login." }, 409);
+    if (await emailOnStaff(env, email)) return json({ error: "That email belongs to the owner account. Use a different one." }, 400);
+    const cu = await fetch(`${base}/auth/v1/admin/users`, { method: "POST", headers: H, body: JSON.stringify({ email, password, email_confirm: true }) });
+    if (!cu.ok) return json({ error: await errText(cu) }, 400);
+    const user = await cu.json();
+    const up = await setCrew({ kind: "login", user_id: user.id, email });
+    if (!up.ok) { await fetch(`${base}/auth/v1/admin/users/${user.id}`, { method: "DELETE", headers: H }); return json({ error: "Could not link the login. Did you run the Stage 4 SQL?" }, 502); }
+    return json({ ok: true });
+  }
+  if (!row.user_id) return json({ error: "This person has no login." }, 400);
+  if (action === "reset") {
+    if (password.length < 8 || password.length > 72) return json({ error: "Password must be 8 to 72 characters." }, 400);
+    const r = await fetch(`${base}/auth/v1/admin/users/${row.user_id}`, { method: "PUT", headers: H, body: JSON.stringify({ password }) });
+    return r.ok ? json({ ok: true }) : json({ error: await errText(r) }, 400);
+  }
+  if (action === "remove") {
+    const r = await fetch(`${base}/auth/v1/admin/users/${row.user_id}`, { method: "DELETE", headers: H });
+    if (!r.ok && r.status !== 404) return json({ error: await errText(r) }, 400);
+    await setCrew({ kind: "temp", user_id: null, email: "" });
+    return json({ ok: true });
+  }
+  return json({ error: "bad action" }, 400);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -110,6 +178,10 @@ export default {
     if (url.pathname === "/api/submit") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handleSubmit(request, env);
+    }
+    if (url.pathname === "/api/crew-login") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      return handleCrewLogin(request, env);
     }
     return env.ASSETS.fetch(request);
   },
