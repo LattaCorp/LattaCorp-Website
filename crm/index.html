@@ -19,7 +19,7 @@
 body{margin:0;background:#f5f8f4;color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 header{background:var(--forest);color:#fff;padding:calc(8px + env(safe-area-inset-top)) 16px 8px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:15;box-shadow:0 2px 10px rgba(0,0,0,.18)}
 .brandbar{display:flex;align-items:center;gap:10px;text-decoration:none;flex:none}
-.brandbar .tree{height:56px;width:auto;display:block}.brandbar .word{height:32px;width:auto;display:block}
+.brandbar{gap:14px}.brandbar .tree{height:64px;width:auto;display:block;filter:drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff)}.brandbar .word{height:44px;width:auto;display:block}
 .gsearch{flex:1;max-width:560px;margin:0 auto;position:relative}
 .gsearch input{background:rgba(255,255,255,.96);border:0;border-radius:999px;padding:11px 18px 11px 42px;font-size:1rem;box-shadow:inset 0 1px 3px rgba(0,0,0,.12);background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='%231b552b' stroke-width='2.4' stroke-linecap='round'%3E%3Ccircle cx='11' cy='11' r='7'/%3E%3Cpath d='m20 20-3.5-3.5'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:15px center}
 .gsearch input:focus{outline:3px solid rgba(242,201,76,.8)}
@@ -33,7 +33,7 @@ header{background:var(--forest);color:#fff;padding:calc(8px + env(safe-area-inse
 .hbtns{display:flex;gap:8px;flex:none}
 header button.hb{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
 header button.hb:hover{background:rgba(255,255,255,.26)}
-@media(max-width:700px){header{flex-wrap:wrap;gap:8px 10px}.brandbar{order:1}.brandbar .tree{height:38px}.brandbar .word{height:21px}.hbtns{order:2;margin-left:auto}.gsearch{order:3;flex:1 1 100%;max-width:none}}
+@media(max-width:700px){header{flex-wrap:wrap;gap:8px 10px}.brandbar{order:1}.brandbar{gap:10px}.brandbar .tree{height:46px}.brandbar .word{height:28px}header button.hb{padding:6px 9px;font-size:.88rem}.hbtns{order:2;margin-left:auto}.gsearch{order:3;flex:1 1 100%;max-width:none}}
 main{max-width:1000px;margin:0 auto;padding:16px}
 .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(27,85,43,.06)}
 button,input,select,textarea{font:inherit}
@@ -95,7 +95,7 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 </head>
 <body>
 <header>
-  <a class="brandbar" href="./" aria-label="Latta Corp CRM home"><img class="tree" src="../images/logo-tree-footer.png" alt=""><img class="word" src="../images/logo-wordmark-footer.svg" alt="Latta Corp"></a>
+  <a class="brandbar" href="./" aria-label="Latta Corp CRM home"><img class="tree" src="../images/logo-tree-header.png" alt=""><img class="word" src="../images/logo-wordmark-header.svg" alt="Latta Corp"></a>
   <div class="gsearch" id="gsearch" hidden><input id="gs" type="search" placeholder="Search clients, addresses, or jobs (lawn maintenance, trimming...)" aria-label="Search clients, addresses and jobs" autocomplete="off"><div id="gres" role="listbox"></div></div>
   <div class="hbtns"><button class="hb" id="refresh" hidden>Refresh</button><button class="hb" id="signout" hidden>Sign out</button></div>
 </header>
