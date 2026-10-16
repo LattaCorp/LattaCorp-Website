@@ -502,3 +502,17 @@ html.rvon .rv.in{opacity:1;transform:none}
 .trust li{display:flex;align-items:center;gap:8px;color:var(--forest);font-weight:600;font-size:.98rem}.trust svg{width:22px;height:22px;flex:none;color:var(--leaf)}
 @media (max-width:1000px){.quick{grid-template-columns:1fr 1fr}.quick .qq-h{grid-column:1/-1}.quick .btn{grid-column:1/-1}}
 @media (max-width:560px){.quick{grid-template-columns:1fr;padding:16px 16px}.trust{flex-direction:column;align-items:flex-start;gap:8px;margin-left:8px}}
+
+/* Home row: quick quote on the left, community notice as a right-hand column */
+.homerow{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:24px;align-items:stretch;margin-bottom:28px}
+.homerow .hr-main{display:flex;flex-direction:column;min-width:0}
+.homerow .quick{grid-template-columns:1fr 1fr;margin-bottom:14px;flex:1;align-content:start}
+.homerow .quick .qq-h{grid-column:1/-1}.homerow .quick .btn{grid-column:1/-1}
+.homerow .trust{margin:0;justify-content:flex-start;gap:8px 22px}
+.homerow .hoanote{flex-direction:column;align-items:stretch;justify-content:center;text-align:center;margin:0;padding:22px 20px;border-left-width:2px;border-top-width:8px;gap:16px}
+.homerow .hoanote .hn-t{gap:8px}.homerow .hoanote b{font-size:1.25rem;line-height:1.25}
+.homerow .hoanote .btn{white-space:normal;text-align:center}
+@media (max-width:900px){.homerow{grid-template-columns:1fr}.homerow .quick{grid-template-columns:1fr 1fr}}
+@media (max-width:560px){.homerow .quick{grid-template-columns:1fr}.homerow .trust{margin-left:8px}}
+@media (min-width:901px){.homerow .quick{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media (min-width:561px) and (max-width:900px){.homerow .quick{grid-template-columns:repeat(3,minmax(0,1fr))}}
