@@ -4,7 +4,8 @@ var cfg=window.CRM_CONFIG,sb=window.supabase.createClient(cfg.url,cfg.key,{auth:
 var STATUSES=[["new","New"],["contacted","Contacted"],["quoted","Quoted"],["won","Won"],["lost","Lost"]];
 var TYPES=[["residential","Residential"],["hoa","HOA"],["commercial","Commercial"]];
 var leads=[],clients=[],props=[],clientsErr=false,services=[],jobs=[],visits=[],jobsErr=false;
-var view="leads",lfilter="all",cfilter="active",jfilter="active",sfilter="upcoming",query="";
+var view="leads",lfilter="all",cfilter="active",jfilter="active",smode="day",selDate=today(),crewF="all",query="";
+var crew=[],s3=false,histFrom=addDays(today(),-45);
 var $=function(id){return document.getElementById(id)};
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
 function btn(text,cls,fn){var b=el("button",cls||"btn",text);b.type="button";if(fn)b.addEventListener("click",fn);return b}
@@ -49,14 +50,15 @@ function load(){
     sb.from("properties").select("*").order("created_at",{ascending:true}).limit(10000),
     sb.from("services").select("*").order("name",{ascending:true}).limit(500),
     sb.from("jobs").select("*").order("created_at",{ascending:true}).limit(5000),
-    sb.from("visits").select("*").gte("scheduled_date",addDays(today(),-45)).order("scheduled_date",{ascending:true}).limit(5000)
+    sb.from("visits").select("*").gte("scheduled_date",addDays(today(),-45)).order("scheduled_date",{ascending:true}).limit(5000),
+    sb.from("crew").select("*").order("name",{ascending:true}).limit(200)
   ]).then(function(rs){
     if(rs[0].error){$("msg").textContent="Could not load leads. If you just signed in, make sure this email is on the staff list.";return}
     leads=rs[0].data||[];
     clientsErr=!!(rs[1].error||rs[2].error);
     clients=rs[1].error?[]:(rs[1].data||[]);props=rs[2].error?[]:(rs[2].data||[]);
     jobsErr=!!(rs[3].error||rs[4].error||rs[5].error||clientsErr);
-    services=rs[3].error?[]:(rs[3].data||[]);jobs=rs[4].error?[]:(rs[4].data||[]);visits=rs[5].error?[]:(rs[5].data||[]);
+    services=rs[3].error?[]:(rs[3].data||[]);jobs=rs[4].error?[]:(rs[4].data||[]);visits=rs[5].error?[]:(rs[5].data||[]);histFrom=addDays(today(),-45);s3=!rs[6].error;crew=rs[6].error?[]:(rs[6].data||[]);
     render();topUp().then(function(n){if(n)render()});
   });
 }
@@ -336,9 +338,10 @@ function flabel(f){var x=FREQ.filter(function(a){return a[0]===f})[0];return x?x
 function needSql(){alert("Run the Stage 2 SQL in Supabase first (SQL Editor), then press Refresh.")}
 
 function loadVisits(){
+  histFrom=addDays(today(),-45);
   return sb.from("visits").select("*").gte("scheduled_date",addDays(today(),-45)).order("scheduled_date",{ascending:true}).limit(5000).then(function(r){if(!r.error)visits=r.data||[]})}
 function visitDates(job){
-  var t=today(),end=addDays(t,56);
+  var t=today(),end=addDays(t,84);
   if(job.frequency==="once")return[job.start_date];
   if(job.end_date&&job.end_date<end)end=job.end_date;
   var step=job.frequency==="weekly"?7:14,out=[],d=job.start_date,floor=addDays(t,-7);
@@ -352,7 +355,7 @@ function topUp(){
     if(j.status!=="active")return;
     visitDates(j).forEach(function(d){
       if(visits.some(function(v){return v.job_id===j.id&&v.orig_date===d}))return;
-      rows.push({job_id:j.id,client_id:j.client_id,property_id:j.property_id,orig_date:d,scheduled_date:d,status:"scheduled",price:j.price})})});
+      var row={job_id:j.id,client_id:j.client_id,property_id:j.property_id,orig_date:d,scheduled_date:d,status:"scheduled",price:j.price};if(s3)row.crew_id=j.crew_id||null;rows.push(row)})});
   if(!rows.length)return Promise.resolve(0);
   return sb.from("visits").upsert(rows,{onConflict:"job_id,orig_date",ignoreDuplicates:true}).then(function(r){
     if(r.error)return 0;return loadVisits().then(function(){return rows.length})})}
@@ -384,9 +387,12 @@ function renderJobs(){
     b.appendChild(left);b.appendChild(right);b.addEventListener("click",function(){openJob(j.id)});list.appendChild(b)})}
 
 /* ---- visit card (used in Schedule and in job detail) ---- */
-function visitCard(v,after,showJob){
+function visitCard(v,after,showJob,opts){
+  opts=opts||{};
   var j=byId(jobs,v.job_id),card=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px";
-  var l=el("div");l.appendChild(el("b",null,cname(v.client_id)+(j?" · "+j.title:"")));l.appendChild(el("div","note",[paddr(v.property_id),money(v.price)].filter(Boolean).join(" · ")));
+  var l=el("div");l.appendChild(el("b",null,(opts.num?opts.num+". ":"")+cname(v.client_id)+(j?" · "+j.title:"")));l.appendChild(el("div","note",[paddr(v.property_id),money(v.price)].filter(Boolean).join(" · ")));
+  if(opts.detail){var pp=byId(props,v.property_id),tips=[pp&&pp.notes,j&&j.instructions].filter(Boolean).join("  |  ");if(tips){var tn=el("div","note","⚠ "+tips);tn.style.cssText="color:#7a5b00;white-space:pre-wrap";l.appendChild(tn)}}
+  if(s3&&crew.length&&v.crew_id&&crewName(v.crew_id))l.appendChild(el("div","note","Crew: "+crewName(v.crew_id)));
   if(v.status!=="scheduled"||showJob===false)l.appendChild(el("div","note",dshort(v.scheduled_date)));
   top.appendChild(l);
   if(v.status!=="scheduled")top.appendChild(el("span","chip "+(v.status==="done"?"won":"lost"),v.status==="done"?"Done":"Skipped"));
@@ -410,28 +416,122 @@ function visitCard(v,after,showJob){
     }else a.appendChild(btn("Undo","btn alt sm",function(){patch({status:"scheduled",completed_at:null})}));
     var pr=byId(props,v.property_id);
     if(pr){var m=el("a","btn alt sm","Map");m.href=mapsUrl(pr.address);m.target="_blank";m.rel="noopener";a.appendChild(m)}
-    if(showJob!==false&&j)a.appendChild(btn("Job","btn alt sm",function(){openJob(j.id)}))}
+    if(showJob!==false&&j)a.appendChild(btn("Job","btn alt sm",function(){openJob(j.id)}));
+    if(opts.up!==undefined||opts.down!==undefined){var u=btn("▲","btn alt sm",opts.up||null);u.disabled=!opts.up;u.setAttribute("aria-label","Move earlier");var dn2=btn("▼","btn alt sm",opts.down||null);dn2.disabled=!opts.down;dn2.setAttribute("aria-label","Move later");a.appendChild(u);a.appendChild(dn2)}
+    if(s3&&crew.length&&v.status==="scheduled"){var sel=document.createElement("select");sel.style.cssText="width:auto;padding:6px 8px;font-size:.88rem";sel.setAttribute("aria-label","Assign to");[["","Me / unassigned"]].concat(crew.filter(function(c){return c.active!==false}).map(function(c){return[c.id,c.name]})).forEach(function(o){var op=document.createElement("option");op.value=o[0];op.textContent=o[1];sel.appendChild(op)});sel.value=v.crew_id||"";sel.addEventListener("change",function(){patch({crew_id:sel.value||null})});a.appendChild(sel)}}
   btns();card.appendChild(a);return card}
 
-/* ---- Schedule (agenda) ---- */
+/* ---- Schedule: Today/Day, Week, Month, Upcoming, Overdue, Done ---- */
+var DOW=["Mon","Tue","Wed","Thu","Fri","Sat","Sun"];
+function mondayOf(s){var d=pd(s),k=(d.getDay()+6)%7;d.setDate(d.getDate()-k);return ymd(d)}
+function longDate(s){return pd(s).toLocaleDateString(undefined,{weekday:"long",month:"long",day:"numeric",year:"numeric"})}
+function monthName(s){return pd(s).toLocaleDateString(undefined,{month:"long",year:"numeric"})}
+function onDay(d){return visits.filter(function(v){return v.scheduled_date===d})}
+function crewName(id){var c=byId(crew,id);return c?c.name:""}
+function crewOk(v){return crewF==="all"||(crewF==="none"?!v.crew_id:v.crew_id===crewF)}
+function dayOrder(a,b){
+  var sa=a.status==="scheduled"?0:1,sb2=b.status==="scheduled"?0:1;if(sa!==sb2)return sa-sb2;
+  if((a.sort_order||0)!==(b.sort_order||0))return(a.sort_order||0)-(b.sort_order||0);
+  return cname(a.client_id).localeCompare(cname(b.client_id))}
+function ensureFrom(d){
+  if(d>=histFrom)return Promise.resolve();
+  return sb.from("visits").select("*").gte("scheduled_date",d).lt("scheduled_date",histFrom).limit(5000).then(function(r){if(!r.error){visits=visits.concat(r.data||[]);histFrom=d}})}
+function crewChips(list){
+  if(!s3||!crew.length)return;
+  var row=el("div","tabs");row.style.marginTop="8px";
+  [["all","Everyone"],["none","Me"]].concat(crew.map(function(c){return[c.id,c.name]})).forEach(function(x){
+    var b=el("button","tab"+(crewF===x[0]?" on":""),x[1]);b.type="button";b.addEventListener("click",function(){crewF=x[0];render()});row.appendChild(b)});
+  list.appendChild(row)}
+function calNav(title,prev,next,todayFn,showToday){
+  var n=el("div","calnav");n.appendChild(btn("‹","btn alt sm",prev));var b=el("b",null,title);n.appendChild(b);n.appendChild(btn("›","btn alt sm",next));
+  if(showToday)n.appendChild(btn("Today","btn alt sm",todayFn));return n}
+
 function renderSchedule(){
   var tabs=$("tabs");tabs.textContent="";var t=today();
   var up=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date>=t}),od=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date<t}),dn=visits.filter(function(v){return v.status!=="scheduled"});
-  [["upcoming","Upcoming",up.length],["overdue","Overdue",od.length],["done","Done",dn.length]].forEach(function(s){
-    var b=el("button","tab"+(sfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){sfilter=s[0];render()});tabs.appendChild(b)});
+  [["day",selDate===t?"Today":"Day",-1],["week","Week",-1],["month","Month",-1],["upcoming","Upcoming",up.length],["overdue","Overdue",od.length],["done","Done",dn.length]].forEach(function(s){
+    var b=el("button","tab"+(smode===s[0]?" on":""),s[1]);b.type="button";if(s[2]>=0)b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){smode=s[0];render()});tabs.appendChild(b)});
+  if(s3)$("topbtns").appendChild(btn("Crew","btn alt",openCrew));
   var list=$("list");list.textContent="";
   if(jobsErr){list.appendChild(el("div","empty","The schedule isn't set up yet. Run the Stage 2 SQL in Supabase, then press Refresh."));return}
-  var set=sfilter==="upcoming"?up:sfilter==="overdue"?od:dn;
+  if(smode==="day")return renderDay(list,od.length);
+  if(smode==="week")return renderWeek(list);
+  if(smode==="month")return renderMonth(list);
+  var set=smode==="upcoming"?up:smode==="overdue"?od:dn;
   set=set.filter(function(v){if(!query)return true;var j=byId(jobs,v.job_id);return[cname(v.client_id),paddr(v.property_id),j?j.title:""].join(" ").toLowerCase().indexOf(query)>-1});
-  set.sort(function(a,b){return sfilter==="done"?(a.scheduled_date<b.scheduled_date?1:-1):(a.scheduled_date<b.scheduled_date?-1:1)});
-  if(sfilter==="done")set=set.slice(0,150);
-  if(!set.length){list.appendChild(el("div","empty",sfilter==="upcoming"?"Nothing scheduled. Add a job to a client and its visits appear here.":sfilter==="overdue"?"Nothing overdue. Nice.":"No completed visits yet."));return}
+  set.sort(function(a,b){return smode==="done"?(a.scheduled_date<b.scheduled_date?1:-1):(a.scheduled_date<b.scheduled_date?-1:1)});
+  if(smode==="done")set=set.slice(0,150);
+  if(!set.length){list.appendChild(el("div","empty",smode==="upcoming"?"Nothing scheduled. Add a job to a client and its visits appear here.":smode==="overdue"?"Nothing overdue. Nice.":"No completed visits yet."));return}
   var groups={},order=[];set.forEach(function(v){if(!groups[v.scheduled_date]){groups[v.scheduled_date]=[];order.push(v.scheduled_date)}groups[v.scheduled_date].push(v)});
   order.forEach(function(d){
     var g=groups[d],box=el("div"),h=el("h3",null,dlabel(d)+"  ·  "+g.length+" stop"+(g.length>1?"s":"")+"  ·  "+money(g.reduce(function(s,v){return s+Number(v.price||0)},0)));
     h.style.cssText="margin:14px 0 6px;font-size:.98rem;color:var(--forest);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap";
-    if(sfilter!=="done"){h.appendChild(btn("Push to next day","btn alt sm",function(){pushDay(d,g.length)}))}
+    var go=btn("Open day","btn alt sm",function(){selDate=d;smode="day";render()});h.appendChild(go);
+    if(smode!=="done"){h.appendChild(btn("Push to next day","btn alt sm",function(){pushDay(d,g.length)}))}
     box.appendChild(h);g.forEach(function(v){box.appendChild(visitCard(v,function(){render()}))});list.appendChild(box)})}
+
+function routeUrl(stops){
+  var addrs=stops.map(function(v){return paddr(v.property_id)}).filter(Boolean).slice(0,10);if(!addrs.length)return"";
+  var dest=addrs[addrs.length-1],w=addrs.slice(0,-1);
+  return"https://www.google.com/maps/dir/?api=1&travelmode=driving&destination="+encodeURIComponent(dest)+(w.length?"&waypoints="+encodeURIComponent(w.join("|")):"")}
+function moveVisit(v,dir,filtered){
+  var ds=onDay(v.scheduled_date).filter(function(x){return x.status==="scheduled"}).sort(dayOrder);
+  var fi=filtered.indexOf(v),nb=filtered[fi+dir];if(!nb)return;
+  var i=ds.indexOf(v),j=ds.indexOf(nb);ds[i]=nb;ds[j]=v;
+  var jobsToDo=[];ds.forEach(function(x,k){var n=k*10;if((x.sort_order||0)!==n){x.sort_order=n;jobsToDo.push(sb.from("visits").update({sort_order:n}).eq("id",x.id))}});
+  Promise.all(jobsToDo).then(function(rs){if(rs.some(function(r){return r.error}))alert("Could not save the new order.");render()})}
+
+function renderDay(list,odCount){
+  var d=selDate,t=today();
+  list.appendChild(calNav(longDate(d),function(){selDate=addDays(d,-1);render()},function(){selDate=addDays(d,1);render()},function(){selDate=t;render()},d!==t));
+  var di=document.createElement("input");di.type="date";di.value=d;di.style.cssText="width:auto;margin-left:auto";di.setAttribute("aria-label","Jump to date");di.addEventListener("change",function(){if(di.value){selDate=di.value;render()}});list.lastChild.appendChild(di);
+  if(d===t&&odCount){var ob=btn(odCount+" overdue visit"+(odCount>1?"s":"")+" need attention. Tap to review.","btn alt",function(){smode="overdue";render()});ob.style.cssText="margin-bottom:10px;border-color:#b3261e;color:#b3261e;width:100%";list.appendChild(ob)}
+  crewChips(list);
+  var all=onDay(d).filter(crewOk).sort(dayOrder),sched=all.filter(function(v){return v.status==="scheduled"});
+  if(!all.length){list.appendChild(el("div","empty","Nothing scheduled for this day."));return}
+  var done=all.filter(function(v){return v.status==="done"}).length,total=all.reduce(function(s,v){return s+(v.status==="skipped"?0:Number(v.price||0))},0);
+  var sum=el("div","daysum");sum.appendChild(el("b",null,all.length+" stop"+(all.length>1?"s":"")+" · "+money(total)+(done?" · "+done+" done":"")));
+  var bt=el("span");
+  if(sched.length){
+    var ru=routeUrl(sched);if(ru){var a=el("a","btn sm","Start route");a.href=ru;a.target="_blank";a.rel="noopener";bt.appendChild(a)}
+    bt.appendChild(document.createTextNode(" "));bt.appendChild(btn("Push to next day","btn alt sm",function(){pushDay(d,onDay(d).filter(function(v){return v.status==="scheduled"}).length)}))}
+  sum.appendChild(bt);list.appendChild(sum);
+  if(sched.length>10)list.appendChild(el("div","note","The route link covers the first 10 stops in your order."));
+  all.forEach(function(v){
+    var idx=sched.indexOf(v),opts={detail:true};
+    if(s3&&idx>-1){opts.up=idx>0?function(){moveVisit(v,-1,sched)}:null;opts.down=idx<sched.length-1?function(){moveVisit(v,1,sched)}:null;opts.num=idx+1}
+    list.appendChild(visitCard(v,function(){render()},true,opts))})}
+
+function renderWeek(list){
+  var ws=mondayOf(selDate),we=addDays(ws,6),t=today();
+  list.appendChild(calNav(pd(ws).toLocaleDateString(undefined,{month:"short",day:"numeric"})+" – "+pd(we).toLocaleDateString(undefined,{month:"short",day:"numeric"}),function(){selDate=addDays(ws,-7);render()},function(){selDate=addDays(ws,7);render()},function(){selDate=t;render()},!(t>=ws&&t<=we)));
+  if(ws<histFrom){ensureFrom(ws).then(function(){if(smode==="week")render()})}
+  crewChips(list);
+  var g=el("div","weekgrid");
+  for(var i=0;i<7;i++){(function(d,i){
+    var vs=onDay(d).filter(crewOk).sort(dayOrder),col=el("div","daycol"+(d===t?" today":"")+(i>=5?" wkend":""));
+    var h=el("button","dayhd");h.type="button";h.appendChild(el("b",null,DOW[i]+" "+pd(d).getDate()));
+    var tot=vs.reduce(function(s,v){return s+(v.status==="skipped"?0:Number(v.price||0))},0);
+    h.appendChild(el("span",null,vs.length?vs.length+" stop"+(vs.length>1?"s":"")+" · "+money(tot):"—"));
+    h.addEventListener("click",function(){selDate=d;smode="day";render()});col.appendChild(h);
+    vs.slice(0,8).forEach(function(v){var b=el("button","vline "+v.status);b.type="button";b.textContent=cname(v.client_id)+(v.crew_id&&crewName(v.crew_id)?" ("+crewName(v.crew_id).split(" ")[0]+")":"");b.addEventListener("click",function(){selDate=d;smode="day";render()});col.appendChild(b)});
+    if(vs.length>8)col.appendChild(el("div","note","+"+(vs.length-8)+" more"));
+    g.appendChild(col)})(addDays(ws,i),i)}
+  list.appendChild(g)}
+
+function renderMonth(list){
+  var first=selDate.slice(0,8)+"01",t=today(),gs=mondayOf(first);
+  list.appendChild(calNav(monthName(first),function(){selDate=addDays(first,-1).slice(0,8)+"01";render()},function(){selDate=addDays(first,32).slice(0,8)+"01";render()},function(){selDate=t;render()},t.slice(0,7)!==first.slice(0,7)));
+  if(gs<histFrom){ensureFrom(gs).then(function(){if(smode==="month")render()})}
+  crewChips(list);
+  var g=el("div","monthgrid");DOW.forEach(function(n){g.appendChild(el("div","mh",n))});
+  for(var i=0;i<42;i++){(function(d){
+    if(i>=35&&d.slice(0,7)!==first.slice(0,7))return;
+    var vs=onDay(d).filter(crewOk),cell=el("button","mcell"+(d.slice(0,7)!==first.slice(0,7)?" other":"")+(d===t?" today":""));cell.type="button";
+    cell.appendChild(el("span","mn",String(pd(d).getDate())));
+    if(vs.length){cell.appendChild(el("span","mc",vs.length+(vs.length>1?" stops":" stop")));cell.appendChild(el("span","mt",money(vs.reduce(function(s,v){return s+(v.status==="skipped"?0:Number(v.price||0))},0))))}
+    cell.addEventListener("click",function(){selDate=d;smode="day";render()});g.appendChild(cell)})(addDays(gs,i))}
+  list.appendChild(g)}
 function pushDay(d,n){
   if(!confirm("Move all "+n+" scheduled stop"+(n>1?"s":"")+" on "+dlabel(d)+" to "+dlabel(addDays(d,1))+"? (Good for rain days.)"))return;
   sb.from("visits").update({scheduled_date:addDays(d,1)}).eq("scheduled_date",d).eq("status","scheduled").then(function(r){
@@ -489,13 +589,14 @@ function openJobForm(client,job){
   var sd=fld("First visit / start date","date",job?job.start_date:today());
   var ed=fld("Ends on (optional)","date",job&&job.end_date||"");
   var ins=fld("Instructions for the crew (gate, dogs, edging, etc.)","textarea",job?job.instructions:"");
+  var cw=null;if(s3&&crew.length){cw=fld("Assigned to","select",job&&job.crew_id||"",[["","Me / unassigned"]].concat(crew.filter(function(c){return c.active!==false}).map(function(c){return[c.id,c.name]})))}
   var lastSvc=sv.input.value;
   sv.input.addEventListener("change",function(){var s=byId(services,sv.input.value),old=byId(services,lastSvc);
     if(s){if(!ti.input.value.trim()||(old&&ti.input.value===old.name))ti.input.value=s.name;if((!pr.input.value||Number(pr.input.value)===0||(old&&Number(pr.input.value)===Number(old.default_price)))&&s.default_price!=null)pr.input.value=s.default_price}
     lastSvc=sv.input.value});
   fq.input.addEventListener("change",function(){ed.hidden=fq.input.value==="once"});ed.hidden=fq.input.value==="once";
   p.appendChild(cs);p.appendChild(ps);p.appendChild(sv);p.appendChild(ti);
-  var g=el("div","grid2");g.appendChild(pr);g.appendChild(fq);g.appendChild(sd);g.appendChild(ed);p.appendChild(g);p.appendChild(ins);
+  var g=el("div","grid2");g.appendChild(pr);g.appendChild(fq);g.appendChild(sd);g.appendChild(ed);p.appendChild(g);if(cw)p.appendChild(cw);p.appendChild(ins);
   var a=el("div","actions");
   var save=btn("Save job","btn",function(){
     if(!ps.input.value){alert("This client needs a property first. Add one on the client page.");return}
@@ -504,6 +605,7 @@ function openJobForm(client,job){
     var price=parseFloat(pr.input.value);if(isNaN(price)||price<0){alert("Enter the price per visit (0 if unknown).");return}
     var once=fq.input.value==="once";
     var row={client_id:cs.input.value,property_id:ps.input.value,service_id:sv.input.value||null,title:ti.input.value.trim(),price:price,frequency:fq.input.value,start_date:sd.input.value,end_date:(!once&&ed.input.value)?ed.input.value:null,instructions:ins.input.value.trim()};
+    if(s3&&cw)row.crew_id=cw.input.value||null;
     save.disabled=true;
     if(!job){
       sb.from("jobs").insert(row).select().single().then(function(r){
@@ -516,7 +618,7 @@ function openJobForm(client,job){
       Object.assign(job,r.data);
       var fut;
       if(sched&&job.status==="active")fut=sb.from("visits").delete().eq("job_id",job.id).eq("status","scheduled").gte("scheduled_date",today());
-      else fut=sb.from("visits").update({price:job.price,property_id:job.property_id}).eq("job_id",job.id).eq("status","scheduled").gte("scheduled_date",today());
+      else fut=sb.from("visits").update(s3&&cw?{price:job.price,property_id:job.property_id,crew_id:job.crew_id||null}:{price:job.price,property_id:job.property_id}).eq("job_id",job.id).eq("status","scheduled").gte("scheduled_date",today());
       Promise.resolve(fut).then(function(){return loadVisits()}).then(function(){return topUp()}).then(function(){render();openJob(job.id)})})});
   a.appendChild(save);a.appendChild(btn("Cancel","btn alt",function(){if(job)openJob(job.id);else closeDetail()}));p.appendChild(a)}
 
@@ -577,4 +679,19 @@ function historySection(c){
       shown=Math.min(all.length,shown+n);mb.hidden=shown>=all.length}
     var mb=btn("Show more","btn alt sm",function(){more(50)});body.appendChild(mb);more(15)});
   return sec}
+
+/* ---- crew ---- */
+function openCrew(){
+  var p=panel();p.appendChild(el("h2",null,"Crew"));p.appendChild(el("p","note","Only needed when you have help. Leave this empty if you work alone, and the crew options stay hidden. Add people here, then assign them on a job or on any visit."));
+  var holder=el("div");p.appendChild(holder);
+  function row(m){
+    var box=el("div","pcard"),g=el("div","grid2");var n=fld("Name","text",m?m.name:""),ph=fld("Phone (optional)","tel",m?m.phone:"");g.appendChild(n);g.appendChild(ph);box.appendChild(g);var a=el("div","acts");
+    a.appendChild(btn(m?"Save":"Add crew member","btn sm",function(){
+      var name=n.input.value.trim();if(!name){alert("Enter a name.");return}
+      var q=m?sb.from("crew").update({name:name,phone:ph.input.value.trim()}).eq("id",m.id).select().single():sb.from("crew").insert({name:name,phone:ph.input.value.trim()}).select().single();
+      q.then(function(r){if(r.error||!r.data){alert("Could not save.");return}if(m)Object.assign(m,r.data);else crew.push(r.data);crew.sort(function(x,y){return x.name.localeCompare(y.name)});draw();render()})}));
+    if(m)a.appendChild(btn("Remove","btn danger sm",function(){if(!confirm("Remove "+m.name+"? Their visits become unassigned."))return;sb.from("crew").delete().eq("id",m.id).then(function(r){if(r.error){alert("Could not remove.");return}crew=crew.filter(function(z){return z.id!==m.id});visits.forEach(function(v){if(v.crew_id===m.id)v.crew_id=null});jobs.forEach(function(j){if(j.crew_id===m.id)j.crew_id=null});if(crewF===m.id)crewF="all";draw();render()})}));
+    box.appendChild(a);return box}
+  function draw(){holder.textContent="";crew.forEach(function(m){holder.appendChild(row(m))});var h=el("div","note",crew.length?"Add another":"Add your first crew member");h.style.margin="14px 0 6px";holder.appendChild(h);holder.appendChild(row(null))}
+  draw()}
 })();
