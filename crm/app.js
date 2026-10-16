@@ -4,6 +4,7 @@ var cfg=window.CRM_CONFIG,sb=window.supabase.createClient(cfg.url,cfg.key,{auth:
 var STATUSES=[["new","New"],["contacted","Contacted"],["quoted","Quoted"],["won","Won"],["lost","Lost"]];
 var TYPES=[["residential","Residential"],["hoa","HOA"],["commercial","Commercial"]];
 var leads=[],clients=[],props=[],clientsErr=false,services=[],jobs=[],visits=[],jobsErr=false;
+var role="owner",myEmail="";function isOwner(){return role==="owner"}
 var view="leads",lfilter="all",cfilter="active",jfilter="active",smode="day",selDate=today(),crewF="all",query="";
 var invoices=[],biz=null,billErr=false,unbilled=[],bfilter="tobill",billThrough=lastMonthEnd();
 var crew=[],s3=false,histFrom=addDays(today(),-45),crewMe=null,cwDate=today();
@@ -25,8 +26,8 @@ function fld(text,type,val,opts){
 function mapsUrl(a){return"https://www.google.com/maps/search/?api=1&query="+encodeURIComponent(a)}
 function contactRow(phone,email){
   var c=el("div","contact"),dg=digits(phone);
-  if(dg){["Call","Text"].forEach(function(t){var a=el("a","btn alt",t);a.href=(t==="Call"?"tel:":"sms:")+dg;c.appendChild(a)})}
   if(email){var m=el("a","btn alt","Email");m.href="mailto:"+email;c.appendChild(m)}
+  if(dg){(isOwner()?["Call","Text"]:["Call"]).forEach(function(t){var a=el("a","btn alt",t);a.href=(t==="Call"?"tel:":"sms:")+dg;c.appendChild(a)})}
   return c}
 
 /* ---- sign in / out ---- */
@@ -43,7 +44,9 @@ function start(){$("gsearch").hidden=false;$("loginwrap").hidden=true;$("layout"
 sb.auth.getSession().then(function(r){if(r.data&&r.data.session)afterSignIn()});
 /* Crew logins see only their own route; the owner sees everything. */
 function afterSignIn(){
-  var done=false;function go(me){if(done)return;done=true;if(me)startCrewApp(me);else start()}
+  var done=false;function go(me){if(done)return;done=true;if(me){startCrewApp(me);return}
+    sb.auth.getSession().then(function(s){myEmail=((s.data&&s.data.session&&s.data.session.user&&s.data.session.user.email)||"").toLowerCase()}).catch(function(){}).then(function(){
+      return sb.rpc("staff_role")}).then(function(r){role=(r&&!r.error)?(r.data||"office"):"owner";start()},function(){role="owner";start()})}
   try{sb.rpc("crew_me").then(function(r){go(r&&!r.error&&r.data&&r.data.length?r.data[0]:null)},function(){go(null)})}catch(e){go(null)}}
 
 /* ---- data ---- */
@@ -77,15 +80,16 @@ var ICONS={leads:'<svg viewBox="0 0 24 24"><path d="M3 13l2.5-7.5A2 2 0 0 1 7.4 
  clients:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14a6.5 6.5 0 0 1 3.5 6"/></svg>',
  jobs:'<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>',
  billing:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
- schedule:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>'};
+ schedule:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
+ team:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M18.5 3.5v3M17 5h3"/></svg>'};
 function render(){
   var nav=$("side");nav.textContent="";
   var tdy=today(),stops=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date===tdy}).length,newL=leads.filter(function(l){return l.status==="new"}).length;
-  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops],["billing","Billing",invoices.filter(isOverdue).length]].forEach(function(v){
+  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops],["billing","Billing",invoices.filter(isOverdue).length]].concat(isOwner()?[["team","Team",0]]:[]).forEach(function(v){
     var b=el("button",v[0]===view?"on":"");b.type="button";b.addEventListener("click",function(){view=v[0];render()});b.innerHTML=ICONS[v[0]];b.appendChild(el("span",null,v[1]));
     if(v[2])b.appendChild(el("span","badge",String(v[2])));b.setAttribute("aria-current",v[0]===view?"page":"false");nav.appendChild(b)});
   $("topbtns").textContent="";
-  if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else if(view==="billing")renderBilling();else renderSchedule();
+  if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else if(view==="billing")renderBilling();else if(view==="team"&&isOwner())renderTeam();else renderSchedule();
 }
 function renderLeads(){
   var tabs=$("tabs");tabs.textContent="";
@@ -475,7 +479,7 @@ function renderSchedule(){
   var up=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date>=t}),od=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date<t}),dn=visits.filter(function(v){return v.status!=="scheduled"});
   [["day",selDate===t?"Today":"Day",-1],["week","Week",-1],["month","Month",-1],["upcoming","Upcoming",up.length],["overdue","Overdue",od.length],["done","Done",dn.length]].forEach(function(s){
     var b=el("button","tab"+(smode===s[0]?" on":""),s[1]);b.type="button";if(s[2]>=0)b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){smode=s[0];render()});tabs.appendChild(b)});
-  if(s3)$("topbtns").appendChild(btn("Crew","btn alt",openCrew));
+  if(s3&&isOwner())$("topbtns").appendChild(btn("Crew","btn alt",openCrew));
   var list=$("list");list.textContent="";
   if(jobsErr){list.appendChild(el("div","empty","The schedule isn't set up yet. Run the Stage 2 SQL in Supabase, then press Refresh."));return}
   if(smode==="day")return renderDay(list,od.length);
@@ -519,8 +523,8 @@ function renderDay(list,odCount){
   var bt=el("span");
   if(sched.length){
     var ru=routeUrl(sched);if(ru){var a=el("a","btn sm","Start route");a.href=ru;a.target="_blank";a.rel="noopener";bt.appendChild(a);bt.appendChild(document.createTextNode(" "))}
-    if(s3){bt.appendChild(btn("Send route","btn alt sm",function(){openSendRoute(d)}));bt.appendChild(document.createTextNode(" "))}
-    bt.appendChild(btn("Text reminders","btn alt sm",function(){remindPanel(sched,"visit","Text reminders · "+dlabel(d))}));bt.appendChild(document.createTextNode(" "));bt.appendChild(btn("Weather delay","btn alt sm",function(){openWeather(d)}))}
+    if(s3&&isOwner()){bt.appendChild(btn("Send route","btn alt sm",function(){openSendRoute(d)}));bt.appendChild(document.createTextNode(" "))}
+    bt.appendChild(btn("Reminders","btn alt sm",function(){remindPanel(sched,"visit","Reminders · "+dlabel(d))}));bt.appendChild(document.createTextNode(" "));bt.appendChild(btn("Weather delay","btn alt sm",function(){openWeather(d)}))}
   sum.appendChild(bt);list.appendChild(sum);
   if(sched.length>10)list.appendChild(el("div","note","The route link covers the first 10 stops in your order."));
   all.forEach(function(v){
@@ -636,7 +640,7 @@ function remMsg(mode,c,vs){
   return"Hi "+firstName(c)+", this is "+nm+". We're scheduled to take care of your property"+(addrs.length===1?" at "+addrs[0]:"")+" "+(dts[0]===today()?"today":dts[0]===addDays(today(),1)?"tomorrow, "+dshort(dts[0]):"on "+dshort(dts[0]))+". If anything needs to change (gate, pets, etc.), just reply here. Thank you!"}
 function remindPanel(vs,mode,title){
   var p=panel();p.appendChild(el("h2",null,title));
-  p.appendChild(el("p","note",mode==="delay"?"Let these clients know their visit moved. Tap Text to open a ready-to-send message in your Messages app. You can edit it there, and nothing goes out until you press Send.":"Tap Text to open a ready-to-send reminder in your Messages app. You can edit it there, and nothing goes out until you press Send."));
+  p.appendChild(el("p","note",mode==="delay"?"Let these clients know their visit moved. Tap Email to open a ready-to-send message in your email app. Owners also get Text, which opens Messages on a phone. Nothing goes out until you press Send.":"Tap Email to open a ready-to-send reminder in your email app. Owners also get Text, which opens Messages on a phone. Nothing goes out until you press Send."));
   var by={},order=[];vs.slice().sort(mode==="delay"?function(a,b){return a.scheduled_date<b.scheduled_date?-1:1}:dayOrder).forEach(function(v){if(!by[v.client_id]){by[v.client_id]=[];order.push(v.client_id)}by[v.client_id].push(v)});
   if(!order.length){p.appendChild(el("div","empty","No stops to text about."))}
   var sent={};
@@ -645,11 +649,9 @@ function remindPanel(vs,mode,title){
     var l=el("div");l.appendChild(el("b",null,c.name||"(deleted client)"));
     var ad=[];list.forEach(function(v){var a=paddr(v.property_id);if(a&&ad.indexOf(a)<0)ad.push(a)});l.appendChild(el("div","note",ad.join(" · ")+(mode==="delay"?" · now "+dshort(list[0].scheduled_date):"")));top.appendChild(l);
     var r=el("div");r.style.cssText="display:flex;gap:8px;align-items:center";
-    var chip=el("span","chip won","✓ Texted");chip.hidden=!(mode==="visit"&&list.every(function(v){return v.reminded_at}));
+    var chip=el("span","chip won","✓ Sent");chip.hidden=!(mode==="visit"&&list.every(function(v){return v.reminded_at}));
     r.appendChild(chip);
-    if(c.phone){var a=el("a","btn sm","Text");a.href=smsHref(c.phone,remMsg(mode,c,list));
-      a.addEventListener("click",function(){chip.hidden=false;if(mode==="visit"){var on=remOn(),now=new Date().toISOString();list.forEach(function(v){v.reminded_at=now});if(on)sb.from("visits").update({reminded_at:now}).in("id",list.map(function(v){return v.id})).then(function(){})}});r.appendChild(a)}
-    else r.appendChild(el("span","note","No phone on file"));
+    msgActions(r,c,remMsg(mode,c,list),remSubj(mode),function(){chip.hidden=false;if(mode==="visit"){var on=remOn(),now=new Date().toISOString();list.forEach(function(v){v.reminded_at=now});if(on)sb.from("visits").update({reminded_at:now}).in("id",list.map(function(v){return v.id})).then(function(){})}});
     top.appendChild(r);card.appendChild(top);p.appendChild(card)});
   var dn=btn(mode==="delay"?"Skip / Done":"Done","btn alt");dn.style.marginTop="10px";dn.addEventListener("click",function(){closeDetail();render()});p.appendChild(dn)}
 function invRemind(inv,c){
@@ -657,14 +659,62 @@ function invRemind(inv,c){
 function stampInv(inv){var on="reminded_at" in inv,now=new Date().toISOString();inv.reminded_at=now;if(on)sb.from("invoices").update({reminded_at:now}).eq("id",inv.id).then(function(){})}
 function remindOverdue(od){
   var p=panel();p.appendChild(el("h2",null,"Remind overdue clients"));
-  p.appendChild(el("p","note","Tap Text to open a ready-to-send payment reminder in your Messages app. Nothing goes out until you press Send."));
+  p.appendChild(el("p","note","Tap Email to open a ready-to-send payment reminder in your email app. Owners also get Text, which opens Messages on a phone. Nothing goes out until you press Send."));
   od.slice().sort(function(a,b){return a.due_date<b.due_date?-1:1}).forEach(function(i){
     var c=byId(clients,i.client_id)||{},card=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
     var l=el("div");l.appendChild(el("b",null,invNum(i.number)+" · "+cname(i.client_id)));l.appendChild(el("div","note",money(i.total)+" · due "+dshort(i.due_date)+(i.reminded_at?" · last reminded "+dshort(String(i.reminded_at).slice(0,10)):"")));top.appendChild(l);
-    var r=el("div");r.style.cssText="display:flex;gap:8px;align-items:center";var chip=el("span","chip won","✓ Texted");chip.hidden=true;r.appendChild(chip);
-    if(c.phone){var a=el("a","btn sm","Text");a.href=smsHref(c.phone,invRemind(i,c));a.addEventListener("click",function(){chip.hidden=false;stampInv(i)});r.appendChild(a)}else r.appendChild(el("span","note","No phone on file"));
+    var r=el("div");r.style.cssText="display:flex;gap:8px;align-items:center";var chip=el("span","chip won","✓ Sent");chip.hidden=true;r.appendChild(chip);
+    msgActions(r,c,invRemind(i,c),"Payment reminder: invoice "+invNum(i.number),function(){chip.hidden=false;stampInv(i)});
     top.appendChild(r);card.appendChild(top);p.appendChild(card)});
   var dn=btn("Done","btn alt");dn.style.marginTop="10px";dn.addEventListener("click",function(){closeDetail();render()});p.appendChild(dn)}
+
+function mailHref(to,subject,body){return"mailto:"+encodeURIComponent(to).replace("%40","@")+"?subject="+encodeURIComponent(subject)+"&body="+encodeURIComponent(body)}
+function remSubj(mode){return mode==="delay"?"Schedule change from "+bizv("name","Latta Corp"):"Service reminder from "+bizv("name","Latta Corp")}
+function copyBtn(label,text,small,cb){
+  var b=btn(label,"btn alt"+(small?" sm":""),function(){
+    function ok(){var o=b.textContent;b.textContent="Copied ✓";setTimeout(function(){b.textContent=o},1400);if(cb)cb()}
+    function fb(){var t=document.createElement("textarea");t.value=text;t.style.cssText="position:fixed;opacity:0";document.body.appendChild(t);t.select();try{document.execCommand("copy");ok()}catch(e){alert("Could not copy. Select the text and copy it yourself.")}document.body.removeChild(t)}
+    if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(ok,fb);else fb()});
+  return b}
+/* Email is the normal way to reach clients. Text (opens Messages on a phone) is for owners only; Copy lets anyone paste the message elsewhere. */
+function msgActions(r,c,body,subject,onUse){
+  var any=false;
+  if(c.email){var e=el("a","btn sm","Email");e.href=mailHref(c.email,subject,body);e.addEventListener("click",onUse);r.appendChild(e);any=true}
+  if(isOwner()&&c.phone){var a=el("a","btn alt sm","Text");a.href=smsHref(c.phone,body);a.addEventListener("click",onUse);r.appendChild(a);any=true}
+  if(any)r.appendChild(copyBtn("Copy",body,true,onUse));
+  else r.appendChild(el("span","note",isOwner()?"No email or phone on file":"No email on file"))}
+
+/* ---- Team: owners add office staff and co-owners ---- */
+function renderTeam(){
+  var tabs=$("tabs");tabs.textContent="";var list=$("list");list.textContent="";
+  var intro=el("div","note","Everyone here signs in at this same address with their own email and password. Owners and co-owners can do everything. Office staff can use clients, jobs, schedule, billing and invoices, and email clients, but they can't add people, manage crew logins, or text from the CRM.");intro.style.marginBottom="12px";list.appendChild(intro);
+  var holder=el("div");list.appendChild(holder);holder.appendChild(el("div","empty","Loading the team..."));
+  var ROLES=[["office","Office (clients, jobs, schedule, billing)"],["owner","Owner / co-owner (everything)"]];
+  function draw(members){
+    holder.textContent="";
+    members.forEach(function(m){
+      var card=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
+      var l=el("div");l.appendChild(el("b",null,(m.name||m.email)+(m.email===myEmail?" (you)":"")));l.appendChild(el("div","note",m.email));top.appendChild(l);
+      top.appendChild(el("span","chip "+(m.role==="owner"?"won":""),m.role==="owner"?"Owner":"Office"));card.appendChild(top);
+      var a=el("div","acts");a.style.marginTop="8px";
+      if(m.email!==myEmail){
+        a.appendChild(btn(m.role==="owner"?"Make office":"Make owner","btn alt sm",function(){if(!confirm(m.role==="owner"?"Change "+(m.name||m.email)+" to office staff?":"Make "+(m.name||m.email)+" an owner? Owners can see and do everything, including adding and removing people."))return;callApi("/api/team","role",{email:m.email,role:m.role==="owner"?"office":"owner"}).then(function(res){if(!res.ok){alert(res.error);return}load2()})}));
+        if(m.hasLogin)a.appendChild(btn("Reset password","btn alt sm",function(){
+          a.textContent="";var np=document.createElement("input");np.type="text";np.placeholder="New password (8+ characters)";np.autocomplete="off";np.style.width="auto";a.appendChild(np);
+          a.appendChild(btn("Set password","btn sm",function(){callApi("/api/team","reset",{email:m.email,password:np.value}).then(function(res){if(!res.ok){alert(res.error);return}alert("Password changed. Tell them the new password.");load2()})}));a.appendChild(btn("Cancel","btn alt sm",load2))}));
+        a.appendChild(btn("Remove","btn danger sm",function(){if(!confirm("Remove "+(m.name||m.email)+"? They won't be able to sign in any more."))return;callApi("/api/team","remove",{email:m.email}).then(function(res){if(!res.ok){alert(res.error);return}load2()})}))}
+      card.appendChild(a);holder.appendChild(card)});
+    var h=el("h3",null,"Add a team member");h.style.margin="18px 0 6px";holder.appendChild(h);
+    var box=el("div","pcard"),g=el("div","grid2"),nm=fld("Name","text",""),em=fld("Their login email","email",""),rl=fld("Role","select","office",ROLES),pw=fld("Starting password (8+ characters, you tell them)","text","");pw.input.autocomplete="off";
+    g.appendChild(nm);g.appendChild(em);box.appendChild(g);box.appendChild(rl);box.appendChild(pw);
+    var add=btn("Add to team","btn",function(){
+      if(!nm.input.value.trim()){alert("Enter a name.");return}if(!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(em.input.value.trim())){alert("Enter their login email.");return}if(pw.input.value.length<8){alert("The password needs at least 8 characters.");return}
+      add.disabled=true;callApi("/api/team","create",{name:nm.input.value.trim(),email:em.input.value.trim(),role:rl.input.value,password:pw.input.value}).then(function(res){add.disabled=false;if(!res.ok){alert(res.error);return}alert("Added. Give them the email and password; they sign in at this same address.");load2()})});
+    add.style.marginTop="10px";box.appendChild(add);holder.appendChild(box)}
+  function load2(){callApi("/api/team","list",{}).then(function(res){
+    if(!res.ok){holder.textContent="";holder.appendChild(el("div","empty",res.error));return}
+    myEmail=res.data.me||myEmail;draw(res.data.members||[])})}
+  load2()}
 
 /* ---- job detail ---- */
 function openJob(id){
@@ -810,11 +860,12 @@ function historySection(c){
   return sec}
 
 /* ---- crew: temps get a texted route, full-timers get their own limited login ---- */
-function callCrewApi(action,payload){
+function callApi(path,action,payload){
   return sb.auth.getSession().then(function(r){
     var t=r.data&&r.data.session&&r.data.session.access_token;
-    return fetch("/api/crew-login",{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+t},body:JSON.stringify(Object.assign({action:action},payload))})
-      .then(function(res){return res.json().catch(function(){return{}}).then(function(j){return{ok:res.ok,error:j.error||("Error "+res.status)}})},function(){return{ok:false,error:"Could not reach the server."}})})}
+    return fetch(path,{method:"POST",headers:{"content-type":"application/json",authorization:"Bearer "+t},body:JSON.stringify(Object.assign({action:action},payload))})
+      .then(function(res){return res.json().catch(function(){return{}}).then(function(j){return{ok:res.ok,error:j.error||("Error "+res.status),data:j}})},function(){return{ok:false,error:"Could not reach the server."}})})}
+function callCrewApi(action,payload){return callApi("/api/crew-login",action,payload)}
 function refreshCrew(){return sb.from("crew").select("*").order("name",{ascending:true}).limit(200).then(function(r){if(!r.error)crew=r.data||[]})}
 function openCrew(){
   var p=panel();p.appendChild(el("h2",null,"Crew"));
@@ -1036,12 +1087,16 @@ function openInvoice(id){
     var acts=el("div","contact");acts.style.marginTop="14px";
     acts.appendChild(btn("View / Print / PDF","btn",function(){showInvoice(inv,items)}));
     var msg=invMessage(inv,c);
-    if(c&&c.phone){var a1=el("a","btn alt","Text");a1.href=smsHref(c.phone,msg);a1.addEventListener("click",function(){markSent(inv)});acts.appendChild(a1)}
-    if(c&&c.email){var a2=el("a","btn alt","Email");a2.href="mailto:"+encodeURIComponent(c.email).replace("%40","@")+"?subject="+encodeURIComponent("Invoice "+invNum(inv.number)+" from Latta Corp")+"&body="+encodeURIComponent(msg+"\n\n(The invoice PDF is attached.)");a2.addEventListener("click",function(){markSent(inv)});acts.appendChild(a2)}
-    if(inv.status==="open"&&c&&c.phone&&(isOverdue(inv)||inv.sent_at)){var a3=el("a","btn alt",isOverdue(inv)?"Text a payment reminder":"Text a reminder");a3.href=smsHref(c.phone,invRemind(inv,c));a3.addEventListener("click",function(){stampInv(inv)});acts.appendChild(a3)}
+    if(c&&c.email){var a2=el("a","btn","Email invoice");a2.href=mailHref(c.email,"Invoice "+invNum(inv.number)+" from "+bizv("name","Latta Corp"),msg+"\n\n(The invoice PDF is attached.)");a2.addEventListener("click",function(){markSent(inv)});acts.appendChild(a2)}
+    acts.appendChild(copyBtn("Copy message",msg,false,function(){markSent(inv)}));
+    if(isOwner()&&c&&c.phone){var a1=el("a","btn alt","Text");a1.href=smsHref(c.phone,msg);a1.addEventListener("click",function(){markSent(inv)});acts.appendChild(a1)}
+    if(inv.status==="open"&&c&&(isOverdue(inv)||inv.sent_at)){
+      var rem=invRemind(inv,c);
+      if(c.email){var a4=el("a","btn alt","Email a reminder");a4.href=mailHref(c.email,"Payment reminder: invoice "+invNum(inv.number),rem);a4.addEventListener("click",function(){stampInv(inv)});acts.appendChild(a4)}
+      if(isOwner()&&c.phone){var a3=el("a","btn alt","Text a reminder");a3.href=smsHref(c.phone,rem);a3.addEventListener("click",function(){stampInv(inv)});acts.appendChild(a3)}}
     body.appendChild(acts);
     if(inv.status==="open"&&inv.reminded_at)body.appendChild(el("div","note","Last reminder texted "+dshort(String(inv.reminded_at).slice(0,10))+"."));
-    if(c&&(!c.phone||!c.email))body.appendChild(el("div","note","Tip: add a "+(!c.phone?"phone number":"email")+" on the client page to get "+(!c.phone?"a Text":"an Email")+" button here. To email the PDF: tap View / Print / PDF, choose Save as PDF, then attach it."));
+    if(c&&!c.email)body.appendChild(el("div","note","Tip: add an email on the client page to get an Email button here. To email the PDF: tap View / Print / PDF, choose Save as PDF, then attach it."));
     var pay=el("div","sec");
     if(inv.status==="open"){
       pay.appendChild(el("h3",null,"Record payment"));var pg=el("div","grid2");

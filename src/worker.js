@@ -109,22 +109,30 @@ const baseUrl = (env) => env.SUPABASE_URL || DEFAULT_SUPABASE_URL;
 const adminHeaders = (env) => ({ apikey: env.SUPABASE_SECRET_KEY, Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`, "content-type": "application/json" });
 const errText = async (res) => { try { const j = await res.json(); return String(j.msg || j.message || j.error_description || j.error || res.status).slice(0, 200); } catch { return String(res.status); } };
 
-async function callerIsOwner(request, env) {
+async function callerEmail(request, env) {
   const token = (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
-  if (!token) return false;
+  if (!token) return "";
   try {
     const u = await fetch(`${baseUrl(env)}/auth/v1/user`, { headers: { apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${token}` } });
-    if (!u.ok) return false;
-    const email = String((await u.json()).email || "").toLowerCase();
-    if (!email) return false;
-    return await emailOnStaff(env, email);
-  } catch { return false; }
+    if (!u.ok) return "";
+    return String((await u.json()).email || "").toLowerCase();
+  } catch { return ""; }
 }
-async function emailOnStaff(env, email) {
-  const res = await fetch(`${baseUrl(env)}/rest/v1/staff?select=email&email=ilike.${encodeURIComponent(email)}`, { headers: { apikey: env.SUPABASE_SECRET_KEY } });
-  if (!res.ok) return false;
-  return (await res.json()).some((r) => String(r.email).toLowerCase() === email.toLowerCase());
+// Owners (and co-owners) may manage crew logins and the team. Before the Stage 7 SQL is run, anyone on the staff list counts as an owner.
+async function callerIsOwner(request, env) {
+  const email = await callerEmail(request, env);
+  if (!email) return "";
+  const row = await staffRow(env, email);
+  return row && row.role === "owner" ? email : "";
 }
+async function staffRow(env, email) {
+  let res = await fetch(`${baseUrl(env)}/rest/v1/staff?select=email,name,role,user_id&email=ilike.${encodeURIComponent(email)}`, { headers: { apikey: env.SUPABASE_SECRET_KEY } });
+  if (!res.ok) res = await fetch(`${baseUrl(env)}/rest/v1/staff?select=email&email=ilike.${encodeURIComponent(email)}`, { headers: { apikey: env.SUPABASE_SECRET_KEY } });
+  if (!res.ok) return null;
+  const r = (await res.json()).find((x) => String(x.email).toLowerCase() === email.toLowerCase());
+  return r ? { role: "owner", name: "", user_id: null, ...r } : null;
+}
+async function emailOnStaff(env, email) { return Boolean(await staffRow(env, email)); }
 
 export async function handleCrewLogin(request, env) {
   if (!env.SUPABASE_SECRET_KEY) return json({ error: "The CRM key is not set up on the server." }, 500);
@@ -168,6 +176,58 @@ export async function handleCrewLogin(request, env) {
   return json({ error: "bad action" }, 400);
 }
 
+// ---- Team: owners add / change / remove the people who can sign in to the CRM. ----
+export async function handleTeam(request, env) {
+  if (!env.SUPABASE_SECRET_KEY) return json({ error: "The CRM key is not set up on the server." }, 500);
+  const me = await callerIsOwner(request, env);
+  if (!me) return json({ error: "Not allowed." }, 403);
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const action = String((d && d.action) || ""), base = baseUrl(env), H = adminHeaders(env);
+  const email = String((d && d.email) || "").trim().toLowerCase(), password = String((d && d.password) || "");
+  const role = String((d && d.role) || "");
+  if (action === "list") {
+    const r = await fetch(`${base}/rest/v1/staff?select=email,name,role,user_id&order=email.asc`, { headers: { apikey: env.SUPABASE_SECRET_KEY } });
+    if (!r.ok) return json({ error: "Could not read the team. Did you run the Stage 7 SQL?" }, 502);
+    return json({ ok: true, me, members: (await r.json()).map((m) => ({ email: m.email, name: m.name || "", role: m.role, hasLogin: Boolean(m.user_id) })) });
+  }
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return json({ error: "Enter a valid email." }, 400);
+  const patchStaff = (patch) => fetch(`${base}/rest/v1/staff?email=eq.${encodeURIComponent(email)}`, { method: "PATCH", headers: { ...H, Prefer: "return=minimal" }, body: JSON.stringify(patch) });
+  if (action === "create") {
+    const name = String((d && d.name) || "").trim().slice(0, 80);
+    if (!name) return json({ error: "Enter a name." }, 400);
+    if (role !== "owner" && role !== "office") return json({ error: "Pick a role." }, 400);
+    if (password.length < 8 || password.length > 72) return json({ error: "Password must be 8 to 72 characters." }, 400);
+    if (await emailOnStaff(env, email)) return json({ error: "That email is already on the team." }, 409);
+    const cu = await fetch(`${base}/auth/v1/admin/users`, { method: "POST", headers: H, body: JSON.stringify({ email, password, email_confirm: true }) });
+    if (!cu.ok) return json({ error: await errText(cu) }, 400);
+    const user = await cu.json();
+    const ins = await fetch(`${base}/rest/v1/staff`, { method: "POST", headers: { ...H, Prefer: "return=minimal" }, body: JSON.stringify({ email, name, role, user_id: user.id }) });
+    if (!ins.ok) { await fetch(`${base}/auth/v1/admin/users/${user.id}`, { method: "DELETE", headers: H }); return json({ error: "Could not add them to the team. Did you run the Stage 7 SQL?" }, 502); }
+    return json({ ok: true });
+  }
+  const row = await staffRow(env, email);
+  if (!row) return json({ error: "That person is not on the team." }, 404);
+  if (action === "role") {
+    if (role !== "owner" && role !== "office") return json({ error: "Pick a role." }, 400);
+    if (email === me) return json({ error: "You can't change your own role." }, 400);
+    const r = await patchStaff({ role });
+    return r.ok ? json({ ok: true }) : json({ error: "Could not change the role." }, 502);
+  }
+  if (action === "reset") {
+    if (password.length < 8 || password.length > 72) return json({ error: "Password must be 8 to 72 characters." }, 400);
+    if (!row.user_id) return json({ error: "This account wasn't created from the Team screen, so its password can't be reset here." }, 400);
+    const r = await fetch(`${base}/auth/v1/admin/users/${row.user_id}`, { method: "PUT", headers: H, body: JSON.stringify({ password }) });
+    return r.ok ? json({ ok: true }) : json({ error: await errText(r) }, 400);
+  }
+  if (action === "remove") {
+    if (email === me) return json({ error: "You can't remove yourself." }, 400);
+    if (row.user_id) { const r = await fetch(`${base}/auth/v1/admin/users/${row.user_id}`, { method: "DELETE", headers: H }); if (!r.ok && r.status !== 404) return json({ error: await errText(r) }, 400); }
+    const del = await fetch(`${base}/rest/v1/staff?email=eq.${encodeURIComponent(email)}`, { method: "DELETE", headers: { ...H, Prefer: "return=minimal" } });
+    return del.ok ? json({ ok: true }) : json({ error: "Could not remove them." }, 502);
+  }
+  return json({ error: "bad action" }, 400);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -182,6 +242,10 @@ export default {
     if (url.pathname === "/api/crew-login") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handleCrewLogin(request, env);
+    }
+    if (url.pathname === "/api/team") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      return handleTeam(request, env);
     }
     return env.ASSETS.fetch(request);
   },

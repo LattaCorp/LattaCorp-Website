@@ -68,4 +68,43 @@ calls = []; r = await worker.fetch(cl({ action: "remove", crew_id: CID }), env);
 assert(calls.some((c) => c.opts.method === "DELETE" && c.url.includes("/auth/v1/admin/users/" + UID)), "auth user deleted");
 assert.deepEqual(JSON.parse(calls.find((c) => c.opts.method === "PATCH").opts.body), { kind: "temp", user_id: null, email: "" });
 crewRow = { id: CID, user_id: null }; r = await worker.fetch(cl({ action: "reset", crew_id: CID, password: "newpassword9" }), env); assert.equal(r.status, 400);
+
+
+// ---- team endpoint ----
+let staff = [{ email: "owner@example.com", name: "Matteo", role: "owner", user_id: null }, { email: "mom@example.com", name: "Mom", role: "owner", user_id: "u-mom" }, { email: "sis@example.com", name: "Sis", role: "office", user_id: "u-sis" }];
+let tcalls = [];
+globalThis.fetch = async (url, opts = {}) => {
+  url = String(url); tcalls.push({ url, opts });
+  if (url.endsWith("/auth/v1/user")) { const tk = (opts.headers.Authorization || "").replace("Bearer ", ""); const m = { "t-owner": "owner@example.com", "t-mom": "mom@example.com", "t-sis": "sis@example.com" }[tk]; return m ? new Response(JSON.stringify({ email: m })) : new Response("{}", { status: 401 }); }
+  if (url.includes("/rest/v1/staff") && (opts.method || "GET") === "GET") { if (url.includes("email=ilike.")) { const e = decodeURIComponent(url.split("email=ilike.")[1]); return new Response(JSON.stringify(staff.filter((x) => x.email === e.toLowerCase()))); } return new Response(JSON.stringify(staff)); }
+  if (url.includes("/rest/v1/staff") && opts.method === "POST") return new Response(null, { status: 201 });
+  if (url.includes("/rest/v1/staff") && (opts.method === "PATCH" || opts.method === "DELETE")) return new Response(null, { status: 204 });
+  if (url.endsWith("/auth/v1/admin/users") && opts.method === "POST") { const b = JSON.parse(opts.body); return b.email === "dup@example.com" ? new Response(JSON.stringify({ msg: "already registered" }), { status: 422 }) : new Response(JSON.stringify({ id: "u-new", email: b.email })); }
+  if (url.includes("/auth/v1/admin/users/")) return new Response("{}", { status: 200 });
+  return new Response("{}", { status: 200 });
+};
+const tm = (body, token = "t-owner", method = "POST") => new Request("https://x.test/api/team", { method, headers: { "content-type": "application/json", ...(token ? { authorization: "Bearer " + token } : {}) }, body: method === "POST" ? JSON.stringify(body) : undefined });
+r = await worker.fetch(tm({ action: "list" }, null), env); assert.equal(r.status, 403, "no token");
+r = await worker.fetch(tm({ action: "list" }, "t-sis"), env); assert.equal(r.status, 403, "office staff cannot manage the team");
+r = await worker.fetch(tm({}, "t-owner", "GET"), env); assert.equal(r.status, 405);
+r = await worker.fetch(tm({ action: "list" }, "t-mom"), env); assert.equal(r.status, 200); let lj = await r.json(); assert.equal(lj.members.length, 3); assert.equal(lj.me, "mom@example.com"); assert.equal(lj.members[2].hasLogin, true); assert(!JSON.stringify(lj).includes("u-sis"), "user ids not leaked");
+r = await worker.fetch(tm({ action: "create", name: "New", email: "new@example.com", role: "boss", password: "longenough1" }), env); assert.equal(r.status, 400, "bad role");
+r = await worker.fetch(tm({ action: "create", name: "New", email: "new@example.com", role: "office", password: "short" }), env); assert.equal(r.status, 400, "short password");
+r = await worker.fetch(tm({ action: "create", name: "", email: "new@example.com", role: "office", password: "longenough1" }), env); assert.equal(r.status, 400, "needs a name");
+r = await worker.fetch(tm({ action: "create", name: "Sis2", email: "SIS@example.com", role: "office", password: "longenough1" }), env); assert.equal(r.status, 409, "already on team");
+r = await worker.fetch(tm({ action: "create", name: "Dup", email: "dup@example.com", role: "office", password: "longenough1" }), env); assert.equal(r.status, 400, "auth refuses");
+tcalls = []; r = await worker.fetch(tm({ action: "create", name: "Aunt", email: "Aunt@Example.com", role: "office", password: "longenough1" }), env); assert.equal(r.status, 200);
+const ins = tcalls.find((c) => c.url.includes("/rest/v1/staff") && c.opts.method === "POST"); assert.deepEqual(JSON.parse(ins.opts.body), { email: "aunt@example.com", name: "Aunt", role: "office", user_id: "u-new" });
+assert.equal(JSON.parse(tcalls.find((c) => c.url.endsWith("/auth/v1/admin/users")).opts.body).email_confirm, true);
+r = await worker.fetch(tm({ action: "role", email: "owner@example.com", role: "office" }), env); assert.equal(r.status, 400, "cannot demote self");
+r = await worker.fetch(tm({ action: "role", email: "sis@example.com", role: "owner" }), env); assert.equal(r.status, 200);
+r = await worker.fetch(tm({ action: "role", email: "nobody@example.com", role: "owner" }), env); assert.equal(r.status, 404);
+r = await worker.fetch(tm({ action: "reset", email: "owner@example.com", password: "newpassword9" }), env); assert.equal(r.status, 400, "no login id on the founding owner");
+r = await worker.fetch(tm({ action: "reset", email: "sis@example.com", password: "newpassword9" }), env); assert.equal(r.status, 200);
+r = await worker.fetch(tm({ action: "remove", email: "owner@example.com" }), env); assert.equal(r.status, 400, "cannot remove self");
+tcalls = []; r = await worker.fetch(tm({ action: "remove", email: "sis@example.com" }), env); assert.equal(r.status, 200);
+assert(tcalls.some((c) => c.opts.method === "DELETE" && c.url.includes("/auth/v1/admin/users/u-sis")), "auth user deleted"); assert(tcalls.some((c) => c.opts.method === "DELETE" && c.url.includes("/rest/v1/staff?email=eq.sis%40example.com")), "staff row deleted");
+// crew logins now require an owner, not just anyone on staff
+calls = []; globalThis.fetch = async (url, opts = {}) => { url = String(url); if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ email: "sis@example.com" })); if (url.includes("/rest/v1/staff")) return new Response(JSON.stringify([{ email: "sis@example.com", role: "office" }])); return new Response("{}", { status: 200 }); };
+r = await worker.fetch(cl({ action: "create", crew_id: CID, email: "z@y.co", password: "longenough1" }, "any"), env); assert.equal(r.status, 403, "office staff cannot create crew logins");
 console.log("all worker checks passed");
