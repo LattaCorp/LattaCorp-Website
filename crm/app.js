@@ -1632,7 +1632,7 @@ function openEstimate(id){
 function setEstTotal(e,total,cb){sb.from("estimates").update({total:total}).eq("id",e.id).then(function(r){if(r.error){alert("Could not update the total.");return}e.total=total;render();cb()})}
 
 /* ---- Inventory: Excel-style sheets with your own categories and columns ---- */
-var INV_PRESETS=[["Blank sheet",["Item","Qty","Notes"]],["Equipment",["Item","Qty","Condition","Location","Last service","Notes"]],["Supplies",["Item","Qty","Unit","Min","Cost","Location"]]];
+var INV_PRESETS=[["Blank sheet",["Item","Qty","Notes"]],["Equipment",["Item","Qty","Serial number","Condition","Location","Notes"]],["Supplies",["Item","Qty","Unit","Min","Cost","Location"]]];
 function invKey(){return"c"+Math.random().toString(36).slice(2,8)}
 function invColType(n){return/^(qty|quantity|min|cost|price|count|total|amount|hours)$/i.test(n)?"number":"text"}
 function invCols(c){return Array.isArray(c.columns)?c.columns:[]}
