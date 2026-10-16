@@ -37,7 +37,7 @@ $("login").addEventListener("submit",function(e){
 });
 $("signout").addEventListener("click",function(){sb.auth.signOut().then(function(){location.reload()})});
 $("refresh").addEventListener("click",load);
-function start(){$("loginwrap").hidden=true;$("app").hidden=false;$("signout").hidden=false;$("refresh").hidden=false;load()}
+function start(){$("gsearch").hidden=false;$("loginwrap").hidden=true;$("app").hidden=false;$("signout").hidden=false;$("refresh").hidden=false;load()}
 sb.auth.getSession().then(function(r){if(r.data&&r.data.session)start()});
 
 /* ---- data ---- */
@@ -66,8 +66,7 @@ function render(){
   var nav=$("nav");nav.textContent="";
   var tdy=today(),stops=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date===tdy}).length;
   [["leads","Leads"+(leads.filter(function(l){return l.status==="new"}).length?" ("+leads.filter(function(l){return l.status==="new"}).length+")":"")],["clients","Clients"],["jobs","Jobs"],["schedule","Schedule"+(stops?" ("+stops+" today)":"")]].forEach(function(v){
-    var b=btn(v[1],v[0]===view?"on":"",function(){view=v[0];query="";$("q").value="";render()});nav.appendChild(b)});
-  $("q").placeholder=view==="leads"?"Search name, phone, address, service...":view==="clients"?"Search clients, phone, address...":"Search client, address, job...";
+    var b=btn(v[1],v[0]===view?"on":"",function(){view=v[0];render()});nav.appendChild(b)});
   $("topbtns").textContent="";
   if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else renderSchedule();
 }
@@ -118,7 +117,6 @@ function renderClients(){
     var right=el("div");right.style.textAlign="right";right.appendChild(el("span","chip "+c.type,tlabel(c.type)));
     b.appendChild(left);b.appendChild(right);b.addEventListener("click",function(){openClient(c.id)});list.appendChild(b)});
 }
-$("q").addEventListener("input",function(e){query=e.target.value.trim().toLowerCase();render()});
 
 /* ---- panel helpers ---- */
 function panel(){var p=$("panel");p.textContent="";p.appendChild(btn("×","close",closeDetail)).setAttribute("aria-label","Close");$("detail").classList.add("on");return p}
@@ -295,6 +293,28 @@ function openImport(){
       out.appendChild(go)};
     rd.readAsText(f)});
 }
+
+/* ---- global search (header) ---- */
+(function(){
+  var gs=$("gs"),res=$("gres");
+  function toks(q){return q.toLowerCase().split(/\s+/).filter(Boolean)}
+  function all(hay,t){hay=hay.toLowerCase();var dig=hay.replace(/\D/g,"");return t.every(function(x){return hay.indexOf(x)>-1||(/^\d{3,}$/.test(x)&&dig.indexOf(x)>-1)})}
+  function sec(title,items,make){if(!items.length)return;res.appendChild(el("h4",null,title));items.slice(0,8).forEach(function(it){var m=make(it),b=document.createElement("button");b.type="button";b.appendChild(el("b",null,m[0]));if(m[1])b.appendChild(el("span",null,m[1]));b.addEventListener("click",function(){close();gs.value="";m[2]()});res.appendChild(b)})}
+  function close(){res.classList.remove("on");res.textContent=""}
+  function run(){
+    var t=toks(gs.value);res.textContent="";if(!t.length){close();return}
+    var cl=clients.filter(function(c){return all([c.name,c.company,c.phone,c.phone2,c.email,clientProps(c.id).map(function(p){return p.address}).join(" ")].join(" "),t)});
+    var jb=jobs.filter(function(j){var sv=byId(services,j.service_id);return all([j.title,sv?sv.name:"",cname(j.client_id),paddr(j.property_id),flabel(j.frequency)].join(" "),t)});
+    var ld=leads.filter(function(l){return all([l.name,l.email,l.phone,l.address,l.service,l.kind].join(" "),t)});
+    sec("Clients",cl,function(c){var ps=clientProps(c.id);return[c.name+(c.company?" · "+c.company:""),[ps[0]&&ps[0].address,c.phone].filter(Boolean).join(" · "),function(){openClient(c.id)}]});
+    sec("Jobs",jb,function(j){return[cname(j.client_id)+" · "+j.title,[paddr(j.property_id),flabel(j.frequency),money(j.price),j.status!=="active"?j.status:""].filter(Boolean).join(" · "),function(){openJob(j.id)}]});
+    sec("Leads",ld,function(l){return[l.name||"(no name)",[l.kind,l.service,l.address].filter(Boolean).join(" · "),function(){openLead(l.id)}]});
+    if(!res.firstChild)res.appendChild(el("div","none","No matches."));
+    res.classList.add("on")}
+  gs.addEventListener("input",run);gs.addEventListener("focus",function(){if(gs.value.trim())run()});
+  gs.addEventListener("keydown",function(e){if(e.key==="Escape"){close();gs.blur()}else if(e.key==="Enter"){var f=res.querySelector("button");if(f)f.click()}});
+  document.addEventListener("click",function(e){if(!$("gsearch").contains(e.target))close()});
+})();
 
 /* ======================= STAGE 2: services, jobs, visits ======================= */
 var FREQ=[["weekly","Weekly"],["biweekly","Every 2 weeks"],["once","One-time"]];
