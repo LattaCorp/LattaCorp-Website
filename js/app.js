@@ -134,3 +134,14 @@ var x0=null;c.addEventListener("touchstart",function(e){x0=e.touches[0].clientX}
 c.addEventListener("touchend",function(e){if(x0===null)return;var d=e.changedTouches[0].clientX-x0;if(Math.abs(d)>40){show(cur+(d<0?1:-1));restart()}x0=null});
 restart();
 }catch(e){}})();
+
+/* Quick quote strip: copy the three answers into the full quote form, then open it */
+(function(){try{
+var f=document.getElementById("qq");if(!f)return;
+f.addEventListener("submit",function(e){e.preventDefault();
+var q=document.getElementById("qf");if(!q)return;
+var a=f.querySelectorAll("input"),n=q.querySelector('input[autocomplete="name"]'),p=q.querySelector('input[type="tel"]'),sv=document.getElementById("svc");
+if(n&&a[0].value)n.value=a[0].value;if(p&&a[1].value)p.value=a[1].value;
+var v=f.querySelector("select").value;if(sv&&v){sv.value=v;sv.dispatchEvent(new Event("change",{bubbles:true}))}
+location.hash="#/services/quote"});
+}catch(e){}})();

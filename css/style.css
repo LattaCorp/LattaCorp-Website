@@ -492,3 +492,13 @@ html.rvon .rv.in{opacity:1;transform:none}
 .hoanote .hn-t{display:flex;flex-direction:column;gap:4px}.hoanote b{color:var(--forest);font-size:1.15rem}.hoanote span{color:var(--ink)}
 .hoanote .btn{white-space:nowrap;flex:none}
 @media (max-width:720px){.hoanote{flex-direction:column;align-items:stretch;text-align:center;padding:16px 16px}.hoanote .btn{text-align:center}}
+
+/* Home: quick quote strip + trust row */
+.quick{display:grid;grid-template-columns:1.15fr 1fr 1fr 1fr auto;gap:14px 16px;align-items:end;margin:0 0 18px;padding:20px 24px;background:#fff;border:1px solid var(--line);border-top:5px solid var(--leaf);border-radius:16px;box-shadow:0 10px 30px rgba(27,85,43,.12)}
+.quick .qq-h h2{margin:0;font-size:1.3rem;color:var(--forest);line-height:1.2}.quick .qq-h p{margin:4px 0 0;font-size:.92rem;color:var(--muted);line-height:1.4}
+.quick label{display:block;font-weight:600;font-size:.88rem}.quick input,.quick select{width:100%;margin-top:4px}
+.quick .btn{white-space:nowrap;align-self:end}
+.trust{list-style:none;margin:0 0 26px;padding:0;display:flex;flex-wrap:wrap;justify-content:center;gap:10px 30px}
+.trust li{display:flex;align-items:center;gap:8px;color:var(--forest);font-weight:600;font-size:.98rem}.trust svg{width:22px;height:22px;flex:none;color:var(--leaf)}
+@media (max-width:1000px){.quick{grid-template-columns:1fr 1fr}.quick .qq-h{grid-column:1/-1}.quick .btn{grid-column:1/-1}}
+@media (max-width:560px){.quick{grid-template-columns:1fr;padding:16px 16px}.trust{flex-direction:column;align-items:flex-start;gap:8px;margin-left:8px}}

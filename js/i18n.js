@@ -1,5 +1,11 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"Residential, HOA & commercial": "Residencial, HOA y comercial",
+"Get a quick quote": "Solicite una cotización rápida",
+"Just three details to start. We'll take it from there.": "Solo tres datos para empezar. Nosotros nos encargamos del resto.",
+"Continue my quote": "Continuar mi cotización",
+"Locally owned in Kissimmee": "Negocio local en Kissimmee",
+"We reply within 1 to 3 business days": "Respondemos en 1 a 3 días hábiles",
 "Live in a community we service?": "¿Vive en una comunidad que atendemos?",
 "For questions, comments, or concerns about the lawn service we provide for your community, please use our Service Requests page.": "Para preguntas, comentarios o inquietudes sobre el servicio de césped que brindamos a su comunidad, use nuestra página de Solicitudes de servicio.",
 "Go to Service Requests": "Ir a Solicitudes de servicio",
