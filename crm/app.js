@@ -191,6 +191,7 @@ function openClient(id){
   var sec=el("div","sec"),h=el("h3",null,"Properties"),addp=btn("+ Add property","btn alt sm",function(){propForm(c,null,sec,h)});h.appendChild(addp);sec.appendChild(h);p.appendChild(sec);
   var holder=el("div");sec.appendChild(holder);drawProps(c,holder);
   p.appendChild(clientJobsSection(c));
+  p.appendChild(historySection(c));
   /* leads */
   var ls=leads.filter(function(l){return l.client_id===c.id});
   if(ls.length){var s2=el("div","sec");s2.appendChild(el("h3",null,"Requests from the website"));
@@ -550,5 +551,30 @@ function clientJobsSection(c){
     var nv=j.status==="active"?nextVisit(j):null;
     card.appendChild(el("div","note",[flabel(j.frequency),money(j.price),j.status!=="active"?(j.status==="paused"?"Paused":"Ended"):nv?"Next: "+dshort(nv.scheduled_date):""].filter(Boolean).join(" · ")));
     var a=el("div","acts");a.appendChild(btn("Open","btn alt sm",function(){openJob(j.id)}));card.appendChild(a);sec.appendChild(card)});
+  return sec}
+
+/* ---- job history on the client page (all-time, not just recent) ---- */
+function historySection(c){
+  var sec=el("div","sec"),h=el("h3",null,"Job history");sec.appendChild(h);
+  var body=el("div");sec.appendChild(body);
+  if(jobsErr){body.appendChild(el("div","note","Run the Stage 2 SQL in Supabase to turn on job history."));return sec}
+  body.appendChild(el("div","note","Loading..."));
+  sb.from("visits").select("*").eq("client_id",c.id).order("scheduled_date",{ascending:false}).limit(1000).then(function(r){
+    body.textContent="";
+    if(r.error){body.appendChild(el("div","note","Could not load history."));return}
+    var all=(r.data||[]).filter(function(v){return v.status!=="scheduled"}).sort(function(a,b){return a.scheduled_date<b.scheduled_date?1:-1});
+    if(!all.length){body.appendChild(el("div","note","No completed work yet. Visits show up here once you mark them Done."));return}
+    var done=all.filter(function(v){return v.status==="done"}),total=done.reduce(function(s,v){return s+Number(v.price||0)},0);
+    var sum=el("div","note",done.length+" visit"+(done.length===1?"":"s")+" completed · "+money(total)+" total"+(all.length>done.length?" · "+(all.length-done.length)+" skipped":"")+(done[0]?" · last: "+dshort(done[0].scheduled_date):""));
+    sum.style.cssText="margin-bottom:8px;font-weight:700";body.appendChild(sum);
+    var list=el("div");body.appendChild(list);var shown=0;
+    function more(n){
+      all.slice(shown,shown+n).forEach(function(v){
+        var j=byId(jobs,v.job_id),row=el("div","pcard");row.style.cssText="display:flex;justify-content:space-between;gap:10px;align-items:center;cursor:"+(j?"pointer":"default");
+        var l=el("div");l.appendChild(el("b",null,dshort(v.scheduled_date)+" · "+(j?j.title:"(deleted job)")));l.appendChild(el("div","note",[paddr(v.property_id),money(v.price)].filter(Boolean).join(" · ")));
+        var rt=el("span","chip "+(v.status==="done"?"won":"lost"),v.status==="done"?"Done":"Skipped");row.appendChild(l);row.appendChild(rt);
+        if(j)row.addEventListener("click",function(){openJob(j.id)});list.appendChild(row)});
+      shown=Math.min(all.length,shown+n);mb.hidden=shown>=all.length}
+    var mb=btn("Show more","btn alt sm",function(){more(50)});body.appendChild(mb);more(15)});
   return sec}
 })();
