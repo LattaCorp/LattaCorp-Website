@@ -59,6 +59,24 @@ textarea{min-height:110px;resize:vertical}
 .row:hover{box-shadow:0 4px 14px rgba(27,85,43,.12)}
 .row.new{border-left-color:var(--gold)}
 .row b{font-size:1.02rem}.row .sub{color:var(--muted);font-size:.9rem}
+.invbar{display:flex;gap:10px;align-items:center;margin:4px 0 10px;flex-wrap:wrap}.invbar input{flex:1;min-width:200px;border:1px solid #bcc9b9;border-radius:999px;padding:9px 16px;font:inherit}
+.invwrap{overflow:auto;border:1px solid #cfd9cc;border-radius:8px;background:#fff;max-height:68vh}
+.invgrid{border-collapse:separate;border-spacing:0;width:100%;min-width:520px;font-size:.95rem}
+.invgrid th,.invgrid td{border-right:1px solid #e3eae0;border-bottom:1px solid #e3eae0;padding:0;white-space:nowrap;background:#fff}
+.invgrid thead th{position:sticky;top:0;z-index:2;background:#e8f1e4;color:var(--forest);text-align:left;padding:0 4px 0 0;font-weight:700;min-width:120px}
+.invgrid th.rn,.invgrid td.rn{position:sticky;left:0;z-index:1;min-width:38px;width:38px;text-align:center;background:#f1f5ef;color:var(--muted);font-size:.8rem;padding:0 6px}
+.invgrid thead th.rn{z-index:3}
+.invgrid th.xc,.invgrid td.xc{min-width:34px;width:34px;text-align:center}
+.invgrid .hcol{background:none;border:0;padding:9px 8px;font:inherit;font-weight:700;color:var(--forest);cursor:pointer;text-align:left}
+.invgrid .hgear{background:none;border:0;color:var(--muted);cursor:pointer;font-size:1.05rem;line-height:1;padding:4px 6px;border-radius:6px}.invgrid .hgear:hover{background:#d6e6d1}
+.invgrid td input{width:100%;min-width:120px;border:0;border-radius:0;padding:8px;font:inherit;background:transparent;color:var(--ink);box-shadow:none;margin:0}
+.invgrid td input:focus{outline:2px solid var(--leaf);outline-offset:-2px;background:#f6fbf3}
+.invgrid td{vertical-align:middle}.invgrid thead th:nth-child(2),.invgrid td:nth-child(2) input{min-width:220px}
+.invgrid td input.num,.invgrid th.num,.invgrid td.num{text-align:right}
+.invgrid td input.low{background:#fde8e6;color:var(--red);font-weight:700}
+.invgrid tfoot td{position:sticky;bottom:0;background:#f1f5ef;font-weight:700;padding:7px 8px;font-size:.9rem}
+.invgrid tfoot td.rn{z-index:1}
+.invacts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
 .chip{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.78rem;font-weight:700;background:var(--mint);color:var(--forest);white-space:nowrap}
 .chip.new{background:#fff3c4;color:#7a5b00}.chip.lost{background:#eee;color:#666}.chip.won{background:#d6f2da}
 .empty{text-align:center;color:var(--muted);padding:40px 10px}
@@ -193,7 +211,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 <body>
 <header>
   <a class="brandbar" href="./" aria-label="Foreman by Latta Corp, home"><span class="box"><img class="tree" src="../images/logo-tree-header.png" alt=""></span><span class="bname"><span class="fm">Foreman</span><span class="by">by <img class="word" src="../images/logo-wordmark-header.svg" alt="Latta Corp"></span></span></a>
-  <div class="gsearch" id="gsearch" hidden><input id="gs" type="search" placeholder="Search clients, addresses, jobs..." aria-label="Search clients, addresses and jobs" autocomplete="off"><div id="gres" role="listbox"></div></div>
+  <div class="gsearch" id="gsearch" hidden><input id="gs" type="search" placeholder="Search clients, invoices, estimates, tasks, inventory..." aria-label="Search everything" autocomplete="off"><div id="gres" role="listbox"></div></div>
   <div class="hbtns"><button class="hb" id="refresh" hidden>Refresh</button><button class="hb" id="signout" hidden>Sign out</button></div>
 </header>
 
@@ -226,7 +244,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=16"></script>
+<script src="app.js?v=17"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

@@ -1,0 +1,7 @@
+User-agent: *
+Allow: /
+Disallow: /crm/
+Disallow: /d/
+Disallow: /api/
+
+Sitemap: https://lattacorpfl.com/sitemap.xml
