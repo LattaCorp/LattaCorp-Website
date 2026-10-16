@@ -408,6 +408,7 @@ function visitCard(v,after,showJob,opts){
   if(opts.detail){var pp=byId(props,v.property_id),tips=[pp&&pp.notes,j&&j.instructions].filter(Boolean).join("  |  ");if(tips){var tn=el("div","note","⚠ "+tips);tn.style.cssText="color:#7a5b00;white-space:pre-wrap";l.appendChild(tn)}}
   if(s3&&crew.length&&v.crew_id&&crewName(v.crew_id))l.appendChild(el("div","note","Crew: "+crewName(v.crew_id)));
   if(v.status!=="scheduled"||showJob===false)l.appendChild(el("div","note",dshort(v.scheduled_date)));
+  if(v.status==="scheduled"&&v.weather_from){var wn=el("div","note","Moved by weather from "+dshort(v.weather_from));wn.style.color="#1f5f9a";l.appendChild(wn)}
   top.appendChild(l);
   if(v.status!=="scheduled")top.appendChild(el("span","chip "+(v.status==="done"?"won":"lost"),v.status==="done"?"Done":"Skipped"));
   card.appendChild(top);
@@ -427,7 +428,7 @@ function visitCard(v,after,showJob,opts){
       a.appendChild(btn("Skip","btn alt sm",function(){patch({status:"skipped"})}));
       a.appendChild(btn("Move","btn alt sm",function(){
         a.textContent="";var di=document.createElement("input");di.type="date";di.value=v.scheduled_date;di.style.width="auto";a.appendChild(di);
-        a.appendChild(btn("Save date","btn sm",function(){if(!di.value)return;patch({scheduled_date:di.value})}));a.appendChild(btn("Cancel","btn alt sm",btns))}));
+        a.appendChild(btn("Save date","btn sm",function(){if(!di.value)return;patch(wxOn()?{scheduled_date:di.value,weather_from:null}:{scheduled_date:di.value})}));a.appendChild(btn("Cancel","btn alt sm",btns))}));
     }else{
       if(!v.invoice_id&&!v.paid_at)a.appendChild(btn("Undo","btn alt sm",function(){patch({status:"scheduled",completed_at:null})}));
       if(!billErr&&v.status==="done"){
@@ -509,6 +510,7 @@ function renderDay(list,odCount){
   var di=document.createElement("input");di.type="date";di.value=d;di.style.cssText="width:auto;margin-left:auto";di.setAttribute("aria-label","Jump to date");di.addEventListener("change",function(){if(di.value){selDate=di.value;render()}});list.lastChild.appendChild(di);
   if(d===t&&odCount){var ob=btn(odCount+" overdue visit"+(odCount>1?"s":"")+" need attention. Tap to review.","btn alt",function(){smode="overdue";render()});ob.style.cssText="margin-bottom:10px;border-color:#b3261e;color:#b3261e;width:100%";list.appendChild(ob)}
   crewChips(list);
+  wxBanners(list,d);
   var all=onDay(d).filter(crewOk).sort(dayOrder),sched=all.filter(function(v){return v.status==="scheduled"});
   if(!all.length){list.appendChild(el("div","empty","Nothing scheduled for this day."));return}
   var done=all.filter(function(v){return v.status==="done"}).length,total=all.reduce(function(s,v){return s+(v.status==="skipped"?0:Number(v.price||0))},0);
@@ -517,7 +519,7 @@ function renderDay(list,odCount){
   if(sched.length){
     var ru=routeUrl(sched);if(ru){var a=el("a","btn sm","Start route");a.href=ru;a.target="_blank";a.rel="noopener";bt.appendChild(a);bt.appendChild(document.createTextNode(" "))}
     if(s3){bt.appendChild(btn("Send route","btn alt sm",function(){openSendRoute(d)}));bt.appendChild(document.createTextNode(" "))}
-    bt.appendChild(btn("Push to next day","btn alt sm",function(){pushDay(d,onDay(d).filter(function(v){return v.status==="scheduled"}).length)}))}
+    bt.appendChild(btn("Weather delay","btn alt sm",function(){pushDay(d,onDay(d).filter(function(v){return v.status==="scheduled"}).length)}))}
   sum.appendChild(bt);list.appendChild(sum);
   if(sched.length>10)list.appendChild(el("div","note","The route link covers the first 10 stops in your order."));
   all.forEach(function(v){
@@ -555,10 +557,21 @@ function renderMonth(list){
     if(vs.length){cell.appendChild(el("span","mc",vs.length+(vs.length>1?" stops":" stop")));cell.appendChild(el("span","mt",money(vs.reduce(function(s,v){return s+(v.status==="skipped"?0:Number(v.price||0))},0))))}
     cell.addEventListener("click",function(){selDate=d;smode="day";render()});g.appendChild(cell)})(addDays(gs,i))}
   list.appendChild(g)}
+function wxOn(){return visits.some(function(v){return"weather_from" in v})}
+/* Weather delay: moves the day's scheduled stops to the next day and remembers where they came from, so Undo can put them back. */
 function pushDay(d,n){
-  if(!confirm("Move all "+n+" scheduled stop"+(n>1?"s":"")+" on "+dlabel(d)+" to "+dlabel(addDays(d,1))+"? (Good for rain days.)"))return;
-  sb.from("visits").update({scheduled_date:addDays(d,1)}).eq("scheduled_date",d).eq("status","scheduled").then(function(r){
-    if(r.error){alert("Could not move them.");return}loadVisits().then(render)})}
+  if(!confirm("Weather delay: move all "+n+" scheduled stop"+(n>1?"s":"")+" on "+dlabel(d)+" to "+dlabel(addDays(d,1))+"?\n\nYou can undo this from "+dlabel(d)+" if the weather clears."))return;
+  sb.from("visits").update({scheduled_date:addDays(d,1),weather_from:d}).eq("scheduled_date",d).eq("status","scheduled").then(function(r){
+    if(r.error){alert(/weather_from/.test(r.error.message||"")?"Weather delay needs a one-time setup. Run the weather SQL in Supabase (SQL Editor), then try again.":"Could not move them.");return}loadVisits().then(render)})}
+function undoWeather(d){
+  sb.from("visits").update({scheduled_date:d,weather_from:null}).eq("weather_from",d).eq("status","scheduled").then(function(r){
+    if(r.error){alert("Could not undo the weather delay.");return}loadVisits().then(render)})}
+function wxBanners(list,d){
+  var out=visits.filter(function(v){return v.weather_from===d&&v.status==="scheduled"&&v.scheduled_date!==d}),inn=visits.filter(function(v){return v.scheduled_date===d&&v.weather_from&&v.weather_from!==d&&v.status==="scheduled"});
+  function bar(txt,from){var b=el("div","wxbar");b.appendChild(el("span",null,txt));b.appendChild(btn("Undo weather delay","btn alt sm",function(){undoWeather(from)}));list.appendChild(b)}
+  if(out.length)bar("☔ "+out.length+" stop"+(out.length>1?"s were":" was")+" delayed by weather to "+dlabel(out[0].scheduled_date)+".",d);
+  var froms={};inn.forEach(function(v){froms[v.weather_from]=(froms[v.weather_from]||0)+1});
+  Object.keys(froms).sort().forEach(function(f){bar("☔ "+froms[f]+" stop"+(froms[f]>1?"s":"")+" here "+(froms[f]>1?"were":"was")+" moved from "+dlabel(f)+" by a weather delay.",f)})}
 
 /* ---- job detail ---- */
 function openJob(id){
