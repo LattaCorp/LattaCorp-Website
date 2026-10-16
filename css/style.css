@@ -538,3 +538,12 @@ html.rvon .rv.in{opacity:1;transform:none}
 .qband .cyc button{z-index:1}
 @media (max-width:1100px){.home3{grid-template-columns:1fr;max-width:680px;gap:18px}.home3 .h3c{order:1}.home3 .h3r{order:2;padding-top:0}.home3 .h3l{order:3;padding-top:0}.home3 .trust{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:10px 26px}}
 @media (max-width:560px){.qband{padding:18px 12px 40px;min-height:0}.qband .quick{grid-template-columns:1fr}.home3 .trust{flex-direction:column;align-items:flex-start;margin-left:8px}}
+
+/* Home top v3: left column empty, trust row under the buttons, notice level with the photo band */
+.home3 .h3c{grid-column:2}.home3 .h3r{grid-column:3;grid-row:1;align-self:end;padding-top:0}
+.home3 .h3hero{padding-bottom:6px}
+.home3 .h3hero .cta{margin-top:18px}
+.home3 .h3c>.hero .trust,.home3 .h3hero .trust{flex-direction:row;flex-wrap:wrap;justify-content:center;gap:6px 20px;margin:18px auto 4px;max-width:560px}
+.home3 .h3hero .trust li{font-size:.95rem;align-items:center}.home3 .h3hero .trust svg{margin-top:0;width:20px;height:20px}
+.qband{margin-top:14px}
+@media (max-width:1100px){.home3 .h3c{grid-column:auto}.home3 .h3r{grid-column:auto;grid-row:auto;align-self:auto}}
