@@ -4,6 +4,7 @@ var cfg=window.CRM_CONFIG,sb=window.supabase.createClient(cfg.url,cfg.key,{auth:
 var STATUSES=[["new","New"],["contacted","Contacted"],["quoted","Quoted"],["won","Won"],["lost","Lost"]];
 var TYPES=[["residential","Residential"],["hoa","HOA"],["commercial","Commercial"]];
 var leads=[],clients=[],props=[],clientsErr=false,services=[],jobs=[],visits=[],jobsErr=false;
+var photos=[],photoErr=false,pf={client:"all",kind:"all",when:"all"},psel=null,pshown=60;
 var expenses=[],expErr=false,rtab="overview",rper="month",rfrom="",rto="",exCat="all";
 var todos=[],todoErr=false,tfilter="open",team=[];
 var role="owner",myEmail="";function isOwner(){return role==="owner"}
@@ -66,7 +67,8 @@ function load(){
     sb.from("business").select("*").eq("id",1),
     sb.from("visits").select("*").eq("status","done").is("invoice_id",null).is("paid_at",null).limit(5000),
     sb.from("todos").select("*").order("created_at",{ascending:false}).limit(3000),
-    sb.from("expenses").select("*").order("spent_on",{ascending:false}).limit(20000)
+    sb.from("expenses").select("*").order("spent_on",{ascending:false}).limit(20000),
+    sb.from("photos").select("*").order("created_at",{ascending:false}).limit(5000)
   ]).then(function(rs){
     if(rs[0].error){$("msg").textContent="Could not load leads. If you just signed in, make sure this email is on the staff list.";return}
     leads=rs[0].data||[];
@@ -74,7 +76,7 @@ function load(){
     clients=rs[1].error?[]:(rs[1].data||[]);props=rs[2].error?[]:(rs[2].data||[]);
     jobsErr=!!(rs[3].error||rs[4].error||rs[5].error||clientsErr);
     services=rs[3].error?[]:(rs[3].data||[]);jobs=rs[4].error?[]:(rs[4].data||[]);visits=rs[5].error?[]:(rs[5].data||[]);histFrom=addDays(today(),-45);s3=!rs[6].error;crew=rs[6].error?[]:(rs[6].data||[]);
-    billErr=!!(rs[7].error||rs[9].error||jobsErr);invoices=rs[7].error?[]:(rs[7].data||[]);biz=rs[8].error?null:((rs[8].data||[])[0]||null);unbilled=rs[9].error?[]:(rs[9].data||[]);expErr=!!rs[11].error;expenses=rs[11].error?[]:(rs[11].data||[]);repData=null;todoErr=!!rs[10].error;todos=rs[10].error?[]:(rs[10].data||[]);
+    billErr=!!(rs[7].error||rs[9].error||jobsErr);invoices=rs[7].error?[]:(rs[7].data||[]);biz=rs[8].error?null:((rs[8].data||[])[0]||null);unbilled=rs[9].error?[]:(rs[9].data||[]);photoErr=!!rs[12].error;photos=rs[12].error?[]:(rs[12].data||[]);expErr=!!rs[11].error;expenses=rs[11].error?[]:(rs[11].data||[]);repData=null;todoErr=!!rs[10].error;todos=rs[10].error?[]:(rs[10].data||[]);
     try{sb.rpc("team_names").then(function(r){if(r&&!r.error&&r.data)team=r.data},function(){})}catch(e){}
     render();topUp().then(function(n){if(n)render()});
   });
@@ -88,15 +90,16 @@ var ICONS={leads:'<svg viewBox="0 0 24 24"><path d="M3 13l2.5-7.5A2 2 0 0 1 7.4 
  schedule:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
  team:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M18.5 3.5v3M17 5h3"/></svg>',
  todo:'<svg viewBox="0 0 24 24"><path d="M4 6.5l1.7 1.7L9 4.8"/><path d="M4 13.5l1.7 1.7L9 11.8"/><path d="M4 20.5l1.7 1.7"/><path d="M13 6h8M13 13h8M13 20h8"/></svg>',
- reports:'<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'};
+ reports:'<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>',
+ photos:'<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>'};
 function render(){
   var nav=$("side");nav.textContent="";$("app").classList.toggle("wide",view==="reports");
   var tdy=today(),stops=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date===tdy}).length,newL=leads.filter(function(l){return l.status==="new"}).length;
-  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops],["todo","To-Do",todos.filter(function(t){return!t.done&&t.due_date&&t.due_date<=tdy}).length],["billing","Billing",invoices.filter(isOverdue).length],["reports","Reports",0]].concat(isOwner()?[["team","Team",0]]:[]).forEach(function(v){
+  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops],["todo","To-Do",todos.filter(function(t){return!t.done&&t.due_date&&t.due_date<=tdy}).length],["billing","Billing",invoices.filter(isOverdue).length],["reports","Reports",0],["photos","Photos",0]].concat(isOwner()?[["team","Team",0]]:[]).forEach(function(v){
     var b=el("button",v[0]===view?"on":"");b.type="button";b.addEventListener("click",function(){view=v[0];render()});b.innerHTML=ICONS[v[0]];b.appendChild(el("span",null,v[1]));
     if(v[2])b.appendChild(el("span","badge",String(v[2])));b.setAttribute("aria-current",v[0]===view?"page":"false");nav.appendChild(b)});
   $("topbtns").textContent="";
-  if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else if(view==="billing")renderBilling();else if(view==="todo")renderTodo();else if(view==="reports")renderReports();else if(view==="team"&&isOwner())renderTeam();else renderSchedule();
+  if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else if(view==="billing")renderBilling();else if(view==="todo")renderTodo();else if(view==="reports")renderReports();else if(view==="photos")renderPhotoLib();else if(view==="team"&&isOwner())renderTeam();else renderSchedule();
 }
 function renderLeads(){
   var tabs=$("tabs");tabs.textContent="";
@@ -216,6 +219,7 @@ function openClient(id){
   var holder=el("div");sec.appendChild(holder);drawProps(c,holder);
   p.appendChild(clientJobsSection(c));
   p.appendChild(clientBillingSection(c));
+  p.appendChild(clientPhotosSection(c));
   p.appendChild(historySection(c));
   /* leads */
   var ls=leads.filter(function(l){return l.client_id===c.id});
@@ -449,6 +453,7 @@ function visitCard(v,after,showJob,opts){
         else{var pl=el("span","note","Paid at visit:");pl.style.alignSelf="center";a.appendChild(pl);["Cash","Zelle","Check"].forEach(function(m){a.appendChild(btn(m,"btn alt sm",function(){patch({paid_at:new Date().toISOString(),paid_method:m})}))})}
       }
     }
+    if(!photoErr&&v.status!=="skipped"){var pb=btn("Photo","btn alt sm",function(){pickPhotos(true,function(fs){pb.textContent="Uploading...";uploadMany(fs,{client_id:v.client_id,property_id:v.property_id,visit_id:v.id,kind:v.status==="done"?"after":"before"}).then(function(res){pb.textContent=res.ok?"Photo added ✓":"Photo";var msg=uploadMsg(res);if(msg)alert(msg);render()})})});a.appendChild(pb)}
     var pr=byId(props,v.property_id);
     if(pr){var m=el("a","btn alt sm","Map");m.href=mapsUrl(pr.address);m.target="_blank";m.rel="noopener";a.appendChild(m)}
     if(showJob!==false&&j)a.appendChild(btn("Job","btn alt sm",function(){openJob(j.id)}));
@@ -876,19 +881,27 @@ function renderExpenses(list){
   var tot=r2(set.reduce(function(s,e){return s+Number(e.amount)},0));
   var sm=el("div","note",set.length+" expense"+(set.length===1?"":"s")+" · "+money(tot));sm.style.cssText="font-weight:700;margin:8px 0";list.appendChild(sm);
   if(!set.length){list.appendChild(el("div","empty","No expenses here yet. Tap + Add expense."));return}
-  set.forEach(function(e){var row=el("button","row client");row.type="button";var l=el("div");l.appendChild(el("b",null,(e.vendor||e.category)+" · "+money(e.amount)));l.appendChild(el("div","sub",[dshort(e.spent_on),e.category,e.client_id?cname(e.client_id):"",e.note].filter(Boolean).join(" · ")));row.appendChild(l);row.addEventListener("click",function(){openExpense(e)});list.appendChild(row)})}
+  set.forEach(function(e){var row=el("button","row client");row.type="button";var l=el("div");l.appendChild(el("b",null,(e.vendor||e.category)+" · "+money(e.amount)));l.appendChild(el("div","sub",[dshort(e.spent_on),e.category,e.client_id?cname(e.client_id):"",e.note,photos.some(function(x){return x.expense_id===e.id})?"receipt photo":""].filter(Boolean).join(" · ")));row.appendChild(l);row.addEventListener("click",function(){openExpense(e)});list.appendChild(row)})}
 function openExpense(e){
   var p=panel();p.appendChild(el("h2",null,e?"Expense":"Add expense"));
   var g=el("div","grid2"),dt=fld("Date","date",e?e.spent_on:today()),am=fld("Amount ($)","number",e?e.amount:"");am.input.step="0.01";am.input.inputMode="decimal";g.appendChild(dt);g.appendChild(am);p.appendChild(g);
   var cat=fld("Category","select",e?e.category:"Fuel",EXCATS.map(function(c){return[c,c]})),ve=fld("Vendor / paid to (optional)","text",e?e.vendor:""),no=fld("Note (optional)","text",e?e.note:"");
   var cl=fld("For a client's job (optional)","select",e&&e.client_id?e.client_id:"",[["","None"]].concat(clients.filter(function(c){return!c.archived||(e&&e.client_id===c.id)}).map(function(c){return[c.id,c.name]})));
   [cat,ve,no,cl].forEach(function(f){p.appendChild(f)});
+  var pend=[];
+  if(!photoErr){
+    var rc=el("div","sec"),rh=el("h3",null,"Receipt photos");rc.appendChild(rh);var rg=el("div");rc.appendChild(rg);
+    var have=e?photos.filter(function(x){return x.expense_id===e.id}):[];if(have.length)photoGrid(rg,have,{onTile:function(ph,i){openLightbox(have,i)}});
+    var pn=el("div","note");function pnTxt(){pn.textContent=pend.length?pend.length+" photo"+(pend.length>1?"s":"")+" ready. They upload when you press Save.":(have.length?"":"No receipt attached.")}pnTxt();
+    var rb=el("div","pbar2");rb.appendChild(btn("Take photo","btn alt sm",function(){pickPhotos(true,function(fs){pend=pend.concat(fs);pnTxt()})}));rb.appendChild(btn("Choose photo","btn alt sm",function(){pickPhotos(false,function(fs){pend=pend.concat(fs);pnTxt()})}));rc.appendChild(rb);rc.appendChild(pn);p.appendChild(rc)}
   var acts=el("div","acts");acts.style.marginTop="12px";
   var sv=btn("Save","btn",function(){
     var a=parseFloat(am.input.value);if(isNaN(a)||a<0){alert("Enter the amount.");return}if(!dt.input.value){alert("Pick the date.");return}
     var row={spent_on:dt.input.value,amount:a,category:cat.input.value,vendor:ve.input.value.trim(),note:no.input.value.trim(),client_id:cl.input.value||null};sv.disabled=true;
     var q=e?sb.from("expenses").update(row).eq("id",e.id).select().single():sb.from("expenses").insert(Object.assign({created_by:myEmail||""},row)).select().single();
-    q.then(function(r){sv.disabled=false;if(r.error||!r.data){alert("Could not save. Did you run the Stage 9 SQL?");return}if(e)Object.assign(e,r.data);else expenses.unshift(r.data);repData=null;closeDetail();render()})});acts.appendChild(sv);
+    q.then(function(r){sv.disabled=false;if(r.error||!r.data){alert("Could not save. Did you run the Stage 9 SQL?");return}if(e)Object.assign(e,r.data);else expenses.unshift(r.data);repData=null;
+      if(!pend.length){closeDetail();render();return}
+      sv.disabled=true;sv.textContent="Uploading photo...";uploadMany(pend,{expense_id:r.data.id,client_id:r.data.client_id,kind:"receipt"}).then(function(res){var msg=uploadMsg(res);if(msg)alert(msg);closeDetail();render()})})});acts.appendChild(sv);
   if(e)acts.appendChild(btn("Delete","btn danger",function(){if(!confirm("Delete this expense?"))return;sb.from("expenses").delete().eq("id",e.id).then(function(r){if(r.error){alert("Could not delete.");return}expenses=expenses.filter(function(z){return z.id!==e.id});repData=null;closeDetail();render()})}));
   p.appendChild(acts)}
 
@@ -935,6 +948,143 @@ function drawCharts(host,d,d3){
   host.appendChild(pieChart("Overall earnings",pLabel()+" · "+dshort(d.from)+" – "+dshort(d.to)+" · money made minus money spent",
     [{label:"Kept (net earnings)",v:Math.max(0,r2(d.collected-d.spent)),color:PIECOL.slot6},{label:"Spent",v:Math.min(d.spent,d.collected)||(d.collected?0:d.spent),color:PIECOL.slot2}],
     {big:sm(d.net),small:"net earnings"},"Made "+money(d.collected)+" − spent "+money(d.spent)+" = "+sm(d.net)+"."))}
+
+/* ---- Photos: stored in a private Supabase bucket, shrunk on the phone/computer before upload ---- */
+var KINDS=[["before","Before"],["after","After"],["property","Property"],["issue","Issue / damage"],["receipt","Receipt"],["other","Other"]];
+function kindLabel(k){var x=KINDS.filter(function(a){return a[0]===k})[0];return x?x[1]:"Other"}
+function uid(){return(window.crypto&&crypto.randomUUID)?crypto.randomUUID():"p"+Date.now().toString(36)+Math.random().toString(36).slice(2,10)}
+function viaImg(file){return new Promise(function(res,rej){var u=URL.createObjectURL(file),i=new Image();i.onload=function(){URL.revokeObjectURL(u);res(i)};i.onerror=function(){URL.revokeObjectURL(u);rej(new Error("read"))};i.src=u})}
+function loadImg(file){if(window.createImageBitmap)return createImageBitmap(file,{imageOrientation:"from-image"}).catch(function(){return viaImg(file)});return viaImg(file)}
+function toJpeg(img,max,q){
+  var w=img.width||img.naturalWidth,h=img.height||img.naturalHeight,s=Math.min(1,max/Math.max(w,h)),cw=Math.max(1,Math.round(w*s)),ch=Math.max(1,Math.round(h*s)),c=document.createElement("canvas");c.width=cw;c.height=ch;
+  var x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,cw,ch);x.drawImage(img,0,0,cw,ch);
+  return new Promise(function(res,rej){c.toBlob(function(b){b?res({blob:b,w:cw,h:ch}):rej(new Error("encode"))},"image/jpeg",q)})}
+function pickPhotos(capture,cb){
+  var i=document.createElement("input");i.type="file";i.accept="image/*";if(capture)i.setAttribute("capture","environment");else i.multiple=true;i.style.display="none";document.body.appendChild(i);
+  i.addEventListener("change",function(){var fs=Array.prototype.slice.call(i.files||[]);document.body.removeChild(i);if(fs.length)cb(fs)});i.click()}
+function uploadPhoto(file,meta){
+  return loadImg(file).then(function(img){return Promise.all([toJpeg(img,1600,.82),toJpeg(img,360,.7)])}).then(function(rs){
+    var full=rs[0],th=rs[1],id=uid(),folder=meta.client_id||"general",path=folder+"/"+id+".jpg",tpath=folder+"/"+id+"_t.jpg",st=sb.storage.from("photos");
+    return st.upload(path,full.blob,{contentType:"image/jpeg"}).then(function(u){
+      if(u.error)throw new Error("upload");
+      return st.upload(tpath,th.blob,{contentType:"image/jpeg"}).then(function(u2){
+        if(u2.error){st.remove([path]);throw new Error("upload")}
+        var row={client_id:meta.client_id||null,property_id:meta.property_id||null,visit_id:meta.visit_id||null,expense_id:meta.expense_id||null,kind:meta.kind||"other",caption:meta.caption||"",path:path,thumb_path:tpath,size_bytes:full.blob.size+th.blob.size,width:full.w,height:full.h,created_by:myEmail||""};
+        return sb.from("photos").insert(row).select().single().then(function(r){
+          if(r.error||!r.data){st.remove([path,tpath]);throw new Error("save")}
+          photos.unshift(r.data);return r.data})})})})}
+function uploadMany(files,meta,onProg){
+  var ok=0,bad=[];
+  return files.reduce(function(p,f,i){return p.then(function(){if(onProg)onProg(i+1,files.length);return uploadPhoto(f,meta).then(function(){ok++},function(){bad.push(f.name||"photo")})})},Promise.resolve()).then(function(){return{ok:ok,bad:bad}})}
+function uploadMsg(res){return res.bad.length?"Added "+res.ok+". Could not add: "+res.bad.join(", ")+". (Photos must be JPEG, PNG or WebP images; if you picked an iPhone HEIC on a computer, choose the same photo from the phone instead.)":""}
+var pcache={};
+function signPaths(paths){
+  var need=paths.filter(function(p){var c=pcache[p];return p&&(!c||c.exp<Date.now()+60000)});if(!need.length)return Promise.resolve();
+  var ch=[];for(var i=0;i<need.length;i+=100)ch.push(need.slice(i,i+100));
+  return Promise.all(ch.map(function(c){return sb.storage.from("photos").createSignedUrls(c,3600).then(function(r){if(r.error||!r.data)return;r.data.forEach(function(d){if(d.signedUrl&&d.path)pcache[d.path]={url:d.signedUrl,exp:Date.now()+3500000}})},function(){})}))}
+function photoLabel(ph){var c=ph.client_id?byId(clients,ph.client_id):null;return(c?c.name:"No client")+" · "+kindLabel(ph.kind)+" · "+dshort(String(ph.created_at).slice(0,10))}
+function photoGrid(host,rows,opts){
+  opts=opts||{};host.textContent="";
+  if(!rows.length)return;
+  var grid=el("div","pgrid"),imgs=[];
+  rows.forEach(function(ph,i){
+    var t=el("button","ptile"+(opts.sel&&opts.sel[ph.id]?" picked":""));t.type="button";t.title=photoLabel(ph)+(ph.caption?" · "+ph.caption:"");
+    var im=document.createElement("img");im.alt=ph.caption||photoLabel(ph);im.loading="lazy";t.appendChild(im);imgs.push([im,ph.thumb_path||ph.path]);
+    if(opts.sel){var ck=el("span","pck",opts.sel[ph.id]?"✓":"");t.appendChild(ck)}
+    if(!opts.sel&&ph.caption)t.appendChild(el("span","pcap",ph.caption));
+    t.addEventListener("click",function(){if(opts.onTile)opts.onTile(ph,i);else openLightbox(rows,i)});grid.appendChild(t)});
+  host.appendChild(grid);
+  signPaths(imgs.map(function(x){return x[1]})).then(function(){imgs.forEach(function(x){var c=pcache[x[1]];if(c)x[0].src=c.url})})}
+function removePhotos(rows){
+  var paths=[];rows.forEach(function(p){paths.push(p.path);if(p.thumb_path)paths.push(p.thumb_path)});
+  return sb.storage.from("photos").remove(paths).then(function(r){
+    if(r.error)return false;
+    return sb.from("photos").delete().in("id",rows.map(function(p){return p.id})).then(function(d){
+      if(d.error)return false;var ids={};rows.forEach(function(p){ids[p.id]=1;delete pcache[p.path];delete pcache[p.thumb_path]});photos=photos.filter(function(p){return!ids[p.id]});return true})})}
+function deletePhotos(rows,done){
+  if(!rows.length)return;
+  if(!confirm("Delete "+rows.length+" photo"+(rows.length>1?"s":"")+"? This frees up the space and can't be undone."))return;
+  removePhotos(rows).then(function(ok){if(!ok){alert("Could not delete. Check your connection and try again.");return}if(done)done();render()})}
+
+/* full-size viewer */
+var lbx=null;
+function openLightbox(rows,idx){
+  if(!lbx){lbx=document.createElement("div");lbx.id="lbx";lbx.hidden=true;document.body.appendChild(lbx)}
+  var cur=idx;lbx.hidden=false;document.body.classList.add("lbopen");
+  function close(){lbx.hidden=true;lbx.textContent="";document.body.classList.remove("lbopen");document.removeEventListener("keydown",key)}
+  function key(e){if(e.key==="Escape"){e.stopPropagation();close()}else if(e.key==="ArrowLeft")go(-1);else if(e.key==="ArrowRight")go(1)}
+  function go(d){var n=cur+d;if(n<0||n>=rows.length)return;cur=n;draw()}
+  function draw(){
+    var ph=rows[cur];lbx.textContent="";
+    var bar=el("div","lbbar");bar.appendChild(btn("‹ Close","hb",close));bar.appendChild(el("span","lbct",(cur+1)+" of "+rows.length));lbx.appendChild(bar);
+    var stage=el("div","lbstage"),im=document.createElement("img");im.alt=photoLabel(ph);stage.appendChild(im);
+    var pv=btn("‹","lbnav l",function(){go(-1)});pv.disabled=cur===0;pv.setAttribute("aria-label","Previous photo");var nx=btn("›","lbnav r",function(){go(1)});nx.disabled=cur===rows.length-1;nx.setAttribute("aria-label","Next photo");stage.appendChild(pv);stage.appendChild(nx);lbx.appendChild(stage);
+    signPaths([ph.path]).then(function(){var c=pcache[ph.path];if(c&&rows[cur]===ph)im.src=c.url});
+    var info=el("div","lbinfo"),pr=ph.property_id?byId(props,ph.property_id):null;
+    info.appendChild(el("div","lbt",photoLabel(ph)+(pr?" · "+pr.address:"")));
+    var cap=document.createElement("input");cap.type="text";cap.placeholder="Add a caption...";cap.value=ph.caption||"";cap.setAttribute("aria-label","Caption");
+    var kd=document.createElement("select");kd.setAttribute("aria-label","Photo type");KINDS.forEach(function(k){var o=document.createElement("option");o.value=k[0];o.textContent=k[1];kd.appendChild(o)});kd.value=ph.kind;
+    var sv=btn("Save","btn sm",function(){sb.from("photos").update({caption:cap.value.trim(),kind:kd.value}).eq("id",ph.id).then(function(r){if(r.error){alert("Could not save.");return}ph.caption=cap.value.trim();ph.kind=kd.value;sv.textContent="Saved ✓";setTimeout(function(){sv.textContent="Save"},1200)})});
+    var row=el("div","lbrow");row.appendChild(cap);row.appendChild(kd);row.appendChild(sv);info.appendChild(row);
+    var acts=el("div","lbrow");
+    var full=el("a","btn alt sm","Open full size");full.target="_blank";full.rel="noopener";signPaths([ph.path]).then(function(){var c=pcache[ph.path];if(c)full.href=c.url});acts.appendChild(full);
+    if(ph.client_id)acts.appendChild(btn("Open client","btn alt sm",function(){close();openClient(ph.client_id)}));
+    acts.appendChild(btn("Delete","btn danger sm",function(){if(!confirm("Delete this photo? This frees up the space and can't be undone."))return;removePhotos([ph]).then(function(ok){if(!ok){alert("Could not delete. Check your connection and try again.");return}rows.splice(cur,1);if(!rows.length){close();render();return}if(cur>=rows.length)cur=rows.length-1;draw();render()})}));
+    info.appendChild(acts);lbx.appendChild(info)}
+  document.addEventListener("keydown",key,true);draw()}
+
+/* photos on a client profile */
+function addPhotoControls(host,meta,onDone,withKind){
+  var bar=el("div","pbar2"),kd=document.createElement("select");kd.setAttribute("aria-label","Photo type");KINDS.forEach(function(k){var o=document.createElement("option");o.value=k[0];o.textContent=k[1];kd.appendChild(o)});kd.value=meta.kind||"other";kd.style.width="auto";
+  var st=el("span","note");
+  function run(files){var m=Object.assign({},meta,{kind:withKind===false?meta.kind:kd.value});st.textContent="Uploading...";uploadMany(files,m,function(i,n){st.textContent="Uploading "+i+" of "+n+"..."}).then(function(res){st.textContent=res.ok?"Added "+res.ok+" photo"+(res.ok>1?"s":"")+".":"";var msg=uploadMsg(res);if(msg)alert(msg);onDone()})}
+  bar.appendChild(btn("Take photo","btn alt sm",function(){pickPhotos(true,run)}));bar.appendChild(btn("Add photos","btn alt sm",function(){pickPhotos(false,run)}));
+  if(withKind!==false)bar.appendChild(kd);bar.appendChild(st);host.appendChild(bar)}
+function clientPhotosSection(c){
+  var sec=el("div","sec"),h=el("h3",null,"Photos");sec.appendChild(h);
+  if(photoErr){sec.appendChild(el("div","note","Run the Stage 10 SQL in Supabase to turn on photos."));return sec}
+  var holder=el("div"),more=false;
+  function mine(){return photos.filter(function(p){return p.client_id===c.id}).sort(function(a,b){return String(b.created_at)<String(a.created_at)?-1:1})}
+  function draw(){var all=mine();h.textContent="Photos"+(all.length?" ("+all.length+")":"");var rows=more?all:all.slice(0,12);holder.textContent="";
+    var g=el("div");holder.appendChild(g);photoGrid(g,rows,{onTile:function(ph,i){openLightbox(rows,i)}});
+    if(!all.length)holder.appendChild(el("div","note","No photos yet. Take one or add some from your phone or computer."));
+    if(all.length>12&&!more)holder.appendChild(btn("Show all "+all.length,"btn alt sm",function(){more=true;draw()}))}
+  var ps=props.filter(function(p){return p.client_id===c.id});
+  addPhotoControls(sec,{client_id:c.id,property_id:ps.length===1?ps[0].id:null,kind:"other"},function(){draw();render()});
+  sec.appendChild(holder);draw();return sec}
+
+/* the Photos tab: every photo, in bulk */
+function renderPhotoLib(){
+  var tabs=$("tabs");tabs.textContent="";var list=$("list");list.textContent="";
+  if(photoErr){list.appendChild(el("div","empty","Photos aren't set up yet. Run the Stage 10 SQL in Supabase (SQL Editor), then press Refresh."));return}
+  $("topbtns").appendChild(btn("+ Add photos","btn",openAddPhotos));$("topbtns").appendChild(document.createTextNode(" "));
+  $("topbtns").appendChild(btn(psel?"Cancel selecting":"Select","btn alt",function(){psel=psel?null:{};render()}));
+  var used=photos.reduce(function(s,p){return s+(p.size_bytes||0)},0),cap=1024*1024*1024,pct=Math.min(100,used/cap*100),avg=Math.max(250000,photos.length?used/photos.length:350000);
+  var mt=el("div","meterbox");mt.appendChild(el("div","note",photos.length+" photo"+(photos.length===1?"":"s")+" · using "+(used>=1048576*100?(used/1073741824).toFixed(2)+" GB":(used/1048576).toFixed(1)+" MB")+" of 1 GB on the free plan (room for about "+Math.max(0,Math.floor((cap-used)/avg)).toLocaleString()+" more)"));
+  var tr=el("div","meter"),f=el("span");f.style.width=Math.max(1,pct)+"%";if(pct>85)f.style.background="var(--red)";tr.appendChild(f);mt.appendChild(tr);list.appendChild(mt);
+  var cs={};photos.forEach(function(p){if(p.client_id)cs[p.client_id]=1});
+  var fb=el("div","pbar");
+  var fc=fld("Client","select",pf.client,[["all","All clients"],["none","No client"]].concat(Object.keys(cs).map(function(k){return[k,cname(k)]}).sort(function(a,b){return a[1].localeCompare(b[1])})));
+  var fk=fld("Type","select",pf.kind,[["all","All types"]].concat(KINDS));
+  var fw=fld("When","select",pf.when,[["all","All time"],["month","This month"],["3m","Last 3 months"],["year","This year"]]);
+  [[fc,"client"],[fk,"kind"],[fw,"when"]].forEach(function(x){x[0].style.cssText="margin:0;min-width:150px";x[0].input.addEventListener("change",function(){pf[x[1]]=x[0].input.value;pshown=60;render()});fb.appendChild(x[0])});list.appendChild(fb);
+  var t=today(),from=pf.when==="month"?t.slice(0,8)+"01":pf.when==="3m"?addDays(t,-92):pf.when==="year"?t.slice(0,4)+"-01-01":"";
+  var set=photos.filter(function(p){return(pf.client==="all"||(pf.client==="none"?!p.client_id:p.client_id===pf.client))&&(pf.kind==="all"||p.kind===pf.kind)&&(!from||String(p.created_at).slice(0,10)>=from)&&(!query||[p.caption,p.client_id?cname(p.client_id):"",kindLabel(p.kind)].join(" ").toLowerCase().indexOf(query)>-1)}).sort(function(a,b){return String(b.created_at)<String(a.created_at)?-1:1});
+  if(psel){var n=Object.keys(psel).length,bar=el("div","selbar");bar.appendChild(el("b",null,n+" selected"));
+    bar.appendChild(btn("Select all shown ("+set.length+")","btn alt sm",function(){set.forEach(function(p){psel[p.id]=1});render()}));
+    bar.appendChild(btn("Clear","btn alt sm",function(){psel={};render()}));
+    var dl=btn("Delete selected","btn danger sm",function(){var rows=photos.filter(function(p){return psel[p.id]});deletePhotos(rows,function(){psel={}})});dl.disabled=!n;bar.appendChild(dl);list.appendChild(bar)}
+  if(!set.length){list.appendChild(el("div","empty",photos.length?"No photos match those filters.":"No photos yet. Add some here, from a client's page, or from a visit."));return}
+  var shown=set.slice(0,pshown),g=el("div");list.appendChild(g);
+  photoGrid(g,shown,{sel:psel,onTile:psel?function(ph){if(psel[ph.id])delete psel[ph.id];else psel[ph.id]=1;render()}:null});
+  if(set.length>pshown)list.appendChild(btn("Show more ("+(set.length-pshown)+" left)","btn alt",function(){pshown+=60;render()}))}
+function openAddPhotos(){
+  var p=panel();p.appendChild(el("h2",null,"Add photos"));
+  var cl=fld("Client (optional)","select","",[["","No client"]].concat(clients.filter(function(c){return!c.archived}).map(function(c){return[c.id,c.name]})));p.appendChild(cl);
+  var holder=el("div");p.appendChild(holder);
+  function build(){holder.textContent="";var ps=props.filter(function(x){return x.client_id===cl.input.value});addPhotoControls(holder,{client_id:cl.input.value||null,property_id:ps.length===1?ps[0].id:null,kind:"other"},function(){render()})}
+  cl.input.addEventListener("change",build);build();
+  var dn=btn("Done","btn alt");dn.style.marginTop="12px";dn.addEventListener("click",function(){closeDetail();render()});p.appendChild(dn)}
 
 /* ---- job detail ---- */
 function openJob(id){

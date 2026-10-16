@@ -132,6 +132,18 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 .cbig{font-size:13px;font-weight:800;fill:#1c2a20}.csm{font-size:7px;fill:#58675c}
 .lg2{flex:1;min-width:170px}.lg2 .lr{display:grid;grid-template-columns:12px 1fr auto auto;gap:8px;align-items:center;font-size:.86rem;padding:3px 0}.lg2 .sw{width:12px;height:12px;border-radius:3px}.lg2 .lv{font-weight:700}.lg2 .lp{color:var(--muted);min-width:36px;text-align:right}
 @media(max-width:1280px){.repgrid{grid-template-columns:minmax(0,1fr)}}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:8px}
+.ptile{position:relative;aspect-ratio:1/1;border:1px solid var(--line);border-radius:10px;overflow:hidden;background:var(--mint);padding:0;cursor:pointer}.ptile img{width:100%;height:100%;object-fit:cover;display:block}
+.ptile.picked{outline:3px solid #2f7d3f;outline-offset:-3px}.ptile .pck{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:50%;background:rgba(255,255,255,.9);border:2px solid #2f7d3f;color:#2f7d3f;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:.9rem}.ptile.picked .pck{background:#2f7d3f;color:#fff}
+.ptile .pcap{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.55);color:#fff;font-size:.72rem;padding:3px 6px;text-align:left;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pbar2{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:6px 0 10px}.pbar2 select{padding:6px 8px;font-size:.9rem}
+.meterbox{margin-bottom:10px}.meter{height:8px;background:var(--mint);border-radius:999px;overflow:hidden;margin-top:4px}.meter span{display:block;height:100%;background:var(--forest);border-radius:999px}
+.selbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;margin:10px 0;position:sticky;top:76px;z-index:3}
+#lbx{position:fixed;inset:0;background:rgba(10,18,12,.97);z-index:60;display:flex;flex-direction:column}#lbx[hidden]{display:none}body.lbopen{overflow:hidden}
+#lbx .lbbar{display:flex;gap:12px;align-items:center;padding:calc(10px + env(safe-area-inset-top)) 14px 10px;color:#fff}#lbx .lbbar .hb{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:8px;padding:8px 12px;font:inherit;font-weight:600;cursor:pointer}
+#lbx .lbstage{position:relative;flex:1;min-height:0;display:flex;align-items:center;justify-content:center}#lbx .lbstage img{max-width:100%;max-height:100%;object-fit:contain}
+#lbx .lbnav{position:absolute;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.18);color:#fff;border:0;border-radius:999px;width:46px;height:46px;font-size:1.8rem;line-height:1;cursor:pointer}#lbx .lbnav.l{left:10px}#lbx .lbnav.r{right:10px}#lbx .lbnav:disabled{opacity:.25;cursor:default}
+#lbx .lbinfo{background:#fff;padding:12px 14px calc(12px + env(safe-area-inset-bottom));display:grid;gap:8px}#lbx .lbt{font-weight:700}#lbx .lbrow{display:flex;gap:8px;flex-wrap:wrap;align-items:center}#lbx .lbrow input[type=text]{flex:1 1 180px;width:auto}#lbx .lbrow select{width:auto}
 .invtotal{text-align:right;font-weight:800;font-size:1.15rem;margin:6px 0 12px}
 #invview{position:fixed;inset:0;background:#e6ece3;z-index:40;overflow:auto}
 .invtool{position:sticky;top:0;z-index:2;background:var(--forest);padding:calc(8px + env(safe-area-inset-top)) 14px 8px;display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;color:#fff}.invtool .hint{font-size:.85rem;opacity:.85;flex:1;text-align:center}
@@ -169,8 +181,8 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
   .hbtns{order:2;margin-left:auto}header button.hb{padding:6px 9px;font-size:.88rem}
   .gsearch{order:3;flex:1 1 100%;max-width:none;margin:0 0 10px 12px;max-width:calc(100% - 12px)}
   .layout{display:block}
-  #side{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;height:auto;flex-direction:row;gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--line);z-index:12;box-shadow:0 -4px 14px rgba(0,0,0,.1);overflow:visible}
-  #side button{flex:1;flex-direction:column;gap:3px;padding:8px 2px;font-size:.78rem;border-left:0;border-top:4px solid transparent;text-align:center;justify-content:center;position:relative}
+  #side{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;height:auto;flex-direction:row;gap:2px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--line);z-index:12;box-shadow:0 -4px 14px rgba(0,0,0,.1);overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  #side button{flex:1 0 auto;min-width:56px;width:auto;flex-direction:column;gap:3px;padding:8px 4px;font-size:.74rem;white-space:nowrap;border-left:0;border-top:4px solid transparent;text-align:center;justify-content:center;position:relative}
   #side button.on{border-left-color:transparent;border-top-color:var(--forest)}
   #side button svg{width:24px;height:24px}
   #side .badge{position:absolute;top:2px;right:calc(50% - 26px);margin:0;padding:0 6px;font-size:.7rem}
@@ -214,7 +226,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=11"></script>
+<script src="app.js?v=13"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
