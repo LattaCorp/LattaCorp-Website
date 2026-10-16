@@ -4,6 +4,7 @@ var cfg=window.CRM_CONFIG,sb=window.supabase.createClient(cfg.url,cfg.key,{auth:
 var STATUSES=[["new","New"],["contacted","Contacted"],["quoted","Quoted"],["won","Won"],["lost","Lost"]];
 var TYPES=[["residential","Residential"],["hoa","HOA"],["commercial","Commercial"]];
 var leads=[],clients=[],props=[],clientsErr=false,services=[],jobs=[],visits=[],jobsErr=false;
+var expenses=[],expErr=false,rtab="overview",rper="month",rfrom="",rto="",exCat="all";
 var todos=[],todoErr=false,tfilter="open",team=[];
 var role="owner",myEmail="";function isOwner(){return role==="owner"}
 var view="leads",lfilter="all",cfilter="active",jfilter="active",smode="day",selDate=today(),crewF="all",query="";
@@ -64,7 +65,8 @@ function load(){
     sb.from("invoices").select("*").order("number",{ascending:false}).limit(3000),
     sb.from("business").select("*").eq("id",1),
     sb.from("visits").select("*").eq("status","done").is("invoice_id",null).is("paid_at",null).limit(5000),
-    sb.from("todos").select("*").order("created_at",{ascending:false}).limit(3000)
+    sb.from("todos").select("*").order("created_at",{ascending:false}).limit(3000),
+    sb.from("expenses").select("*").order("spent_on",{ascending:false}).limit(20000)
   ]).then(function(rs){
     if(rs[0].error){$("msg").textContent="Could not load leads. If you just signed in, make sure this email is on the staff list.";return}
     leads=rs[0].data||[];
@@ -72,7 +74,7 @@ function load(){
     clients=rs[1].error?[]:(rs[1].data||[]);props=rs[2].error?[]:(rs[2].data||[]);
     jobsErr=!!(rs[3].error||rs[4].error||rs[5].error||clientsErr);
     services=rs[3].error?[]:(rs[3].data||[]);jobs=rs[4].error?[]:(rs[4].data||[]);visits=rs[5].error?[]:(rs[5].data||[]);histFrom=addDays(today(),-45);s3=!rs[6].error;crew=rs[6].error?[]:(rs[6].data||[]);
-    billErr=!!(rs[7].error||rs[9].error||jobsErr);invoices=rs[7].error?[]:(rs[7].data||[]);biz=rs[8].error?null:((rs[8].data||[])[0]||null);unbilled=rs[9].error?[]:(rs[9].data||[]);todoErr=!!rs[10].error;todos=rs[10].error?[]:(rs[10].data||[]);
+    billErr=!!(rs[7].error||rs[9].error||jobsErr);invoices=rs[7].error?[]:(rs[7].data||[]);biz=rs[8].error?null:((rs[8].data||[])[0]||null);unbilled=rs[9].error?[]:(rs[9].data||[]);expErr=!!rs[11].error;expenses=rs[11].error?[]:(rs[11].data||[]);repData=null;todoErr=!!rs[10].error;todos=rs[10].error?[]:(rs[10].data||[]);
     try{sb.rpc("team_names").then(function(r){if(r&&!r.error&&r.data)team=r.data},function(){})}catch(e){}
     render();topUp().then(function(n){if(n)render()});
   });
@@ -85,15 +87,16 @@ var ICONS={leads:'<svg viewBox="0 0 24 24"><path d="M3 13l2.5-7.5A2 2 0 0 1 7.4 
  billing:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
  schedule:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
  team:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M18.5 3.5v3M17 5h3"/></svg>',
- todo:'<svg viewBox="0 0 24 24"><path d="M4 6.5l1.7 1.7L9 4.8"/><path d="M4 13.5l1.7 1.7L9 11.8"/><path d="M4 20.5l1.7 1.7"/><path d="M13 6h8M13 13h8M13 20h8"/></svg>'};
+ todo:'<svg viewBox="0 0 24 24"><path d="M4 6.5l1.7 1.7L9 4.8"/><path d="M4 13.5l1.7 1.7L9 11.8"/><path d="M4 20.5l1.7 1.7"/><path d="M13 6h8M13 13h8M13 20h8"/></svg>',
+ reports:'<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'};
 function render(){
   var nav=$("side");nav.textContent="";
   var tdy=today(),stops=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date===tdy}).length,newL=leads.filter(function(l){return l.status==="new"}).length;
-  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops],["todo","To-Do",todos.filter(function(t){return!t.done&&t.due_date&&t.due_date<=tdy}).length],["billing","Billing",invoices.filter(isOverdue).length]].concat(isOwner()?[["team","Team",0]]:[]).forEach(function(v){
+  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops],["todo","To-Do",todos.filter(function(t){return!t.done&&t.due_date&&t.due_date<=tdy}).length],["billing","Billing",invoices.filter(isOverdue).length],["reports","Reports",0]].concat(isOwner()?[["team","Team",0]]:[]).forEach(function(v){
     var b=el("button",v[0]===view?"on":"");b.type="button";b.addEventListener("click",function(){view=v[0];render()});b.innerHTML=ICONS[v[0]];b.appendChild(el("span",null,v[1]));
     if(v[2])b.appendChild(el("span","badge",String(v[2])));b.setAttribute("aria-current",v[0]===view?"page":"false");nav.appendChild(b)});
   $("topbtns").textContent="";
-  if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else if(view==="billing")renderBilling();else if(view==="todo")renderTodo();else if(view==="team"&&isOwner())renderTeam();else renderSchedule();
+  if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else if(view==="billing")renderBilling();else if(view==="todo")renderTodo();else if(view==="reports")renderReports();else if(view==="team"&&isOwner())renderTeam();else renderSchedule();
 }
 function renderLeads(){
   var tabs=$("tabs");tabs.textContent="";
@@ -773,6 +776,118 @@ function openTodo(t){
   acts.appendChild(sv);
   if(t){acts.appendChild(btn(t.done?"Mark not done":"Mark done","btn alt",function(){toggleTodo(t,!t.done);closeDetail()}));
     acts.appendChild(btn("Delete","btn danger",function(){if(!confirm("Delete this task?"))return;sb.from("todos").delete().eq("id",t.id).then(function(r){if(r.error){alert("Could not delete.");return}todos=todos.filter(function(z){return z.id!==t.id});closeDetail();render()})}))}
+  p.appendChild(acts)}
+
+/* ---- Reports & expenses ---- */
+var EXCATS=["Fuel","Equipment & repairs","Materials & supplies","Crew pay","Insurance & licenses","Vehicle","Marketing","Software & phone","Other"];
+function monthStart(s){return s.slice(0,8)+"01"}
+function monthEndOf(s){return addDays(addDays(monthStart(s),32).slice(0,8)+"01",-1)}
+function periodRange(){
+  var t=today(),y=t.slice(0,4);
+  if(rper==="month")return[monthStart(t),monthEndOf(t)];
+  if(rper==="last"){var lm=addDays(monthStart(t),-1);return[monthStart(lm),lm]}
+  if(rper==="quarter"){var m=+t.slice(5,7),q=Math.floor((m-1)/3)*3+1,qs=y+"-"+pad(q)+"-01";return[qs,monthEndOf(addDays(qs,70))]}
+  if(rper==="ytd")return[y+"-01-01",t];
+  if(rper==="lastyear")return[(+y-1)+"-01-01",(+y-1)+"-12-31"];
+  return[rfrom||monthStart(t),rto||t]}
+function periodBar(list){
+  var bar=el("div","pbar");
+  [["month","This month"],["last","Last month"],["quarter","This quarter"],["ytd","Year to date"],["lastyear","Last year"],["custom","Custom"]].forEach(function(p){
+    var b=el("button","tab"+(rper===p[0]?" on":""),p[1]);b.type="button";b.addEventListener("click",function(){if(p[0]==="custom"&&!rfrom){var r=periodRange();rfrom=r[0];rto=r[1]}rper=p[0];render()});bar.appendChild(b)});
+  list.appendChild(bar);
+  if(rper==="custom"){var cr=el("div","pbar");[["From","from"],["To","to"]].forEach(function(x){var l=el("label","f");l.style.margin="0";l.appendChild(el("span",null,x[0]));var di=document.createElement("input");di.type="date";di.style.width="auto";di.value=x[1]==="from"?rfrom:rto;di.addEventListener("change",function(){if(x[1]==="from")rfrom=di.value||rfrom;else rto=di.value||rto;render()});l.appendChild(di);cr.appendChild(l)});list.appendChild(cr)}
+  var r=periodRange();list.appendChild(el("div","note",dshort(r[0])+" – "+dshort(r[1])))}
+function inRange(d,a,b){return d>=a&&d<=b}
+function computeReport(from,to){
+  var a=sb.from("visits").select("id,client_id,scheduled_date,price").eq("status","done").gte("scheduled_date",from).lte("scheduled_date",to).limit(20000);
+  var b=sb.from("visits").select("id,client_id,price,paid_at,paid_method").is("invoice_id",null).gte("paid_at",from+"T00:00:00").lte("paid_at",to+"T23:59:59").limit(20000);
+  return Promise.all([a,b]).then(function(rs){
+    if(rs[0].error||rs[1].error)return{error:true};
+    var done=rs[0].data||[],pays=[];
+    invoices.forEach(function(i){var d=i.paid_at?String(i.paid_at).slice(0,10):"";if(i.status==="paid"&&d&&inRange(d,from,to)&&Number(i.total)>0)pays.push({date:d,type:"Invoice",client_id:i.client_id,ref:invNum(i.number),method:i.paid_method||"",amount:Number(i.total)})});
+    (rs[1].data||[]).forEach(function(v){if(Number(v.price)>0&&v.paid_at)pays.push({date:String(v.paid_at).slice(0,10),type:"Paid at visit",client_id:v.client_id,ref:"",method:v.paid_method||"",amount:Number(v.price)})});
+    pays.sort(function(x,y){return x.date<y.date?-1:1});
+    var exs=expenses.filter(function(e){return inRange(e.spent_on,from,to)}).sort(function(x,y){return x.spent_on<y.spent_on?1:-1});
+    var earned=r2(done.reduce(function(s,v){return s+Number(v.price||0)},0)),collected=r2(pays.reduce(function(s,p){return s+p.amount},0)),spent=r2(exs.reduce(function(s,e){return s+Number(e.amount)},0));
+    var months=[],m=monthStart(from);while(m<=to&&months.length<36){months.push({k:m.slice(0,7),label:monthName(m),earned:0,collected:0,spent:0});m=addDays(monthEndOf(m),1)}
+    function mo(k){return months.filter(function(x){return x.k===k})[0]}
+    done.forEach(function(v){var x=mo(v.scheduled_date.slice(0,7));if(x)x.earned+=Number(v.price||0)});pays.forEach(function(p){var x=mo(p.date.slice(0,7));if(x)x.collected+=p.amount});exs.forEach(function(e){var x=mo(e.spent_on.slice(0,7));if(x)x.spent+=Number(e.amount)});
+    var cat={};exs.forEach(function(e){cat[e.category||"Other"]=(cat[e.category||"Other"]||0)+Number(e.amount)});
+    var cats=Object.keys(cat).map(function(k){return{k:k,v:r2(cat[k])}}).sort(function(x,y){return y.v-x.v});
+    var cl={};done.forEach(function(v){cl[v.client_id]=(cl[v.client_id]||0)+Number(v.price||0)});
+    var top=Object.keys(cl).map(function(k){return{k:k,v:r2(cl[k])}}).filter(function(x){return x.v>0}).sort(function(x,y){return y.v-x.v}).slice(0,8);
+    var meth={};pays.forEach(function(p){var k=p.method||"Other";meth[k]=(meth[k]||0)+p.amount});
+    return{from:from,to:to,earned:earned,collected:collected,spent:spent,net:r2(collected-spent),months:months,cats:cats,top:top,meth:meth,pays:pays,exs:exs,visitsDone:done.length}})}
+function sm(n){n=r2(n);return n<0?"-"+money(-n):money(n)}
+function bars(list,rows,fmt,labelFn){
+  var max=rows.reduce(function(m,x){return Math.max(m,x.v)},0)||1;
+  rows.forEach(function(x){var r=el("div","hrow"),lb=labelFn?labelFn(x):x.k;r.title=lb+": "+fmt(x.v);
+    r.appendChild(el("span","hl",lb));var tr=el("span","ht"),f=el("span","hf");f.style.width=Math.max(1,Math.round(x.v/max*100))+"%";tr.appendChild(f);r.appendChild(tr);r.appendChild(el("span","hv",fmt(x.v)));list.appendChild(r)})}
+function agingBuckets(){
+  var t=today(),b=[["Not yet due",0],["1–30 days late",0],["31–60 days late",0],["Over 60 days late",0]];
+  invoices.forEach(function(i){if(i.status!=="open")return;var late=i.due_date&&i.due_date<t?ddiff(i.due_date,t):0,k=late<=0?0:late<=30?1:late<=60?2:3;b[k][1]+=Number(i.total||0)});return b}
+function downloadCsv(name,rows){
+  var csv=rows.map(function(r){return r.map(function(c){c=String(c==null?"":c);return/[",\n]/.test(c)?'"'+c.replace(/"/g,'""')+'"':c}).join(",")}).join("\r\n");
+  var blob=new Blob(["﻿"+csv],{type:"text/csv;charset=utf-8"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=name;document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);document.body.removeChild(a)},500)}
+var repKey="",repData=null,repAt=0;
+function renderReports(){
+  var tabs=$("tabs");tabs.textContent="";var list=$("list");list.textContent="";
+  [["overview","Overview"],["expenses","Expenses"]].forEach(function(s){var b=el("button","tab"+(rtab===s[0]?" on":""),s[1]);b.type="button";b.addEventListener("click",function(){rtab=s[0];render()});tabs.appendChild(b)});
+  if(billErr){list.appendChild(el("div","empty","Billing isn't set up yet. Run the Stage 5 SQL in Supabase (SQL Editor), then press Refresh."));return}
+  if(rtab==="expenses")return renderExpenses(list);
+  var r=periodRange(),key=r[0]+"|"+r[1]+"|"+invoices.length+"|"+expenses.length+"|"+invoices.filter(function(i){return i.status==="paid"}).length;
+  periodBar(list);
+  var out=el("div");list.appendChild(out);
+  function draw(d){
+    out.textContent="";
+    if(d.error){out.appendChild(el("div","empty","Could not load the report. Check your connection and press Refresh."));return}
+    $("topbtns").textContent="";
+    $("topbtns").appendChild(btn("Income CSV","btn alt",function(){downloadCsv("income_"+d.from+"_to_"+d.to+".csv",[["Date","Type","Client","Invoice","Method","Amount"]].concat(d.pays.map(function(p){return[p.date,p.type,cname(p.client_id),p.ref,p.method,p.amount.toFixed(2)]})))}));
+    $("topbtns").appendChild(document.createTextNode(" "));
+    $("topbtns").appendChild(btn("Expenses CSV","btn alt",function(){downloadCsv("expenses_"+d.from+"_to_"+d.to+".csv",[["Date","Category","Vendor","Note","Client","Amount"]].concat(d.exs.map(function(e){return[e.spent_on,e.category,e.vendor,e.note,e.client_id?cname(e.client_id):"",Number(e.amount).toFixed(2)]})))}));
+    var st=el("div","stats");
+    [["Collected",money(d.collected),""],["Earned",money(d.earned),""],["Expenses",money(d.spent),""],["Net (collected − expenses)",sm(d.net),d.net<0?"bad":""]].forEach(function(x){var c=el("div","stat "+x[2]);c.appendChild(el("span",null,x[0]));c.appendChild(el("b",null,x[1]));st.appendChild(c)});out.appendChild(st);
+    var nt=el("div","note","Collected = money actually received (paid invoices plus payments at the visit). Earned = work completed in the period, whether or not it's paid yet."+(expErr?" Expenses aren't set up yet, so they show as $0. Run the Stage 9 SQL.":""));nt.style.marginBottom="10px";out.appendChild(nt);
+    var h1=el("h3",null,"By month");h1.style.margin="14px 0 6px";out.appendChild(h1);
+    var tb=document.createElement("table");tb.className="rtable";var hd=document.createElement("tr");["Month","Earned","Collected","Expenses","Net"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i)th.className="r";hd.appendChild(th)});tb.appendChild(hd);
+    d.months.forEach(function(m){var tr=document.createElement("tr"),net=r2(m.collected-m.spent);[m.label,money(r2(m.earned)),money(r2(m.collected)),money(r2(m.spent)),sm(net)].forEach(function(x,i){var td=document.createElement("td");td.textContent=x;if(i)td.className="r";if(i===4&&net<0)td.style.color="var(--red)";tr.appendChild(td)});tb.appendChild(tr)});
+    var wrap=el("div","tscroll");wrap.appendChild(tb);out.appendChild(wrap);
+    var h2=el("h3",null,"Expenses by category");h2.style.margin="18px 0 6px";out.appendChild(h2);
+    if(d.cats.length)bars(out,d.cats,money);else out.appendChild(el("div","note","No expenses in this period."));
+    var h3=el("h3",null,"Top clients (work completed)");h3.style.margin="18px 0 6px";out.appendChild(h3);
+    if(d.top.length)bars(out,d.top,money,function(x){return cname(x.k)});else out.appendChild(el("div","note","No completed work in this period."));
+    var ms=Object.keys(d.meth);if(ms.length){var h4=el("h3",null,"How you were paid");h4.style.margin="18px 0 6px";out.appendChild(h4);out.appendChild(el("div","note",ms.map(function(k){return k+" "+money(r2(d.meth[k]))}).join(" · ")))}
+    var h5=el("h3",null,"Unpaid invoices (as of today)");h5.style.margin="18px 0 6px";out.appendChild(h5);
+    var ag=agingBuckets(),tot=r2(ag.reduce(function(s,x){return s+x[1]},0));
+    if(!tot)out.appendChild(el("div","note","Nothing owed right now."));else{var t2=document.createElement("table");t2.className="rtable";ag.forEach(function(x){var tr=document.createElement("tr");var a=document.createElement("td");a.textContent=x[0];var b2=document.createElement("td");b2.className="r";b2.textContent=money(r2(x[1]));if(x[0]!=="Not yet due"&&x[1]>0)b2.style.color="var(--red)";tr.appendChild(a);tr.appendChild(b2);t2.appendChild(tr)});var tr2=document.createElement("tr");var a2=document.createElement("td");a2.innerHTML="<b>Total owed</b>";var b3=document.createElement("td");b3.className="r";b3.innerHTML="<b>"+esc(money(tot))+"</b>";tr2.appendChild(a2);tr2.appendChild(b3);t2.appendChild(tr2);var w2=el("div","tscroll");w2.appendChild(t2);out.appendChild(w2)}}
+  if(repData&&repKey===key&&Date.now()-repAt<20000){draw(repData);return}
+  out.appendChild(el("div","empty","Loading the report..."));
+  computeReport(r[0],r[1]).then(function(d){repKey=key;repData=d;repAt=Date.now();if(view==="reports"&&rtab==="overview"&&out.isConnected)draw(d)})}
+
+function renderExpenses(list){
+  $("topbtns").appendChild(btn("+ Add expense","btn",function(){openExpense(null)}));
+  if(expErr){list.appendChild(el("div","empty","Expenses aren't set up yet. Run the Stage 9 SQL in Supabase (SQL Editor), then press Refresh."));return}
+  periodBar(list);
+  var r=periodRange(),cats=[["all","All categories"]].concat(EXCATS.map(function(c){return[c,c]}));
+  var cf=fld("Category","select",exCat,cats);cf.style.maxWidth="260px";cf.input.addEventListener("change",function(){exCat=cf.input.value;render()});list.appendChild(cf);
+  var set=expenses.filter(function(e){return inRange(e.spent_on,r[0],r[1])&&(exCat==="all"||e.category===exCat)}).filter(function(e){return!query||[e.vendor,e.note,e.category,e.client_id?cname(e.client_id):""].join(" ").toLowerCase().indexOf(query)>-1}).sort(function(a,b){return a.spent_on<b.spent_on?1:-1});
+  var tot=r2(set.reduce(function(s,e){return s+Number(e.amount)},0));
+  var sm=el("div","note",set.length+" expense"+(set.length===1?"":"s")+" · "+money(tot));sm.style.cssText="font-weight:700;margin:8px 0";list.appendChild(sm);
+  if(!set.length){list.appendChild(el("div","empty","No expenses here yet. Tap + Add expense."));return}
+  set.forEach(function(e){var row=el("button","row client");row.type="button";var l=el("div");l.appendChild(el("b",null,(e.vendor||e.category)+" · "+money(e.amount)));l.appendChild(el("div","sub",[dshort(e.spent_on),e.category,e.client_id?cname(e.client_id):"",e.note].filter(Boolean).join(" · ")));row.appendChild(l);row.addEventListener("click",function(){openExpense(e)});list.appendChild(row)})}
+function openExpense(e){
+  var p=panel();p.appendChild(el("h2",null,e?"Expense":"Add expense"));
+  var g=el("div","grid2"),dt=fld("Date","date",e?e.spent_on:today()),am=fld("Amount ($)","number",e?e.amount:"");am.input.step="0.01";am.input.inputMode="decimal";g.appendChild(dt);g.appendChild(am);p.appendChild(g);
+  var cat=fld("Category","select",e?e.category:"Fuel",EXCATS.map(function(c){return[c,c]})),ve=fld("Vendor / paid to (optional)","text",e?e.vendor:""),no=fld("Note (optional)","text",e?e.note:"");
+  var cl=fld("For a client's job (optional)","select",e&&e.client_id?e.client_id:"",[["","None"]].concat(clients.filter(function(c){return!c.archived||(e&&e.client_id===c.id)}).map(function(c){return[c.id,c.name]})));
+  [cat,ve,no,cl].forEach(function(f){p.appendChild(f)});
+  var acts=el("div","acts");acts.style.marginTop="12px";
+  var sv=btn("Save","btn",function(){
+    var a=parseFloat(am.input.value);if(isNaN(a)||a<0){alert("Enter the amount.");return}if(!dt.input.value){alert("Pick the date.");return}
+    var row={spent_on:dt.input.value,amount:a,category:cat.input.value,vendor:ve.input.value.trim(),note:no.input.value.trim(),client_id:cl.input.value||null};sv.disabled=true;
+    var q=e?sb.from("expenses").update(row).eq("id",e.id).select().single():sb.from("expenses").insert(Object.assign({created_by:myEmail||""},row)).select().single();
+    q.then(function(r){sv.disabled=false;if(r.error||!r.data){alert("Could not save. Did you run the Stage 9 SQL?");return}if(e)Object.assign(e,r.data);else expenses.unshift(r.data);repData=null;closeDetail();render()})});acts.appendChild(sv);
+  if(e)acts.appendChild(btn("Delete","btn danger",function(){if(!confirm("Delete this expense?"))return;sb.from("expenses").delete().eq("id",e.id).then(function(r){if(r.error){alert("Could not delete.");return}expenses=expenses.filter(function(z){return z.id!==e.id});repData=null;closeDetail();render()})}));
   p.appendChild(acts)}
 
 /* ---- job detail ---- */

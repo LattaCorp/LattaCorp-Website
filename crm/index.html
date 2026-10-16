@@ -121,6 +121,9 @@ details summary{cursor:pointer;color:var(--forest);font-weight:600;margin-top:6p
 .todo{display:flex;gap:12px;align-items:flex-start;border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fbfdfb;cursor:pointer}.todo:hover{background:var(--mint)}
 .todo .ck{flex:none;width:28px;height:28px;border-radius:50%;border:2px solid var(--forest);background:#fff;color:#fff;font-weight:800;cursor:pointer;padding:0;line-height:1}
 .todo.done .ck{background:#2f7d3f;border-color:#2f7d3f}.todo.done .tt{text-decoration:line-through;color:var(--muted)}.todo .tt{font-weight:700;overflow-wrap:anywhere}.todo .tb{flex:1;min-width:0}
+.pbar{display:flex;gap:6px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px}
+.tscroll{overflow-x:auto}.rtable{width:100%;border-collapse:collapse;font-size:.92rem}.rtable th{text-align:left;padding:6px 8px;font-size:.78rem;color:var(--muted);border-bottom:1px solid var(--line);font-weight:700}.rtable td{padding:7px 8px;border-bottom:1px solid var(--line)}.rtable th.r,.rtable td.r{text-align:right;white-space:nowrap}
+.hrow{display:grid;grid-template-columns:minmax(90px,170px) 1fr auto;gap:10px;align-items:center;margin:7px 0}.hrow .hl{font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.hrow .ht{height:10px;background:var(--mint);border-radius:0 4px 4px 0;overflow:hidden}.hrow .hf{display:block;height:100%;background:var(--forest);border-radius:0 4px 4px 0}.hrow .hv{font-weight:700;font-size:.9rem;min-width:56px;text-align:right}
 .invtotal{text-align:right;font-weight:800;font-size:1.15rem;margin:6px 0 12px}
 #invview{position:fixed;inset:0;background:#e6ece3;z-index:40;overflow:auto}
 .invtool{position:sticky;top:0;z-index:2;background:var(--forest);padding:calc(8px + env(safe-area-inset-top)) 14px 8px;display:flex;gap:10px;justify-content:space-between;align-items:center;flex-wrap:wrap;color:#fff}.invtool .hint{font-size:.85rem;opacity:.85;flex:1;text-align:center}
@@ -203,7 +206,7 @@ details summary{cursor:pointer;color:var(--forest);font-weight:600;margin-top:6p
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=9"></script>
+<script src="app.js?v=10"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
