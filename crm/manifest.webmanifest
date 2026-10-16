@@ -1,7 +1,7 @@
 {
-  "name": "LattaCorp CRM",
-  "short_name": "LattaCorp",
-  "description": "LattaCorp of Central Florida – leads and customers",
+  "name": "Foreman by LattaCorp",
+  "short_name": "Foreman",
+  "description": "LattaCorp of Central Florida – clients, jobs, schedule and billing",
   "start_url": "/crm/",
   "scope": "/crm/",
   "display": "standalone",
