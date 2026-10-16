@@ -90,7 +90,7 @@ var ICONS={leads:'<svg viewBox="0 0 24 24"><path d="M3 13l2.5-7.5A2 2 0 0 1 7.4 
  todo:'<svg viewBox="0 0 24 24"><path d="M4 6.5l1.7 1.7L9 4.8"/><path d="M4 13.5l1.7 1.7L9 11.8"/><path d="M4 20.5l1.7 1.7"/><path d="M13 6h8M13 13h8M13 20h8"/></svg>',
  reports:'<svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>'};
 function render(){
-  var nav=$("side");nav.textContent="";
+  var nav=$("side");nav.textContent="";$("app").classList.toggle("wide",view==="reports");
   var tdy=today(),stops=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date===tdy}).length,newL=leads.filter(function(l){return l.status==="new"}).length;
   [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops],["todo","To-Do",todos.filter(function(t){return!t.done&&t.due_date&&t.due_date<=tdy}).length],["billing","Billing",invoices.filter(isOverdue).length],["reports","Reports",0]].concat(isOwner()?[["team","Team",0]]:[]).forEach(function(v){
     var b=el("button",v[0]===view?"on":"");b.type="button";b.addEventListener("click",function(){view=v[0];render()});b.innerHTML=ICONS[v[0]];b.appendChild(el("span",null,v[1]));
@@ -836,11 +836,12 @@ function renderReports(){
   if(billErr){list.appendChild(el("div","empty","Billing isn't set up yet. Run the Stage 5 SQL in Supabase (SQL Editor), then press Refresh."));return}
   if(rtab==="expenses")return renderExpenses(list);
   var r=periodRange(),key=r[0]+"|"+r[1]+"|"+invoices.length+"|"+expenses.length+"|"+invoices.filter(function(i){return i.status==="paid"}).length;
-  periodBar(list);
-  var out=el("div");list.appendChild(out);
-  function draw(d){
-    out.textContent="";
-    if(d.error){out.appendChild(el("div","empty","Could not load the report. Check your connection and press Refresh."));return}
+  var grid=el("div","repgrid"),left=el("div","repleft"),right=el("div","repright");grid.appendChild(left);grid.appendChild(right);list.appendChild(grid);
+  periodBar(left);var out=el("div");left.appendChild(out);
+  function draw(d,d3){
+    out.textContent="";right.textContent="";
+    if(d.error||d3.error){out.appendChild(el("div","empty","Could not load the report. Check your connection and press Refresh."));return}
+    drawCharts(right,d,d3);
     $("topbtns").textContent="";
     $("topbtns").appendChild(btn("Income CSV","btn alt",function(){downloadCsv("income_"+d.from+"_to_"+d.to+".csv",[["Date","Type","Client","Invoice","Method","Amount"]].concat(d.pays.map(function(p){return[p.date,p.type,cname(p.client_id),p.ref,p.method,p.amount.toFixed(2)]})))}));
     $("topbtns").appendChild(document.createTextNode(" "));
@@ -860,9 +861,10 @@ function renderReports(){
     var h5=el("h3",null,"Unpaid invoices (as of today)");h5.style.margin="18px 0 6px";out.appendChild(h5);
     var ag=agingBuckets(),tot=r2(ag.reduce(function(s,x){return s+x[1]},0));
     if(!tot)out.appendChild(el("div","note","Nothing owed right now."));else{var t2=document.createElement("table");t2.className="rtable";ag.forEach(function(x){var tr=document.createElement("tr");var a=document.createElement("td");a.textContent=x[0];var b2=document.createElement("td");b2.className="r";b2.textContent=money(r2(x[1]));if(x[0]!=="Not yet due"&&x[1]>0)b2.style.color="var(--red)";tr.appendChild(a);tr.appendChild(b2);t2.appendChild(tr)});var tr2=document.createElement("tr");var a2=document.createElement("td");a2.innerHTML="<b>Total owed</b>";var b3=document.createElement("td");b3.className="r";b3.innerHTML="<b>"+esc(money(tot))+"</b>";tr2.appendChild(a2);tr2.appendChild(b3);t2.appendChild(tr2);var w2=el("div","tscroll");w2.appendChild(t2);out.appendChild(w2)}}
-  if(repData&&repKey===key&&Date.now()-repAt<20000){draw(repData);return}
+  if(repData&&repKey===key&&Date.now()-repAt<20000){draw(repData.d,repData.d3);return}
   out.appendChild(el("div","empty","Loading the report..."));
-  computeReport(r[0],r[1]).then(function(d){repKey=key;repData=d;repAt=Date.now();if(view==="reports"&&rtab==="overview"&&out.isConnected)draw(d)})}
+  var m1=monthStart(today()),f3=monthStart(addDays(monthStart(addDays(m1,-1)),-1));
+  Promise.all([computeReport(r[0],r[1]),computeReport(f3,today())]).then(function(rs){repKey=key;repData={d:rs[0],d3:rs[1]};repAt=Date.now();if(view==="reports"&&rtab==="overview"&&out.isConnected)draw(rs[0],rs[1])})}
 
 function renderExpenses(list){
   $("topbtns").appendChild(btn("+ Add expense","btn",function(){openExpense(null)}));
@@ -889,6 +891,50 @@ function openExpense(e){
     q.then(function(r){sv.disabled=false;if(r.error||!r.data){alert("Could not save. Did you run the Stage 9 SQL?");return}if(e)Object.assign(e,r.data);else expenses.unshift(r.data);repData=null;closeDetail();render()})});acts.appendChild(sv);
   if(e)acts.appendChild(btn("Delete","btn danger",function(){if(!confirm("Delete this expense?"))return;sb.from("expenses").delete().eq("id",e.id).then(function(r){if(r.error){alert("Could not delete.");return}expenses=expenses.filter(function(z){return z.id!==e.id});repData=null;closeDetail();render()})}));
   p.appendChild(acts)}
+
+/* ---- Pie (donut) charts on the Reports screen ---- */
+var PIECOL={slot1:"#2a78d6",slot2:"#eb6834",slot3:"#1baf7a",slot4:"#eda100",slot5:"#e87ba4",slot6:"#008300"};
+function svgEl(n,a){var e=document.createElementNS("http://www.w3.org/2000/svg",n);for(var k in a)e.setAttribute(k,a[k]);return e}
+function arcPath(cx,cy,r0,r1,a0,a1){
+  if(a1-a0>=Math.PI*2-0.0001)a1=a0+Math.PI*2-0.0001;
+  var big=(a1-a0)>Math.PI?1:0;function X(r,a){return(cx+r*Math.sin(a)).toFixed(2)}function Y(r,a){return(cy-r*Math.cos(a)).toFixed(2)}
+  return"M"+X(r1,a0)+" "+Y(r1,a0)+" A"+r1+" "+r1+" 0 "+big+" 1 "+X(r1,a1)+" "+Y(r1,a1)+" L"+X(r0,a1)+" "+Y(r0,a1)+" A"+r0+" "+r0+" 0 "+big+" 0 "+X(r0,a0)+" "+Y(r0,a0)+" Z"}
+/* slices: [{label,v,color}] in a fixed order; the legend lists every slice with its amount and share, so no value depends on color alone. */
+function pieChart(title,sub,slices,center,note){
+  var box=el("div","pcard chart");box.appendChild(el("h3",null,title));box.appendChild(el("div","note",sub));
+  slices=slices.filter(function(s){return s.v>0.004});
+  var total=r2(slices.reduce(function(s,x){return s+x.v},0));
+  if(!total){box.appendChild(el("div","note","Nothing to show yet for this period."));return box}
+  var wrap=el("div","donut"),svg=svgEl("svg",{viewBox:"0 0 120 120",role:"img","aria-label":title+": "+slices.map(function(s){return s.label+" "+money(r2(s.v))}).join(", ")});
+  var a=0;
+  slices.forEach(function(s){var ang=s.v/total*Math.PI*2,pct=Math.round(s.v/total*100),p=svgEl("path",{d:arcPath(60,60,34,56,a,a+ang),fill:s.color,"class":"sl",tabindex:"0"});
+    var t=svgEl("title",{});t.textContent=s.label+": "+money(r2(s.v))+" ("+pct+"%)";p.appendChild(t);svg.appendChild(p);a+=ang});
+  if(center){var t1=svgEl("text",{x:60,y:center.small?58:64,"text-anchor":"middle","class":"cbig"});t1.textContent=center.big;svg.appendChild(t1);
+    if(center.small){var t2=svgEl("text",{x:60,y:72,"text-anchor":"middle","class":"csm"});t2.textContent=center.small;svg.appendChild(t2)}}
+  wrap.appendChild(svg);
+  var lg=el("div","lg2");
+  slices.forEach(function(s){var r=el("div","lr"),sw=el("span","sw");sw.style.background=s.color;r.appendChild(sw);r.appendChild(el("span",null,s.label));r.appendChild(el("span","lv",money(r2(s.v))));r.appendChild(el("span","lp",Math.round(s.v/total*100)+"%"));lg.appendChild(r)});
+  wrap.appendChild(lg);box.appendChild(wrap);
+  if(note)box.appendChild(el("div","note",note));
+  return box}
+function pLabel(){return{month:"This month",last:"Last month",quarter:"This quarter",ytd:"Year to date",lastyear:"Last year",custom:"Custom range"}[rper]||""}
+function drawCharts(host,d,d3){
+  host.textContent="";
+  /* 1: last 3 months of money received, by how it was paid */
+  var order=["Zelle","Cash","Check","Other"],cols=[PIECOL.slot1,PIECOL.slot2,PIECOL.slot3,PIECOL.slot4],m={};
+  Object.keys(d3.meth).forEach(function(k){var kk=order.indexOf(k)>-1?k:"Other";m[kk]=(m[kk]||0)+d3.meth[k]});
+  host.appendChild(pieChart("Revenue by payment type","Last 3 months · "+dshort(d3.from)+" – "+dshort(d3.to)+" · money received",order.map(function(k,i){return{label:k,v:m[k]||0,color:cols[i]}}),{big:money(d3.collected),small:"received"}));
+  /* 2: where each dollar of money received went: costs, then what's left as profit */
+  var c=function(k){return d.cats.filter(function(x){return x.k===k}).reduce(function(s,x){return s+x.v},0)};
+  var labor=c("Crew pay"),fuel=c("Fuel")+c("Vehicle"),equip=c("Equipment & repairs"),mat=c("Materials & supplies"),over=c("Insurance & licenses")+c("Marketing")+c("Software & phone")+c("Other");
+  var profit=Math.max(0,r2(d.collected-d.spent)),loss=d.spent>d.collected;
+  host.appendChild(pieChart("Where the money goes",pLabel()+" · "+dshort(d.from)+" – "+dshort(d.to)+" · received money split into costs and profit",
+    [{label:"Labor (crew pay)",v:labor,color:PIECOL.slot1},{label:"Fuel & vehicle",v:fuel,color:PIECOL.slot2},{label:"Equipment & repairs",v:equip,color:PIECOL.slot3},{label:"Materials & supplies",v:mat,color:PIECOL.slot4},{label:"Overhead (insurance, marketing, software, other)",v:over,color:PIECOL.slot5},{label:"Profit",v:profit,color:PIECOL.slot6}],
+    {big:sm(d.net),small:d.collected>0&&!loss?Math.round(d.net/d.collected*100)+"% profit":"net"},loss?"Spending is higher than the money received in this period, so there is no profit slice.":""));
+  /* 3: overall earnings: money made minus money spent */
+  host.appendChild(pieChart("Overall earnings",pLabel()+" · "+dshort(d.from)+" – "+dshort(d.to)+" · money made minus money spent",
+    [{label:"Kept (net earnings)",v:Math.max(0,r2(d.collected-d.spent)),color:PIECOL.slot6},{label:"Spent",v:Math.min(d.spent,d.collected)||(d.collected?0:d.spent),color:PIECOL.slot2}],
+    {big:sm(d.net),small:"net earnings"},"Made "+money(d.collected)+" − spent "+money(d.spent)+" = "+sm(d.net)+"."))}
 
 /* ---- job detail ---- */
 function openJob(id){
