@@ -429,7 +429,7 @@ function visitCard(v,after,showJob,opts){
       a.appendChild(btn("Skip","btn alt sm",function(){patch(wxOn()?{status:"skipped",weather_from:null,weather_batch:null}:{status:"skipped"})}));
       a.appendChild(btn("Move","btn alt sm",function(){
         a.textContent="";var di=document.createElement("input");di.type="date";di.value=v.scheduled_date;di.style.width="auto";a.appendChild(di);
-        a.appendChild(btn("Save date","btn sm",function(){if(!di.value)return;var nd=di.value,od=v.scheduled_date;patch(wxOn()?{scheduled_date:nd,weather_from:null,weather_batch:null}:{scheduled_date:nd},nd>od?function(){catchup([v],"m|"+Date.now(),after)}:null)}));a.appendChild(btn("Cancel","btn alt sm",btns))}));
+        a.appendChild(btn("Save date","btn sm",function(){if(!di.value)return;var nd=di.value,od=v.scheduled_date,pp={scheduled_date:nd};if(wxOn()){pp.weather_from=null;pp.weather_batch=null}if(remOn())pp.reminded_at=null;patch(pp,nd>od?function(){catchup([v],"m|"+Date.now(),after)}:null)}));a.appendChild(btn("Cancel","btn alt sm",btns))}));
     }else{
       if(!v.invoice_id&&!v.paid_at)a.appendChild(btn("Undo","btn alt sm",function(){patch({status:"scheduled",completed_at:null})}));
       if(!billErr&&v.status==="done"){
@@ -520,7 +520,7 @@ function renderDay(list,odCount){
   if(sched.length){
     var ru=routeUrl(sched);if(ru){var a=el("a","btn sm","Start route");a.href=ru;a.target="_blank";a.rel="noopener";bt.appendChild(a);bt.appendChild(document.createTextNode(" "))}
     if(s3){bt.appendChild(btn("Send route","btn alt sm",function(){openSendRoute(d)}));bt.appendChild(document.createTextNode(" "))}
-    bt.appendChild(btn("Weather delay","btn alt sm",function(){openWeather(d)}))}
+    bt.appendChild(btn("Text reminders","btn alt sm",function(){remindPanel(sched,"visit","Text reminders · "+dlabel(d))}));bt.appendChild(document.createTextNode(" "));bt.appendChild(btn("Weather delay","btn alt sm",function(){openWeather(d)}))}
   sum.appendChild(bt);list.appendChild(sum);
   if(sched.length>10)list.appendChild(el("div","note","The route link covers the first 10 stops in your order."));
   all.forEach(function(v){
@@ -576,10 +576,10 @@ function openWeather(d){
   sel.addEventListener("change",prev);p.appendChild(go);prev()}
 function doDelay(d,n){
   var key="w|"+d+"|"+Date.now(),chain=Promise.resolve(null);
-  for(var i=n;i>=0;i--){(function(day){chain=chain.then(function(err){if(err)return err;return sb.from("visits").update({scheduled_date:addDays(day,1),weather_from:day,weather_batch:key}).eq("scheduled_date",day).eq("status","scheduled").then(function(r){return r.error||null})})})(addDays(d,i))}
+  for(var i=n;i>=0;i--){(function(day){chain=chain.then(function(err){if(err)return err;return sb.from("visits").update(Object.assign({scheduled_date:addDays(day,1),weather_from:day,weather_batch:key},remOn()?{reminded_at:null}:{})).eq("scheduled_date",day).eq("status","scheduled").then(function(r){return r.error||null})})})(addDays(d,i))}
   chain.then(function(err){
     if(err){closeDetail();alert(/weather_/.test(err.message||"")?"Weather delay needs a one-time setup. Run the weather SQL in Supabase (SQL Editor), then try again.":"Something went wrong while moving the stops. Check the schedule; Undo weather delay will put back anything that moved.");loadVisits().then(render);return}
-    loadVisits().then(function(){closeDetail();render();catchup(visits.filter(function(v){return v.weather_batch===key&&v.status==="scheduled"}),key,render)})})}
+    loadVisits().then(function(){closeDetail();render();catchup(visits.filter(function(v){return v.weather_batch===key&&v.status==="scheduled"}),key,function(){render();remindPanel(visits.filter(function(v){return v.weather_batch===key&&v.status==="scheduled"}),"delay","Let clients know")})})})}
 function undoWeather(key){
   var vs=visits.filter(function(v){return v.weather_from&&gk(v)===key&&(v.status==="scheduled"||v.status==="skipped")});
   if(!vs.length)return;
@@ -624,7 +624,47 @@ function catchup(moved,key,after){
     var rs=btn("Reset: next one "+(c.iv===7?"1 week":"2 weeks")+" after this cut (recommended)","btn sm",function(){act(c,"reset",card,row)});
     row.appendChild(rs);row.appendChild(btn("Skip the next one","btn alt sm",function(){act(c,"skip",card,row)}));row.appendChild(btn("Keep both","btn alt sm",function(){row.textContent="";row.appendChild(el("div","note","Kept as scheduled."))}));
     card.appendChild(row);card.style.marginBottom="10px";p.appendChild(card);cards.push({c:c,card:card,row:row})});
-  var dn=btn("Done","btn",function(){closeDetail();render()});dn.style.marginTop="8px";p.appendChild(dn)}
+  var dn=btn("Done","btn",function(){closeDetail();after()});dn.style.marginTop="8px";p.appendChild(dn)}
+
+/* ---- Text reminders (tap-to-text: opens your own Messages app, nothing is sent until you press Send there) ---- */
+function remOn(){return visits.some(function(v){return"reminded_at" in v})}
+function firstName(c){return String((c&&c.name)||"").split(" ")[0]||"there"}
+function remMsg(mode,c,vs){
+  var nm=bizv("name","Latta Corp"),addrs=[];vs.forEach(function(v){var a=paddr(v.property_id);if(a&&addrs.indexOf(a)<0)addrs.push(a)});
+  var dts=vs.map(function(v){return v.scheduled_date}).sort(),when=dlabel(dts[0]);
+  if(mode==="delay")return"Hi "+firstName(c)+", this is "+nm+". Because of the weather we've moved your service"+(addrs.length===1?" at "+addrs[0]:"")+" to "+(dts[0]===addDays(today(),1)?"tomorrow, "+dshort(dts[0]):dshort(dts[0]))+". Thank you for understanding!";
+  return"Hi "+firstName(c)+", this is "+nm+". We're scheduled to take care of your property"+(addrs.length===1?" at "+addrs[0]:"")+" "+(dts[0]===today()?"today":dts[0]===addDays(today(),1)?"tomorrow, "+dshort(dts[0]):"on "+dshort(dts[0]))+". If anything needs to change (gate, pets, etc.), just reply here. Thank you!"}
+function remindPanel(vs,mode,title){
+  var p=panel();p.appendChild(el("h2",null,title));
+  p.appendChild(el("p","note",mode==="delay"?"Let these clients know their visit moved. Tap Text to open a ready-to-send message in your Messages app. You can edit it there, and nothing goes out until you press Send.":"Tap Text to open a ready-to-send reminder in your Messages app. You can edit it there, and nothing goes out until you press Send."));
+  var by={},order=[];vs.slice().sort(mode==="delay"?function(a,b){return a.scheduled_date<b.scheduled_date?-1:1}:dayOrder).forEach(function(v){if(!by[v.client_id]){by[v.client_id]=[];order.push(v.client_id)}by[v.client_id].push(v)});
+  if(!order.length){p.appendChild(el("div","empty","No stops to text about."))}
+  var sent={};
+  order.forEach(function(cid){
+    var c=byId(clients,cid)||{},list=by[cid],card=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
+    var l=el("div");l.appendChild(el("b",null,c.name||"(deleted client)"));
+    var ad=[];list.forEach(function(v){var a=paddr(v.property_id);if(a&&ad.indexOf(a)<0)ad.push(a)});l.appendChild(el("div","note",ad.join(" · ")+(mode==="delay"?" · now "+dshort(list[0].scheduled_date):"")));top.appendChild(l);
+    var r=el("div");r.style.cssText="display:flex;gap:8px;align-items:center";
+    var chip=el("span","chip won","✓ Texted");chip.hidden=!(mode==="visit"&&list.every(function(v){return v.reminded_at}));
+    r.appendChild(chip);
+    if(c.phone){var a=el("a","btn sm","Text");a.href=smsHref(c.phone,remMsg(mode,c,list));
+      a.addEventListener("click",function(){chip.hidden=false;if(mode==="visit"){var on=remOn(),now=new Date().toISOString();list.forEach(function(v){v.reminded_at=now});if(on)sb.from("visits").update({reminded_at:now}).in("id",list.map(function(v){return v.id})).then(function(){})}});r.appendChild(a)}
+    else r.appendChild(el("span","note","No phone on file"));
+    top.appendChild(r);card.appendChild(top);p.appendChild(card)});
+  var dn=btn(mode==="delay"?"Skip / Done":"Done","btn alt");dn.style.marginTop="10px";dn.addEventListener("click",function(){closeDetail();render()});p.appendChild(dn)}
+function invRemind(inv,c){
+  return"Hi "+firstName(c)+", a friendly reminder from "+bizv("name","Latta Corp")+": invoice "+invNum(inv.number)+" ("+money(inv.total)+") "+(isOverdue(inv)?"was due "+dshort(inv.due_date):"is due "+dshort(inv.due_date))+"."+(bizv("zelle","")?" Pay with Zelle: "+biz.zelle+".":"")+" If you've already paid, thank you!"}
+function stampInv(inv){var on="reminded_at" in inv,now=new Date().toISOString();inv.reminded_at=now;if(on)sb.from("invoices").update({reminded_at:now}).eq("id",inv.id).then(function(){})}
+function remindOverdue(od){
+  var p=panel();p.appendChild(el("h2",null,"Remind overdue clients"));
+  p.appendChild(el("p","note","Tap Text to open a ready-to-send payment reminder in your Messages app. Nothing goes out until you press Send."));
+  od.slice().sort(function(a,b){return a.due_date<b.due_date?-1:1}).forEach(function(i){
+    var c=byId(clients,i.client_id)||{},card=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
+    var l=el("div");l.appendChild(el("b",null,invNum(i.number)+" · "+cname(i.client_id)));l.appendChild(el("div","note",money(i.total)+" · due "+dshort(i.due_date)+(i.reminded_at?" · last reminded "+dshort(String(i.reminded_at).slice(0,10)):"")));top.appendChild(l);
+    var r=el("div");r.style.cssText="display:flex;gap:8px;align-items:center";var chip=el("span","chip won","✓ Texted");chip.hidden=true;r.appendChild(chip);
+    if(c.phone){var a=el("a","btn sm","Text");a.href=smsHref(c.phone,invRemind(i,c));a.addEventListener("click",function(){chip.hidden=false;stampInv(i)});r.appendChild(a)}else r.appendChild(el("span","note","No phone on file"));
+    top.appendChild(r);card.appendChild(top);p.appendChild(card)});
+  var dn=btn("Done","btn alt");dn.style.marginTop="10px";dn.addEventListener("click",function(){closeDetail();render()});p.appendChild(dn)}
 
 /* ---- job detail ---- */
 function openJob(id){
@@ -940,12 +980,13 @@ function renderBilling(){
   if(bfilter==="tobill")return renderToBill(list,bg);
   var set=(bfilter==="open"?op.slice().sort(function(a,b){return a.due_date<b.due_date?-1:1}):pd_).filter(function(i){
     if(!query)return true;return[invNum(i.number),i.number,cname(i.client_id),i.reference].join(" ").toLowerCase().indexOf(query)>-1});
+  if(bfilter==="open"&&od.length){var ro=btn("Remind overdue clients ("+od.length+")","btn alt",function(){remindOverdue(od)});ro.style.margin="8px 0";list.appendChild(ro)}
   if(!set.length){list.appendChild(el("div","empty",bfilter==="open"?"No open invoices.":"No paid invoices yet."));return}
   set.forEach(function(i){list.appendChild(invoiceRow(i))})}
 function invoiceRow(i){
   var b=el("button","row client"+(isOverdue(i)?" overdue":""));b.type="button";var l=el("div");
   l.appendChild(el("b",null,invNum(i.number)+" · "+cname(i.client_id)));
-  l.appendChild(el("div","sub",[i.period_end?monthName(i.period_end):"",i.status==="paid"?"Paid "+(i.paid_at?dshort(String(i.paid_at).slice(0,10)):"")+(i.paid_method?" ("+i.paid_method+")":""):"Due "+dshort(i.due_date),i.reference?"Ref "+i.reference:""].filter(Boolean).join(" · ")));
+  l.appendChild(el("div","sub",[i.period_end?monthName(i.period_end):"",i.status==="paid"?"Paid "+(i.paid_at?dshort(String(i.paid_at).slice(0,10)):"")+(i.paid_method?" ("+i.paid_method+")":""):"Due "+dshort(i.due_date),i.reference?"Ref "+i.reference:"",i.status==="open"&&i.reminded_at?"Reminded "+dshort(String(i.reminded_at).slice(0,10)):""].filter(Boolean).join(" · ")));
   var r=el("div");r.style.textAlign="right";r.appendChild(el("b",null,money(i.total)));
   var chip=i.status==="void"?el("span","chip lost","Void"):i.status==="paid"?el("span","chip won","Paid"):isOverdue(i)?el("span","chip od","Overdue"):el("span","chip",i.sent_at?"Sent":"Not sent");r.appendChild(el("div"));r.appendChild(chip);
   b.appendChild(l);b.appendChild(r);b.addEventListener("click",function(){openInvoice(i.id)});return b}
@@ -997,7 +1038,9 @@ function openInvoice(id){
     var msg=invMessage(inv,c);
     if(c&&c.phone){var a1=el("a","btn alt","Text");a1.href=smsHref(c.phone,msg);a1.addEventListener("click",function(){markSent(inv)});acts.appendChild(a1)}
     if(c&&c.email){var a2=el("a","btn alt","Email");a2.href="mailto:"+encodeURIComponent(c.email).replace("%40","@")+"?subject="+encodeURIComponent("Invoice "+invNum(inv.number)+" from Latta Corp")+"&body="+encodeURIComponent(msg+"\n\n(The invoice PDF is attached.)");a2.addEventListener("click",function(){markSent(inv)});acts.appendChild(a2)}
+    if(inv.status==="open"&&c&&c.phone&&(isOverdue(inv)||inv.sent_at)){var a3=el("a","btn alt",isOverdue(inv)?"Text a payment reminder":"Text a reminder");a3.href=smsHref(c.phone,invRemind(inv,c));a3.addEventListener("click",function(){stampInv(inv)});acts.appendChild(a3)}
     body.appendChild(acts);
+    if(inv.status==="open"&&inv.reminded_at)body.appendChild(el("div","note","Last reminder texted "+dshort(String(inv.reminded_at).slice(0,10))+"."));
     if(c&&(!c.phone||!c.email))body.appendChild(el("div","note","Tip: add a "+(!c.phone?"phone number":"email")+" on the client page to get "+(!c.phone?"a Text":"an Email")+" button here. To email the PDF: tap View / Print / PDF, choose Save as PDF, then attach it."));
     var pay=el("div","sec");
     if(inv.status==="open"){
