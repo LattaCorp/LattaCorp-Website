@@ -4,6 +4,7 @@ var cfg=window.CRM_CONFIG,sb=window.supabase.createClient(cfg.url,cfg.key,{auth:
 var STATUSES=[["new","New"],["contacted","Contacted"],["quoted","Quoted"],["won","Won"],["lost","Lost"]];
 var TYPES=[["residential","Residential"],["hoa","HOA"],["commercial","Commercial"]];
 var leads=[],clients=[],props=[],clientsErr=false,services=[],jobs=[],visits=[],jobsErr=false;
+var todos=[],todoErr=false,tfilter="open",team=[];
 var role="owner",myEmail="";function isOwner(){return role==="owner"}
 var view="leads",lfilter="all",cfilter="active",jfilter="active",smode="day",selDate=today(),crewF="all",query="";
 var invoices=[],biz=null,billErr=false,unbilled=[],bfilter="tobill",billThrough=lastMonthEnd();
@@ -62,7 +63,8 @@ function load(){
     sb.from("crew").select("*").order("name",{ascending:true}).limit(200),
     sb.from("invoices").select("*").order("number",{ascending:false}).limit(3000),
     sb.from("business").select("*").eq("id",1),
-    sb.from("visits").select("*").eq("status","done").is("invoice_id",null).is("paid_at",null).limit(5000)
+    sb.from("visits").select("*").eq("status","done").is("invoice_id",null).is("paid_at",null).limit(5000),
+    sb.from("todos").select("*").order("created_at",{ascending:false}).limit(3000)
   ]).then(function(rs){
     if(rs[0].error){$("msg").textContent="Could not load leads. If you just signed in, make sure this email is on the staff list.";return}
     leads=rs[0].data||[];
@@ -70,7 +72,8 @@ function load(){
     clients=rs[1].error?[]:(rs[1].data||[]);props=rs[2].error?[]:(rs[2].data||[]);
     jobsErr=!!(rs[3].error||rs[4].error||rs[5].error||clientsErr);
     services=rs[3].error?[]:(rs[3].data||[]);jobs=rs[4].error?[]:(rs[4].data||[]);visits=rs[5].error?[]:(rs[5].data||[]);histFrom=addDays(today(),-45);s3=!rs[6].error;crew=rs[6].error?[]:(rs[6].data||[]);
-    billErr=!!(rs[7].error||rs[9].error||jobsErr);invoices=rs[7].error?[]:(rs[7].data||[]);biz=rs[8].error?null:((rs[8].data||[])[0]||null);unbilled=rs[9].error?[]:(rs[9].data||[]);
+    billErr=!!(rs[7].error||rs[9].error||jobsErr);invoices=rs[7].error?[]:(rs[7].data||[]);biz=rs[8].error?null:((rs[8].data||[])[0]||null);unbilled=rs[9].error?[]:(rs[9].data||[]);todoErr=!!rs[10].error;todos=rs[10].error?[]:(rs[10].data||[]);
+    try{sb.rpc("team_names").then(function(r){if(r&&!r.error&&r.data)team=r.data},function(){})}catch(e){}
     render();topUp().then(function(n){if(n)render()});
   });
 }
@@ -81,15 +84,16 @@ var ICONS={leads:'<svg viewBox="0 0 24 24"><path d="M3 13l2.5-7.5A2 2 0 0 1 7.4 
  jobs:'<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>',
  billing:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
  schedule:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>',
- team:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M18.5 3.5v3M17 5h3"/></svg>'};
+ team:'<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/><path d="M18.5 3.5v3M17 5h3"/></svg>',
+ todo:'<svg viewBox="0 0 24 24"><path d="M4 6.5l1.7 1.7L9 4.8"/><path d="M4 13.5l1.7 1.7L9 11.8"/><path d="M4 20.5l1.7 1.7"/><path d="M13 6h8M13 13h8M13 20h8"/></svg>'};
 function render(){
   var nav=$("side");nav.textContent="";
   var tdy=today(),stops=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date===tdy}).length,newL=leads.filter(function(l){return l.status==="new"}).length;
-  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops],["billing","Billing",invoices.filter(isOverdue).length]].concat(isOwner()?[["team","Team",0]]:[]).forEach(function(v){
+  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops],["todo","To-Do",todos.filter(function(t){return!t.done&&t.due_date&&t.due_date<=tdy}).length],["billing","Billing",invoices.filter(isOverdue).length]].concat(isOwner()?[["team","Team",0]]:[]).forEach(function(v){
     var b=el("button",v[0]===view?"on":"");b.type="button";b.addEventListener("click",function(){view=v[0];render()});b.innerHTML=ICONS[v[0]];b.appendChild(el("span",null,v[1]));
     if(v[2])b.appendChild(el("span","badge",String(v[2])));b.setAttribute("aria-current",v[0]===view?"page":"false");nav.appendChild(b)});
   $("topbtns").textContent="";
-  if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else if(view==="billing")renderBilling();else if(view==="team"&&isOwner())renderTeam();else renderSchedule();
+  if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else if(view==="billing")renderBilling();else if(view==="todo")renderTodo();else if(view==="team"&&isOwner())renderTeam();else renderSchedule();
 }
 function renderLeads(){
   var tabs=$("tabs");tabs.textContent="";
@@ -715,6 +719,61 @@ function renderTeam(){
     if(!res.ok){holder.textContent="";holder.appendChild(el("div","empty",res.error));return}
     myEmail=res.data.me||myEmail;draw(res.data.members||[])})}
   load2()}
+
+/* ---- To-Do list (shared by the whole team) ---- */
+function memberName(e){if(!e)return"";var m=team.filter(function(x){return String(x.email).toLowerCase()===String(e).toLowerCase()})[0];return m&&m.name?m.name:String(e).split("@")[0]}
+function todoDueState(t){return t.done||!t.due_date?"":t.due_date<today()?"od":t.due_date===today()?"today":""}
+function toggleTodo(t,done){
+  var now=done?new Date().toISOString():null,by=done?myEmail:"";
+  sb.from("todos").update({done:done,done_at:now,done_by:by}).eq("id",t.id).then(function(r){if(r.error){alert("Could not save that.");return}t.done=done;t.done_at=now;t.done_by=by;render()})}
+function renderTodo(){
+  var tabs=$("tabs");tabs.textContent="";var list=$("list");list.textContent="";
+  if(todoErr){list.appendChild(el("div","empty","To-Do isn't set up yet. Run the Stage 8 SQL in Supabase (SQL Editor), then press Refresh."));return}
+  var me=(myEmail||"").toLowerCase(),open=todos.filter(function(t){return!t.done}),mine=open.filter(function(t){return String(t.assigned_to).toLowerCase()===me&&me}),dn=todos.filter(function(t){return t.done});
+  [["open","Open",open.length],["mine","Mine",mine.length],["done","Done",dn.length]].forEach(function(s){
+    var b=el("button","tab"+(tfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){tfilter=s[0];render()});tabs.appendChild(b)});
+  $("topbtns").appendChild(btn("+ New task","btn",function(){openTodo(null)}));
+  var qa=el("div","qadd"),ti=document.createElement("input");ti.type="text";ti.placeholder="Add a task and press Enter...";ti.setAttribute("aria-label","New task");
+  var di=document.createElement("input");di.type="date";di.setAttribute("aria-label","Due date (optional)");di.title="Due date (optional)";
+  function add(){var v=ti.value.trim();if(!v)return;ab.disabled=true;
+    sb.from("todos").insert({title:v,due_date:di.value||null,created_by:myEmail||"",assigned_to:tfilter==="mine"?(myEmail||""):""}).select().single().then(function(r){ab.disabled=false;if(r.error||!r.data){alert("Could not add the task.");return}todos.unshift(r.data);render()})}
+  var ab=btn("Add","btn",add);ti.addEventListener("keydown",function(e){if(e.key==="Enter"){e.preventDefault();add()}});
+  qa.appendChild(ti);qa.appendChild(di);qa.appendChild(ab);list.appendChild(qa);
+  var set=tfilter==="done"?dn.slice().sort(function(a,b){return String(b.done_at||"")<String(a.done_at||"")?-1:1}):(tfilter==="mine"?mine:open);
+  if(query)set=set.filter(function(t){return[t.title,t.notes,cname(t.client_id),memberName(t.assigned_to)].join(" ").toLowerCase().indexOf(query)>-1});
+  if(!set.length){list.appendChild(el("div","empty",tfilter==="done"?"Nothing completed yet.":tfilter==="mine"?"Nothing assigned to you.":"Nothing to do. Add a task above."));return}
+  var groups=[];
+  if(tfilter==="done")groups=[["Completed",set]];
+  else{
+    var t0=today(),by=function(f){return set.filter(f).sort(function(a,b){return(a.due_date||"")<(b.due_date||"")?-1:1})};
+    groups=[["Overdue",by(function(t){return t.due_date&&t.due_date<t0})],["Today",by(function(t){return t.due_date===t0})],["Upcoming",by(function(t){return t.due_date&&t.due_date>t0})],["No date",set.filter(function(t){return!t.due_date})]]}
+  groups.forEach(function(g){if(!g[1].length)return;
+    var h=el("h3",null,g[0]+" ("+g[1].length+")");h.style.cssText="margin:14px 0 6px;font-size:.95rem;color:"+(g[0]==="Overdue"?"var(--red)":"var(--muted)");list.appendChild(h);
+    g[1].forEach(function(t){
+      var row=el("div","todo"+(t.done?" done":"")),ck=el("button","ck",t.done?"✓":"");ck.type="button";ck.setAttribute("aria-label",t.done?"Mark not done":"Mark done");ck.addEventListener("click",function(e){e.stopPropagation();toggleTodo(t,!t.done)});
+      var body=el("div","tb");body.appendChild(el("div","tt",t.title));
+      var sub=[];if(t.due_date)sub.push(dshort(t.due_date));if(t.assigned_to)sub.push(memberName(t.assigned_to));if(t.client_id)sub.push(cname(t.client_id));if(t.done&&t.done_at)sub.push("done "+dshort(String(t.done_at).slice(0,10))+(t.done_by?" by "+memberName(t.done_by):""));
+      if(sub.length){var sd=el("div","note",sub.join(" · "));if(todoDueState(t)==="od")sd.style.color="var(--red)";body.appendChild(sd)}
+      if(t.notes)body.appendChild(el("div","note",t.notes.length>110?t.notes.slice(0,110)+"…":t.notes));
+      row.appendChild(ck);row.appendChild(body);row.addEventListener("click",function(){openTodo(t)});list.appendChild(row)})})}
+function openTodo(t){
+  var p=panel();p.appendChild(el("h2",null,t?"Task":"New task"));
+  var ti=fld("Task","text",t?t.title:""),no=fld("Notes (optional)","textarea",t?t.notes:""),du=fld("Due date (optional)","date",t&&t.due_date?t.due_date:"");
+  var tm=[["","Anyone"]].concat(team.map(function(m){return[m.email,m.name||m.email]}));
+  if(t&&t.assigned_to&&!tm.some(function(x){return String(x[0]).toLowerCase()===String(t.assigned_to).toLowerCase()}))tm.push([t.assigned_to,memberName(t.assigned_to)]);
+  var as=fld("Assigned to","select",t?t.assigned_to:"",tm);
+  var cl=fld("Client (optional)","select",t&&t.client_id?t.client_id:"",[["","None"]].concat(clients.filter(function(c){return!c.archived||(t&&t.client_id===c.id)}).map(function(c){return[c.id,c.name]})));
+  [ti,no,du,as,cl].forEach(function(f){p.appendChild(f)});
+  var acts=el("div","acts");acts.style.marginTop="12px";
+  var sv=btn("Save","btn",function(){
+    var title=ti.input.value.trim();if(!title){alert("Enter a task.");return}
+    var row={title:title,notes:no.input.value.trim(),due_date:du.input.value||null,assigned_to:as.input.value,client_id:cl.input.value||null};sv.disabled=true;
+    var q=t?sb.from("todos").update(row).eq("id",t.id).select().single():sb.from("todos").insert(Object.assign({created_by:myEmail||""},row)).select().single();
+    q.then(function(r){sv.disabled=false;if(r.error||!r.data){alert("Could not save.");return}if(t)Object.assign(t,r.data);else todos.unshift(r.data);closeDetail();render()})});
+  acts.appendChild(sv);
+  if(t){acts.appendChild(btn(t.done?"Mark not done":"Mark done","btn alt",function(){toggleTodo(t,!t.done);closeDetail()}));
+    acts.appendChild(btn("Delete","btn danger",function(){if(!confirm("Delete this task?"))return;sb.from("todos").delete().eq("id",t.id).then(function(r){if(r.error){alert("Could not delete.");return}todos=todos.filter(function(z){return z.id!==t.id});closeDetail();render()})}))}
+  p.appendChild(acts)}
 
 /* ---- job detail ---- */
 function openJob(id){
