@@ -256,20 +256,22 @@ function setStatus(l,s){sb.from("leads").update({status:s}).eq("id",l.id).then(f
 
 function convertLead(l,b){
   if(clientsErr){alert("Run the Stage 1 SQL in Supabase first (see the setup steps), then press Refresh.");return}
+  var addr=(l.address||"").trim();
+  if(!addr){addr=(prompt("This lead has no address. Enter the service address:")||"").trim();if(!addr){alert("A service address is required to make a client.");return}}
   var dup=clients.filter(function(c){return(l.email&&c.email&&c.email.toLowerCase()===l.email.toLowerCase())||(d10(l.phone).length>=7&&(d10(c.phone)===d10(l.phone)||d10(c.phone2)===d10(l.phone)))})[0];
   if(dup){
     if(!confirm('"'+dup.name+'" already has this phone or email. Link this lead to that existing client?'))return;
-    b.disabled=true;linkLead(l,dup,true);return}
+    b.disabled=true;linkLead(l,dup,addr);return}
   b.disabled=true;
   var type=/proposal|hoa/i.test(l.kind||"")?"hoa":"residential";
   sb.from("clients").insert({name:l.name||"(no name)",email:l.email||"",phone:l.phone||"",type:type,source:l.kind||"",notes:""}).select().single().then(function(r){
     if(r.error||!r.data){b.disabled=false;alert("Could not create the client.");return}
-    clients.push(r.data);clients.sort(function(x,y){return x.name.localeCompare(y.name)});linkLead(l,r.data,false)});
+    clients.push(r.data);clients.sort(function(x,y){return x.name.localeCompare(y.name)});linkLead(l,r.data,addr)});
 }
-function linkLead(l,c,existing){
+function linkLead(l,c,addr){
   function done(){sb.from("leads").update({client_id:c.id}).eq("id",l.id).then(function(r){if(r.error){alert("Client saved, but linking the lead failed.")}else{l.client_id=c.id}render();openClient(c.id)})}
-  var has=clientProps(c.id).some(function(p){return p.address.toLowerCase()===(l.address||"").toLowerCase()});
-  if(l.address&&!has){sb.from("properties").insert({client_id:c.id,label:"Main",address:l.address}).select().single().then(function(r){if(r.data)props.push(r.data);done()})}else done();
+  var has=clientProps(c.id).some(function(p){return p.address.toLowerCase()===addr.toLowerCase()});
+  if(!has){sb.from("properties").insert({client_id:c.id,label:clientProps(c.id).length?"":"Main",address:addr}).select().single().then(function(r){if(r.data)props.push(r.data);done()})}else done();
 }
 
 /* ---- client detail ---- */
@@ -329,10 +331,11 @@ function openClientForm(c){
   var em=fld("Email","email",c&&c.email),ty=fld("Type","select",c?c.type:"residential",TYPES);
   var nt=fld("Notes","textarea",c&&c.notes);
   var g=el("div","grid2");g.appendChild(n);g.appendChild(co);g.appendChild(ph);g.appendChild(ph2);g.appendChild(em);g.appendChild(ty);p.appendChild(g);p.appendChild(nt);
-  var addr=null;if(!c){addr=fld("Service address (optional, you can add more later)","text","");p.appendChild(addr)}
+  var addr=null;if(!c){addr=fld("Service address (required, you can add more later)","text","");addr.input.placeholder="123 Example Ln, Kissimmee, FL 34758";p.appendChild(addr)}
   var a=el("div","actions");
   var save=btn("Save","btn",function(){
     if(!n.input.value.trim()){alert("Enter a name.");return}
+    if(!c&&!addr.input.value.trim()){alert("Enter the service address.");addr.input.focus();return}
     var row={name:n.input.value.trim(),company:co.input.value.trim(),phone:ph.input.value.trim(),phone2:ph2.input.value.trim(),email:em.input.value.trim(),type:ty.input.value,notes:nt.input.value.trim()};
     save.disabled=true;
     if(c){sb.from("clients").update(row).eq("id",c.id).select().single().then(function(r){save.disabled=false;if(r.error||!r.data){alert("Could not save.");return}Object.assign(c,r.data);render();openClient(c.id)})}
@@ -340,8 +343,7 @@ function openClientForm(c){
       if(r.error||!r.data){save.disabled=false;alert("Could not save. Did you run the Stage 1 SQL?");return}
       clients.push(r.data);clients.sort(function(x,y){return x.name.localeCompare(y.name)});
       var ad=addr.input.value.trim();
-      if(ad){sb.from("properties").insert({client_id:r.data.id,label:"Main",address:ad}).select().single().then(function(q){if(q.data)props.push(q.data);render();openClient(r.data.id)})}
-      else{render();openClient(r.data.id)}})}});
+      sb.from("properties").insert({client_id:r.data.id,label:"Main",address:ad}).select().single().then(function(q){if(q.data)props.push(q.data);else alert("Client saved, but the address did not save. Add it from the client page.");render();openClient(r.data.id)})})}});
   a.appendChild(save);a.appendChild(btn("Cancel","btn alt",function(){if(c)openClient(c.id);else closeDetail()}));p.appendChild(a);
 }
 
@@ -378,7 +380,10 @@ function openImport(){
         if(!map[key]){map[key]={name:name,company:g(r,cCo),email:g(r,cEm),phone:g(r,cPh),addrs:[]};order.push(key)}
         if(addr&&map[key].addrs.indexOf(addr)<0)map[key].addrs.push(addr)});
       var fresh=order.map(function(k){return map[k]}).filter(function(x){return!clients.some(function(c){return(x.email&&c.email&&c.email.toLowerCase()===x.email.toLowerCase())||(d10(x.phone).length>=7&&d10(c.phone)===d10(x.phone))})});
-      if(!fresh.length){out.textContent="Nothing new to import (everything already matches a client).";return}
+      var noAddr=fresh.filter(function(x){return!x.addrs.length}).length;
+      fresh=fresh.filter(function(x){return x.addrs.length});
+      if(!fresh.length){out.textContent=noAddr?"Nothing imported: "+noAddr+" client(s) have no address, and an address is required. Add an address column to those rows.":"Nothing new to import (everything already matches a client).";return}
+      if(noAddr)out.appendChild(el("p","note",noAddr+" row(s) skipped because they have no address."));
       out.appendChild(el("p",null,"Ready to import "+fresh.length+" client(s) with "+fresh.reduce(function(n,x){return n+x.addrs.length},0)+" propert"+"ies."));
       var go=btn("Import now","btn",function(){
         go.disabled=true;go.textContent="Importing...";
