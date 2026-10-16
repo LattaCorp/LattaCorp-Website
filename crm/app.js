@@ -367,9 +367,10 @@ function topUp(){
   var rows=[];
   jobs.forEach(function(j){
     if(j.status!=="active")return;
+    var lastV=visits.filter(function(v){return v.job_id===j.id}).sort(function(a,b){return a.orig_date<b.orig_date?1:-1})[0],off=lastV&&/#R$/.test(lastV.weather_batch||"")?Math.round((pd(lastV.scheduled_date)-pd(lastV.orig_date))/86400000):0;
     visitDates(j).forEach(function(d){
       if(visits.some(function(v){return v.job_id===j.id&&v.orig_date===d}))return;
-      var row={job_id:j.id,client_id:j.client_id,property_id:j.property_id,orig_date:d,scheduled_date:d,status:"scheduled",price:j.price};if(s3)row.crew_id=j.crew_id||null;rows.push(row)})});
+      var row={job_id:j.id,client_id:j.client_id,property_id:j.property_id,orig_date:d,scheduled_date:addDays(d,off),status:"scheduled",price:j.price};if(s3)row.crew_id=j.crew_id||null;rows.push(row)})});
   if(!rows.length)return Promise.resolve(0);
   return sb.from("visits").upsert(rows,{onConflict:"job_id,orig_date",ignoreDuplicates:true}).then(function(r){
     if(r.error)return 0;return loadVisits().then(function(){return rows.length})})}
@@ -414,7 +415,7 @@ function visitCard(v,after,showJob,opts){
   card.appendChild(top);
   var a=el("div","acts");
   function patch(p,cb){
-    function fin(){if(!billErr&&(p.status!==undefined||p.paid_at!==undefined))loadUnbilled().then(after);else after()}
+    function fin(){if(cb){cb();return}if(!billErr&&(p.status!==undefined||p.paid_at!==undefined))loadUnbilled().then(after);else after()}
     sb.from("visits").update(p).eq("id",v.id).then(function(r){
       if(r.error){alert("Could not save that.");return}
       Object.assign(v,p);
@@ -425,10 +426,10 @@ function visitCard(v,after,showJob,opts){
     a.textContent="";
     if(v.status==="scheduled"){
       a.appendChild(btn("Done","btn sm",function(){patch({status:"done",completed_at:new Date().toISOString()})}));
-      a.appendChild(btn("Skip","btn alt sm",function(){patch({status:"skipped"})}));
+      a.appendChild(btn("Skip","btn alt sm",function(){patch(wxOn()?{status:"skipped",weather_from:null,weather_batch:null}:{status:"skipped"})}));
       a.appendChild(btn("Move","btn alt sm",function(){
         a.textContent="";var di=document.createElement("input");di.type="date";di.value=v.scheduled_date;di.style.width="auto";a.appendChild(di);
-        a.appendChild(btn("Save date","btn sm",function(){if(!di.value)return;patch(wxOn()?{scheduled_date:di.value,weather_from:null}:{scheduled_date:di.value})}));a.appendChild(btn("Cancel","btn alt sm",btns))}));
+        a.appendChild(btn("Save date","btn sm",function(){if(!di.value)return;var nd=di.value,od=v.scheduled_date;patch(wxOn()?{scheduled_date:nd,weather_from:null,weather_batch:null}:{scheduled_date:nd},nd>od?function(){catchup([v],"m|"+Date.now(),after)}:null)}));a.appendChild(btn("Cancel","btn alt sm",btns))}));
     }else{
       if(!v.invoice_id&&!v.paid_at)a.appendChild(btn("Undo","btn alt sm",function(){patch({status:"scheduled",completed_at:null})}));
       if(!billErr&&v.status==="done"){
@@ -519,7 +520,7 @@ function renderDay(list,odCount){
   if(sched.length){
     var ru=routeUrl(sched);if(ru){var a=el("a","btn sm","Start route");a.href=ru;a.target="_blank";a.rel="noopener";bt.appendChild(a);bt.appendChild(document.createTextNode(" "))}
     if(s3){bt.appendChild(btn("Send route","btn alt sm",function(){openSendRoute(d)}));bt.appendChild(document.createTextNode(" "))}
-    bt.appendChild(btn("Weather delay","btn alt sm",function(){pushDay(d,onDay(d).filter(function(v){return v.status==="scheduled"}).length)}))}
+    bt.appendChild(btn("Weather delay","btn alt sm",function(){openWeather(d)}))}
   sum.appendChild(bt);list.appendChild(sum);
   if(sched.length>10)list.appendChild(el("div","note","The route link covers the first 10 stops in your order."));
   all.forEach(function(v){
@@ -557,21 +558,73 @@ function renderMonth(list){
     if(vs.length){cell.appendChild(el("span","mc",vs.length+(vs.length>1?" stops":" stop")));cell.appendChild(el("span","mt",money(vs.reduce(function(s,v){return s+(v.status==="skipped"?0:Number(v.price||0))},0))))}
     cell.addEventListener("click",function(){selDate=d;smode="day";render()});g.appendChild(cell)})(addDays(gs,i))}
   list.appendChild(g)}
-function wxOn(){return visits.some(function(v){return"weather_from" in v})}
-/* Weather delay: moves the day's scheduled stops to the next day and remembers where they came from, so Undo can put them back. */
-function pushDay(d,n){
-  if(!confirm("Weather delay: move all "+n+" scheduled stop"+(n>1?"s":"")+" on "+dlabel(d)+" to "+dlabel(addDays(d,1))+"?\n\nYou can undo this from "+dlabel(d)+" if the weather clears."))return;
-  sb.from("visits").update({scheduled_date:addDays(d,1),weather_from:d}).eq("scheduled_date",d).eq("status","scheduled").then(function(r){
-    if(r.error){alert(/weather_from/.test(r.error.message||"")?"Weather delay needs a one-time setup. Run the weather SQL in Supabase (SQL Editor), then try again.":"Could not move them.");return}loadVisits().then(render)})}
-function undoWeather(d){
-  sb.from("visits").update({scheduled_date:d,weather_from:null}).eq("weather_from",d).eq("status","scheduled").then(function(r){
-    if(r.error){alert("Could not undo the weather delay.");return}loadVisits().then(render)})}
+function wxOn(){return visits.some(function(v){return"weather_batch" in v})}
+function gk(v){return v.weather_batch?String(v.weather_batch).split("#")[0]:"L|"+v.weather_from}
+function ddiff(a,b){return Math.round((pd(b)-pd(a))/86400000)}
+
+/* Weather delay: pick "just this day" or roll the next few days forward too. Every moved stop remembers where it came from so one tap can undo it. */
+function openWeather(d){
+  var p=panel();p.appendChild(el("h2",null,"Weather delay"));
+  p.appendChild(el("p","note","Moves scheduled stops to the following day. Done and skipped stops stay put. Rolling forward keeps your route order and stops days from piling up on top of each other. You can undo it afterward."));
+  var lab=el("label",null,"How many days?"),sel=document.createElement("select");
+  for(var n=0;n<=6;n++){var o=document.createElement("option");o.value=n;o.textContent=n===0?"Just this day ("+dlabel(d)+")":"This day and the next "+n+" day"+(n>1?"s":"")+" (rolls everything forward)";sel.appendChild(o)}
+  lab.appendChild(sel);p.appendChild(lab);
+  var pv=el("div","note");pv.style.cssText="margin:10px 0;white-space:pre-line";p.appendChild(pv);
+  function cnt(day){return onDay(day).filter(function(v){return v.status==="scheduled"}).length}
+  function prev(){var n=+sel.value,ls=[],tot=0;for(var i=0;i<=n;i++){var day=addDays(d,i),c=cnt(day);tot+=c;ls.push(dshort(day)+": "+c+" stop"+(c===1?"":"s")+" → "+dshort(addDays(day,1)))}pv.textContent=ls.join("\n");go.disabled=!tot;go.textContent=tot?"Delay "+tot+" stop"+(tot>1?"s":""):"Nothing to move"}
+  var go=btn("Delay","btn",function(){go.disabled=true;doDelay(d,+sel.value)});go.style.marginTop="6px";
+  sel.addEventListener("change",prev);p.appendChild(go);prev()}
+function doDelay(d,n){
+  var key="w|"+d+"|"+Date.now(),chain=Promise.resolve(null);
+  for(var i=n;i>=0;i--){(function(day){chain=chain.then(function(err){if(err)return err;return sb.from("visits").update({scheduled_date:addDays(day,1),weather_from:day,weather_batch:key}).eq("scheduled_date",day).eq("status","scheduled").then(function(r){return r.error||null})})})(addDays(d,i))}
+  chain.then(function(err){
+    if(err){closeDetail();alert(/weather_/.test(err.message||"")?"Weather delay needs a one-time setup. Run the weather SQL in Supabase (SQL Editor), then try again.":"Something went wrong while moving the stops. Check the schedule; Undo weather delay will put back anything that moved.");loadVisits().then(render);return}
+    loadVisits().then(function(){closeDetail();render();catchup(visits.filter(function(v){return v.weather_batch===key&&v.status==="scheduled"}),key,render)})})}
+function undoWeather(key){
+  var vs=visits.filter(function(v){return v.weather_from&&gk(v)===key&&(v.status==="scheduled"||v.status==="skipped")});
+  if(!vs.length)return;
+  if(!confirm("Put "+vs.length+" visit"+(vs.length>1?"s":"")+" back on their original days (including any catch-up changes made with this)?"))return;
+  var by={};vs.forEach(function(v){(by[v.weather_from]=by[v.weather_from]||[]).push(v.id)});
+  Promise.all(Object.keys(by).map(function(f){return sb.from("visits").update({scheduled_date:f,weather_from:null,weather_batch:null,status:"scheduled"}).in("id",by[f])})).then(function(rs){
+    if(rs.some(function(r){return r.error}))alert("Could not undo everything.");loadVisits().then(render)})}
 function wxBanners(list,d){
-  var out=visits.filter(function(v){return v.weather_from===d&&v.status==="scheduled"&&v.scheduled_date!==d}),inn=visits.filter(function(v){return v.scheduled_date===d&&v.weather_from&&v.weather_from!==d&&v.status==="scheduled"});
-  function bar(txt,from){var b=el("div","wxbar");b.appendChild(el("span",null,txt));b.appendChild(btn("Undo weather delay","btn alt sm",function(){undoWeather(from)}));list.appendChild(b)}
-  if(out.length)bar("☔ "+out.length+" stop"+(out.length>1?"s were":" was")+" delayed by weather to "+dlabel(out[0].scheduled_date)+".",d);
-  var froms={};inn.forEach(function(v){froms[v.weather_from]=(froms[v.weather_from]||0)+1});
-  Object.keys(froms).sort().forEach(function(f){bar("☔ "+froms[f]+" stop"+(froms[f]>1?"s":"")+" here "+(froms[f]>1?"were":"was")+" moved from "+dlabel(f)+" by a weather delay.",f)})}
+  var g={};
+  visits.forEach(function(v){if(!v.weather_from)return;var rst=/#R$/.test(v.weather_batch||"");
+    if(v.status==="skipped"&&!v.weather_batch)return;if(v.status!=="scheduled"&&v.status!=="skipped")return;if(v.status==="scheduled"&&v.scheduled_date===v.weather_from)return;
+    var k=gk(v),x=g[k]=g[k]||{moved:0,adj:0,first:null,hit:false};
+    if(v.status==="skipped"||rst)x.adj++;else{x.moved++;if(!x.first||v.weather_from<x.first)x.first=v.weather_from}
+    if(v.weather_from===d||v.scheduled_date===d)x.hit=true});
+  Object.keys(g).sort().forEach(function(k){var x=g[k];if(!x.hit)return;
+    var man=k.charAt(0)==="m",t=man?"↔ Catch-up change: "+x.adj+" visit"+(x.adj>1?"s":"")+" adjusted.":"☔ Weather delay"+(x.first?" from "+dshort(x.first):"")+": "+x.moved+" stop"+(x.moved===1?"":"s")+" moved"+(x.adj?" · "+x.adj+" catch-up change"+(x.adj>1?"s":""):"")+".";
+    var b=el("div","wxbar");b.appendChild(el("span",null,t));b.appendChild(btn(man?"Undo":"Undo weather delay","btn alt sm",function(){undoWeather(k)}));list.appendChild(b)})}
+
+/* Smart catch-up: after a repeating (weekly / every 2 weeks) visit is pushed later, check whether the next one is now too close. */
+function catchup(moved,key,after){
+  var cons=[],seen={};
+  moved.slice().sort(function(a,b){return a.orig_date<b.orig_date?-1:1}).forEach(function(mv){
+    var jb=byId(jobs,mv.job_id);if(!jb||jb.status!=="active"||(jb.frequency!=="weekly"&&jb.frequency!=="biweekly")||seen[jb.id])return;seen[jb.id]=1;
+    var iv=jb.frequency==="weekly"?7:14,nx=visits.filter(function(v){return v.job_id===jb.id&&v.status==="scheduled"&&v.id!==mv.id&&v.orig_date>mv.orig_date}).sort(function(a,b){return a.orig_date<b.orig_date?-1:1})[0];
+    if(!nx)return;var gap=ddiff(mv.scheduled_date,nx.scheduled_date);
+    if(gap<=Math.floor(iv/2))cons.push({mv:mv.id,nx:nx.id,job:jb,iv:iv,gap:gap})});
+  if(!cons.length){after();return}
+  var p=panel();p.appendChild(el("h2",null,"Catch-up check"));
+  p.appendChild(el("p","note","These repeating jobs now have a cut very close to the next one. Choose what to do for each. Leaving it alone keeps both visits."));
+  var cards=[];
+  function act(c,kind,card,row){
+    var mv=byId(visits,c.mv),nx=byId(visits,c.nx);if(!mv||!nx)return Promise.resolve();
+    var f=wxOn()?{weather_from:nx.scheduled_date,weather_batch:key}:{},ps;
+    if(kind==="skip"){ps=[sb.from("visits").update(Object.assign({status:"skipped"},f)).eq("id",nx.id)]}
+    else{var delta=ddiff(nx.scheduled_date,addDays(mv.scheduled_date,c.iv));
+      ps=visits.filter(function(v){return v.job_id===c.job.id&&v.status==="scheduled"&&v.orig_date>=nx.orig_date}).map(function(v){return sb.from("visits").update(Object.assign({scheduled_date:addDays(v.scheduled_date,delta)},wxOn()?{weather_from:v.scheduled_date,weather_batch:key+"#R"}:{})).eq("id",v.id)})}
+    return Promise.all(ps).then(function(rs){row.textContent="";row.appendChild(el("div","note",rs.some(function(r){return r.error})?"Could not save that.":kind==="skip"?"✓ Next visit skipped.":"✓ Schedule reset: every "+(c.iv===7?"week":"2 weeks")+" from "+dshort(mv.scheduled_date)+"."));return loadVisits().then(render)})}
+  cons.forEach(function(c){
+    var mv=byId(visits,c.mv),nx=byId(visits,c.nx),card=el("div","pcard"),row=el("div","acts");
+    card.appendChild(el("b",null,cname(mv.client_id)+" · "+c.job.title+" ("+flabel(c.job.frequency).toLowerCase()+")"));
+    card.appendChild(el("div","note","This cut is now "+dshort(mv.scheduled_date)+" and the next is "+dshort(nx.scheduled_date)+(c.gap>0?", only "+c.gap+" day"+(c.gap>1?"s":"")+" later.":", the same day or earlier.")));
+    var rs=btn("Reset: next one "+(c.iv===7?"1 week":"2 weeks")+" after this cut (recommended)","btn sm",function(){act(c,"reset",card,row)});
+    row.appendChild(rs);row.appendChild(btn("Skip the next one","btn alt sm",function(){act(c,"skip",card,row)}));row.appendChild(btn("Keep both","btn alt sm",function(){row.textContent="";row.appendChild(el("div","note","Kept as scheduled."))}));
+    card.appendChild(row);card.style.marginBottom="10px";p.appendChild(card);cards.push({c:c,card:card,row:row})});
+  var dn=btn("Done","btn",function(){closeDetail();render()});dn.style.marginTop="8px";p.appendChild(dn)}
 
 /* ---- job detail ---- */
 function openJob(id){
