@@ -9,6 +9,7 @@ var expenses=[],expErr=false,rtab="overview",rper="month",rfrom="",rto="",exCat=
 var todos=[],todoErr=false,tfilter="open",team=[];
 var role="owner",myEmail="";function isOwner(){return role==="owner"}
 var view="leads",lfilter="all",cfilter="active",jfilter="active",smode="day",selDate=today(),crewF="all",query="";
+var estimates=[],estErr=false;
 var invoices=[],biz=null,billErr=false,unbilled=[],bfilter="tobill",billThrough=lastMonthEnd();
 var crew=[],s3=false,histFrom=addDays(today(),-45),crewMe=null,cwDate=today();
 var $=function(id){return document.getElementById(id)};
@@ -68,7 +69,8 @@ function load(){
     sb.from("visits").select("*").eq("status","done").is("invoice_id",null).is("paid_at",null).limit(5000),
     sb.from("todos").select("*").order("created_at",{ascending:false}).limit(3000),
     sb.from("expenses").select("*").order("spent_on",{ascending:false}).limit(20000),
-    sb.from("photos").select("*").order("created_at",{ascending:false}).limit(5000)
+    sb.from("photos").select("*").order("created_at",{ascending:false}).limit(5000),
+    sb.from("estimates").select("*").order("number",{ascending:false}).limit(3000)
   ]).then(function(rs){
     if(rs[0].error){$("msg").textContent="Could not load leads. If you just signed in, make sure this email is on the staff list.";return}
     leads=rs[0].data||[];
@@ -76,7 +78,7 @@ function load(){
     clients=rs[1].error?[]:(rs[1].data||[]);props=rs[2].error?[]:(rs[2].data||[]);
     jobsErr=!!(rs[3].error||rs[4].error||rs[5].error||clientsErr);
     services=rs[3].error?[]:(rs[3].data||[]);jobs=rs[4].error?[]:(rs[4].data||[]);visits=rs[5].error?[]:(rs[5].data||[]);histFrom=addDays(today(),-45);s3=!rs[6].error;crew=rs[6].error?[]:(rs[6].data||[]);
-    billErr=!!(rs[7].error||rs[9].error||jobsErr);invoices=rs[7].error?[]:(rs[7].data||[]);biz=rs[8].error?null:((rs[8].data||[])[0]||null);unbilled=rs[9].error?[]:(rs[9].data||[]);photoErr=!!rs[12].error;photos=rs[12].error?[]:(rs[12].data||[]);expErr=!!rs[11].error;expenses=rs[11].error?[]:(rs[11].data||[]);repData=null;todoErr=!!rs[10].error;todos=rs[10].error?[]:(rs[10].data||[]);
+    billErr=!!(rs[7].error||rs[9].error||jobsErr);invoices=rs[7].error?[]:(rs[7].data||[]);biz=rs[8].error?null:((rs[8].data||[])[0]||null);unbilled=rs[9].error?[]:(rs[9].data||[]);photoErr=!!rs[12].error;photos=rs[12].error?[]:(rs[12].data||[]);expErr=!!rs[11].error;expenses=rs[11].error?[]:(rs[11].data||[]);repData=null;todoErr=!!rs[10].error;todos=rs[10].error?[]:(rs[10].data||[]);estErr=!!rs[13].error;estimates=rs[13].error?[]:(rs[13].data||[]);
     try{sb.rpc("team_names").then(function(r){if(r&&!r.error&&r.data)team=r.data},function(){})}catch(e){}
     render();topUp().then(function(n){if(n)render()});
   });
@@ -219,6 +221,7 @@ function openClient(id){
   var holder=el("div");sec.appendChild(holder);drawProps(c,holder);
   p.appendChild(clientJobsSection(c));
   p.appendChild(clientBillingSection(c));
+  if(!estErr)p.appendChild(clientEstimatesSection(c));
   p.appendChild(clientPhotosSection(c));
   p.appendChild(historySection(c));
   /* leads */
@@ -667,7 +670,7 @@ function remindPanel(vs,mode,title){
     top.appendChild(r);card.appendChild(top);p.appendChild(card)});
   var dn=btn(mode==="delay"?"Skip / Done":"Done","btn alt");dn.style.marginTop="10px";dn.addEventListener("click",function(){closeDetail();render()});p.appendChild(dn)}
 function invRemind(inv,c){
-  return"Hi "+firstName(c)+", a friendly reminder from "+bizv("name","Latta Corp")+": invoice "+invNum(inv.number)+" ("+money(inv.total)+") "+(isOverdue(inv)?"was due "+dshort(inv.due_date):"is due "+dshort(inv.due_date))+"."+(bizv("zelle","")?" Pay with Zelle: "+biz.zelle+".":"")+" If you've already paid, thank you!"}
+  return"Hi "+firstName(c)+", a friendly reminder from "+bizv("name","Latta Corp")+": invoice "+invNum(inv.number)+" ("+money(inv.total)+") "+(isOverdue(inv)?"was due "+dshort(inv.due_date):"is due "+dshort(inv.due_date))+"."+(inv.share_token?" You can view it here: "+docUrl(inv.share_token)+" ":"")+(bizv("zelle","")?" Pay with Zelle: "+biz.zelle+".":"")+" If you've already paid, thank you!"}
 function stampInv(inv){var on="reminded_at" in inv,now=new Date().toISOString();inv.reminded_at=now;if(on)sb.from("invoices").update({reminded_at:now}).eq("id",inv.id).then(function(){})}
 function remindOverdue(od){
   var p=panel();p.appendChild(el("h2",null,"Remind overdue clients"));
@@ -1388,10 +1391,11 @@ function renderBilling(){
   var tabs=$("tabs");tabs.textContent="";
   var op=invoices.filter(function(i){return i.status==="open"}),pd_=invoices.filter(function(i){return i.status==="paid"}),od=op.filter(isOverdue);
   var bg=billGroups();
-  [["tobill","To bill",bg.order.length],["open","Open",op.length],["paid","Paid",pd_.length]].forEach(function(s){
+  [["tobill","To bill",bg.order.length],["open","Open",op.length],["paid","Paid",pd_.length],["estimates","Estimates",estimates.filter(function(e){return(e.status==="draft"||e.status==="sent")&&!estExpired(e)}).length]].forEach(function(s){
     var b=el("button","tab"+(bfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){bfilter=s[0];render()});tabs.appendChild(b)});
   $("topbtns").appendChild(btn("Billing settings","btn alt",openBizSettings));
   var list=$("list");list.textContent="";
+  if(bfilter==="estimates")return renderEstimates(list);
   if(billErr){list.appendChild(el("div","empty","Billing isn't set up yet. Run the Stage 5 SQL in Supabase (SQL Editor), then press Refresh."));return}
   var mon=today().slice(0,7),paidMonth=r2(pd_.filter(function(i){return i.paid_at&&String(i.paid_at).slice(0,7)===mon}).reduce(function(s,i){return s+Number(i.total||0)},0));
   var stats=el("div","stats");
@@ -1457,14 +1461,18 @@ function openInvoice(id){
     var acts=el("div","contact");acts.style.marginTop="14px";
     acts.appendChild(btn("View / Print / PDF","btn",function(){showInvoice(inv,items)}));
     var msg=invMessage(inv,c);
-    if(c&&c.email){var a2=el("a","btn","Email invoice");a2.href=mailHref(c.email,"Invoice "+invNum(inv.number)+" from "+bizv("name","Latta Corp"),msg+"\n\n(The invoice PDF is attached.)");a2.addEventListener("click",function(){markSent(inv)});acts.appendChild(a2)}
+    if(c&&c.email){var a2=el("a","btn","Email invoice");a2.href=mailHref(c.email,"Invoice "+invNum(inv.number)+" from "+bizv("name","Latta Corp"),msg+(inv.share_token?"":"\n\n(The invoice PDF is attached.)"));a2.addEventListener("click",function(){markSent(inv)});acts.appendChild(a2)}
     acts.appendChild(copyBtn("Copy message",msg,false,function(){markSent(inv)}));
+    if(inv.share_token){acts.appendChild(copyBtn("Copy link",docUrl(inv.share_token),false,function(){markSent(inv)}));var pv=el("a","btn alt","Preview link");pv.href=docUrl(inv.share_token,true);pv.target="_blank";pv.rel="noopener";acts.appendChild(pv)}
     if(isOwner()&&c&&c.phone){var a1=el("a","btn alt","Text");a1.href=smsHref(c.phone,msg);a1.addEventListener("click",function(){markSent(inv)});acts.appendChild(a1)}
     if(inv.status==="open"&&c&&(isOverdue(inv)||inv.sent_at)){
       var rem=invRemind(inv,c);
       if(c.email){var a4=el("a","btn alt","Email a reminder");a4.href=mailHref(c.email,"Payment reminder: invoice "+invNum(inv.number),rem);a4.addEventListener("click",function(){stampInv(inv)});acts.appendChild(a4)}
       if(isOwner()&&c.phone){var a3=el("a","btn alt","Text a reminder");a3.href=smsHref(c.phone,rem);a3.addEventListener("click",function(){stampInv(inv)});acts.appendChild(a3)}}
     body.appendChild(acts);
+    if(inv.share_token&&inv.viewed_at)body.appendChild(el("div","note","✓ Client opened the invoice link "+ago(inv.viewed_at)+"."));
+    else if(inv.share_token&&inv.sent_at)body.appendChild(el("div","note","The client hasn't opened the link yet."));
+    if(!inv.share_token)body.appendChild(el("div","note","Run the Stage 11 SQL in Supabase to give each invoice a private link clients can open."));
     if(inv.status==="open"&&inv.reminded_at)body.appendChild(el("div","note","Last reminder texted "+dshort(String(inv.reminded_at).slice(0,10))+"."));
     if(c&&!c.email)body.appendChild(el("div","note","Tip: add an email on the client page to get an Email button here. To email the PDF: tap View / Print / PDF, choose Save as PDF, then attach it."));
     var pay=el("div","sec");
@@ -1490,7 +1498,7 @@ function releaseVisits(inv,cb){sb.from("visits").update({invoice_id:null}).eq("i
 function markSent(inv){if(inv.sent_at)return;var now=new Date().toISOString();sb.from("invoices").update({sent_at:now}).eq("id",inv.id).then(function(r){if(!r.error){inv.sent_at=now;render()}})}
 function invMessage(inv,c){
   var first=String((c&&c.name)||"").split(" ")[0]||"there";
-  return"Hi "+first+", this is "+bizv("name","Latta Corp")+". Your invoice "+invNum(inv.number)+(inv.period_end?" for "+monthName(inv.period_end):"")+" is "+money(inv.total)+", due "+dshort(inv.due_date)+"."+(bizv("zelle","")?" Pay with Zelle: "+biz.zelle+".":"")+" Thank you!"}
+  return"Hi "+first+", this is "+bizv("name","Latta Corp")+". Your invoice "+invNum(inv.number)+(inv.period_end?" for "+monthName(inv.period_end):"")+" is "+money(inv.total)+", due "+dshort(inv.due_date)+"."+(inv.share_token?" View or print it here: "+docUrl(inv.share_token)+" ":"")+(bizv("zelle","")?" Pay with Zelle: "+biz.zelle+".":"")+" Thank you!"}
 
 /* ---- printable invoice (works as a PDF too) ---- */
 function showInvoice(inv,items){
@@ -1508,6 +1516,97 @@ function showInvoice(inv,items){
     +'<div class="foot">'+esc(bizv("footer","Thank you!"))+"</div></div>";
   var v=$("invview");v.hidden=false;document.body.classList.add("printing");v.scrollTop=0}
 function hideInvoice(){$("invview").hidden=true;document.body.classList.remove("printing")}
+
+/* ---- Estimates (clients open a private link and can accept) ---- */
+function estNum(n){var s=String(n||0);while(s.length<4)s="0"+s;return"EST-"+s}
+function docUrl(tok,peek){return location.origin+"/d/?t="+tok+(peek?"&p=1":"")}
+function estExpired(e){return(e.status==="draft"||e.status==="sent")&&!!e.valid_until&&e.valid_until<today()}
+function estOpen(e){return(e.status==="draft"||e.status==="sent")}
+function estChip(e){
+  if(e.status==="accepted")return el("span","chip won","Accepted");if(e.status==="declined")return el("span","chip lost","Declined");
+  if(estExpired(e))return el("span","chip od","Expired");return el("span","chip",e.status==="sent"?(e.viewed_at?"Viewed":"Sent"):"Draft")}
+function estMessage(e,c){return"Hi "+firstName(c)+", this is "+bizv("name","Latta Corp")+". Here is your estimate"+(e.title?" for "+e.title:"")+" ("+money(e.total)+"): "+docUrl(e.share_token)+" You can look it over and accept it right on that page. Thank you!"}
+function markEstSent(e){if(e.status!=="draft")return;var now=new Date().toISOString();sb.from("estimates").update({status:"sent",sent_at:now}).eq("id",e.id).then(function(r){if(!r.error){e.status="sent";e.sent_at=now;render()}})}
+function estRow(e){
+  var b=el("button","row client");b.type="button";var l=el("div");
+  l.appendChild(el("b",null,estNum(e.number)+" · "+cname(e.client_id)));
+  l.appendChild(el("div","sub",[e.title,e.status==="accepted"?"Accepted "+(e.responded_at?dshort(String(e.responded_at).slice(0,10)):""):e.valid_until?"Valid until "+dshort(e.valid_until):""].filter(Boolean).join(" · ")));
+  var r=el("div");r.style.textAlign="right";r.appendChild(el("b",null,money(e.total)));r.appendChild(el("div"));r.appendChild(estChip(e));
+  b.appendChild(l);b.appendChild(r);b.addEventListener("click",function(){openEstimate(e.id)});return b}
+function renderEstimates(list){
+  $("topbtns").appendChild(btn("New estimate","btn",function(){openEstimateForm(null)}));
+  if(estErr){list.appendChild(el("div","empty","Estimates aren't set up yet. Run the Stage 11 SQL in Supabase (SQL Editor), then press Refresh."));return}
+  var set=estimates.filter(function(e){if(!query)return true;return[estNum(e.number),cname(e.client_id),e.title].join(" ").toLowerCase().indexOf(query)>-1});
+  if(!set.length){list.appendChild(el("div","empty",estimates.length?"Nothing matches that.":"No estimates yet. Tap New estimate, write it up, and send the client a link they can accept."));return}
+  var waiting=set.filter(function(e){return estOpen(e)&&!estExpired(e)}),rest=set.filter(function(e){return waiting.indexOf(e)<0});
+  [["Waiting for a response",waiting],["Accepted, declined or expired",rest]].forEach(function(g){
+    if(!g[1].length)return;var h=el("div","note",g[0]);h.style.cssText="font-weight:700;margin:12px 0 4px";list.appendChild(h);g[1].forEach(function(e){list.appendChild(estRow(e))})})}
+function clientEstimatesSection(c){
+  var sec=el("div","sec"),h=el("h3",null,"Estimates");h.appendChild(btn("+ New estimate","btn alt sm",function(){openEstimateForm(c.id)}));sec.appendChild(h);
+  var mine=estimates.filter(function(e){return e.client_id===c.id});
+  if(!mine.length)sec.appendChild(el("div","note","None yet."));
+  mine.slice(0,5).forEach(function(e){var r=el("div","pcard");r.style.cssText="display:flex;justify-content:space-between;gap:10px;align-items:center;cursor:pointer";
+    var l=el("div");l.appendChild(el("b",null,estNum(e.number)+" · "+money(e.total)));l.appendChild(el("div","note",e.title||"Estimate"));r.appendChild(l);r.appendChild(estChip(e));r.addEventListener("click",function(){openEstimate(e.id)});sec.appendChild(r)});
+  if(mine.length>5)sec.appendChild(el("div","note","+ "+(mine.length-5)+" older estimates in Billing > Estimates."));
+  return sec}
+function openEstimateForm(cid){
+  if(estErr){alert("Run the Stage 11 SQL in Supabase first, then press Refresh.");return}
+  var p=panel();p.appendChild(el("h2",null,"New estimate"));
+  var list=clients.filter(function(c){return!c.archived||c.id===cid});
+  var cs=fld("Client","select",cid||"",[["","Choose a client..."]].concat(list.map(function(c){return[c.id,c.name+(c.company?" · "+c.company:"")]})));
+  var ttl=fld("Title (for example: Spring cleanup and mulch)","text",""),scp=fld("Details the client will see (optional)","textarea",""),vd=fld("Valid for (days)","number","30");
+  p.appendChild(cs);p.appendChild(ttl);p.appendChild(scp);p.appendChild(vd);
+  p.appendChild(el("h3",null,"Lines"));var box=el("div"),rows=[];p.appendChild(box);
+  function addRow(){var r=el("div","grid2"),d=fld("Description","text",""),a=fld("Amount ($)","number","");a.input.step="0.01";a.input.inputMode="decimal";r.appendChild(d);r.appendChild(a);box.appendChild(r);rows.push({d:d,a:a})}
+  addRow();var more=btn("+ Add another line","btn alt sm",addRow);p.appendChild(more);
+  var go=btn("Save estimate","btn",function(){
+    if(!cs.input.value){alert("Choose a client.");return}
+    var items=[];for(var i=0;i<rows.length;i++){var d=rows[i].d.input.value.trim(),a=parseFloat(rows[i].a.input.value);if(!d&&isNaN(a))continue;if(!d||isNaN(a)){alert("Each line needs a description and an amount.");return}items.push({description:d,amount:a})}
+    if(!items.length){alert("Add at least one line.");return}
+    var days=parseInt(vd.input.value,10),total=r2(items.reduce(function(s2,x){return s2+x.amount},0));
+    go.disabled=true;
+    sb.from("estimates").insert({client_id:cs.input.value,title:ttl.input.value.trim(),scope:scp.input.value.trim(),valid_until:days>0?addDays(today(),days):null,total:total}).select().single().then(function(r){
+      if(r.error||!r.data){go.disabled=false;alert("Could not save. Did you run the Stage 11 SQL?");return}
+      var e=r.data;items.forEach(function(x){x.estimate_id=e.id});
+      sb.from("estimate_items").insert(items).then(function(r2_){
+        if(r2_.error){sb.from("estimates").delete().eq("id",e.id).then(function(){go.disabled=false;alert("Could not save the lines.")});return}
+        estimates.unshift(e);render();openEstimate(e.id)})})});
+  go.style.marginTop="14px";p.appendChild(go)}
+function openEstimate(id){
+  var e=byId(estimates,id);if(!e)return;var c=byId(clients,e.client_id),p=panel();
+  p.appendChild(el("h2",null,estNum(e.number)+" · "+cname(e.client_id)));
+  var st=e.status==="accepted"?"Accepted":e.status==="declined"?"Declined":estExpired(e)?"Expired":e.status==="sent"?"Sent":"Draft";
+  p.appendChild(el("div","note",st+" · issued "+dshort(e.issue_date)+(e.valid_until?" · valid until "+dshort(e.valid_until):"")+(e.sent_at?" · sent "+dshort(String(e.sent_at).slice(0,10)):" · not sent yet")));
+  var body=el("div");body.appendChild(el("div","note","Loading..."));p.appendChild(body);
+  sb.from("estimate_items").select("*").eq("estimate_id",e.id).order("created_at",{ascending:true}).limit(500).then(function(r){
+    var items=r.error?[]:(r.data||[]);body.textContent="";var edit=estOpen(e);
+    if(e.status==="accepted"||e.status==="declined"){
+      var ans=el("div","pcard",(e.status==="accepted"?"✓ Accepted":"Declined")+(e.response_name?(/^Recorded/.test(e.response_name)?" ("+e.response_name.toLowerCase()+")":" by "+e.response_name):"")+(e.responded_at?" on "+dshort(String(e.responded_at).slice(0,10)):"")+(e.response_note?'. Note: "'+e.response_note+'"':""));ans.style.fontWeight="700";body.appendChild(ans)}
+    var ttl=fld("Title","text",e.title||""),scp=fld("Details the client will see","textarea",e.scope||""),vu=fld("Valid until","date",e.valid_until||"");
+    if(edit){body.appendChild(ttl);body.appendChild(scp);body.appendChild(vu);
+      var sv=btn("Save details","btn alt sm",function(){var row={title:ttl.input.value.trim(),scope:scp.input.value.trim(),valid_until:vu.input.value||null};sb.from("estimates").update(row).eq("id",e.id).then(function(r2_){if(r2_.error){alert("Could not save.");return}e.title=row.title;e.scope=row.scope;e.valid_until=row.valid_until;sv.textContent="Saved";render();setTimeout(function(){sv.textContent="Save details"},1200)})});sv.style.marginBottom="10px";body.appendChild(sv)}
+    else{if(e.title)body.appendChild(el("b",null,e.title));if(e.scope){var sc=el("div","note",e.scope);sc.style.whiteSpace="pre-wrap";body.appendChild(sc)}}
+    var t=document.createElement("table");t.className="itable";
+    items.forEach(function(it){var tr=document.createElement("tr");tr.appendChild(el("td",null,it.description));tr.appendChild(el("td","amt",money(it.amount)));
+      if(edit&&items.length>1){var x=el("td");var rm=btn("×","link",function(){sb.from("estimate_items").delete().eq("id",it.id).then(function(r2_){if(r2_.error){alert("Could not remove the line.");return}setEstTotal(e,r2(Number(e.total)-Number(it.amount)),function(){openEstimate(e.id)})})});rm.setAttribute("aria-label","Remove line");rm.style.cssText="font-size:1.2rem;text-decoration:none;color:var(--red)";x.appendChild(rm);tr.appendChild(x)}t.appendChild(tr)});
+    body.appendChild(t);body.appendChild(el("div","invtotal","Total "+money(e.total)));
+    if(edit){var add=el("div","pcard"),g=el("div","grid2"),dsc=fld("Add a line","text",""),amt=fld("Amount ($)","number","");amt.input.step="0.01";amt.input.inputMode="decimal";g.appendChild(dsc);g.appendChild(amt);add.appendChild(g);
+      var ab=btn("Add line","btn alt sm",function(){var a2=parseFloat(amt.input.value);if(!dsc.input.value.trim()||isNaN(a2)){alert("Enter a description and an amount.");return}
+        sb.from("estimate_items").insert({estimate_id:e.id,description:dsc.input.value.trim(),amount:a2}).then(function(r2_){if(r2_.error){alert("Could not add the line.");return}setEstTotal(e,r2(Number(e.total)+a2),function(){openEstimate(e.id)})})});ab.style.marginTop="8px";add.appendChild(ab);body.appendChild(add)}
+    var acts=el("div","contact");acts.style.marginTop="14px";var msg=estMessage(e,c);
+    if(c&&c.email){var a2=el("a","btn","Email estimate");a2.href=mailHref(c.email,"Estimate "+estNum(e.number)+" from "+bizv("name","Latta Corp"),msg);a2.addEventListener("click",function(){markEstSent(e)});acts.appendChild(a2)}
+    acts.appendChild(copyBtn("Copy message",msg,false,function(){markEstSent(e)}));acts.appendChild(copyBtn("Copy link",docUrl(e.share_token),false,function(){markEstSent(e)}));
+    if(isOwner()&&c&&c.phone){var a1=el("a","btn alt","Text");a1.href=smsHref(c.phone,msg);a1.addEventListener("click",function(){markEstSent(e)});acts.appendChild(a1)}
+    var pv=el("a","btn alt","Preview / Print");pv.href=docUrl(e.share_token,true);pv.target="_blank";pv.rel="noopener";acts.appendChild(pv);body.appendChild(acts);
+    if(e.viewed_at)body.appendChild(el("div","note","✓ Client opened the link "+ago(e.viewed_at)+"."));else if(e.sent_at)body.appendChild(el("div","note","The client hasn't opened the link yet."));
+    var dz=el("div","actions");dz.style.marginTop="14px";
+    function setStatus(s2,extra){var row={status:s2};Object.keys(extra||{}).forEach(function(k){row[k]=extra[k]});sb.from("estimates").update(row).eq("id",e.id).then(function(r2_){if(r2_.error){alert("Could not save.");return}Object.keys(row).forEach(function(k){e[k]=row[k]});render();openEstimate(e.id)})}
+    if(edit){var sp=el("span");sp.appendChild(btn("Client said yes","btn alt sm",function(){setStatus("accepted",{responded_at:new Date().toISOString(),response_name:"Recorded by our team"})}));sp.appendChild(document.createTextNode(" "));sp.appendChild(btn("Client said no","btn alt sm",function(){setStatus("declined",{responded_at:new Date().toISOString(),response_name:"Recorded by our team"})}));dz.appendChild(sp)}
+    else dz.appendChild(btn("Reopen","btn alt sm",function(){setStatus("sent",{responded_at:null,response_name:"",response_note:""})}));
+    dz.appendChild(btn("Delete","btn danger",function(){if(!confirm("Delete this estimate for good? Its link stops working."))return;sb.from("estimates").delete().eq("id",e.id).then(function(r2_){if(r2_.error){alert("Could not delete.");return}estimates=estimates.filter(function(z){return z.id!==e.id});closeDetail();render()})}));
+    body.appendChild(dz);
+    if(e.status==="accepted")body.appendChild(el("div","note","Next: add the work under Jobs for this client so it lands on the schedule."))})}
+function setEstTotal(e,total,cb){sb.from("estimates").update({total:total}).eq("id",e.id).then(function(r){if(r.error){alert("Could not update the total.");return}e.total=total;render();cb()})}
 
 /* ---- billing settings ---- */
 function openBizSettings(){
