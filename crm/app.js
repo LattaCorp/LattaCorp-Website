@@ -37,7 +37,7 @@ $("login").addEventListener("submit",function(e){
 });
 $("signout").addEventListener("click",function(){sb.auth.signOut().then(function(){location.reload()})});
 $("refresh").addEventListener("click",load);
-function start(){$("gsearch").hidden=false;$("loginwrap").hidden=true;$("app").hidden=false;$("signout").hidden=false;$("refresh").hidden=false;load()}
+function start(){$("gsearch").hidden=false;$("loginwrap").hidden=true;$("layout").hidden=false;$("signout").hidden=false;$("refresh").hidden=false;load()}
 sb.auth.getSession().then(function(r){if(r.data&&r.data.session)start()});
 
 /* ---- data ---- */
@@ -62,11 +62,16 @@ function load(){
 }
 
 /* ---- main screen ---- */
+var ICONS={leads:'<svg viewBox="0 0 24 24"><path d="M3 13l2.5-7.5A2 2 0 0 1 7.4 4h9.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5h-5.5a2.5 2.5 0 0 1-5 0z"/></svg>',
+ clients:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14a6.5 6.5 0 0 1 3.5 6"/></svg>',
+ jobs:'<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>',
+ schedule:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>'};
 function render(){
-  var nav=$("nav");nav.textContent="";
-  var tdy=today(),stops=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date===tdy}).length;
-  [["leads","Leads"+(leads.filter(function(l){return l.status==="new"}).length?" ("+leads.filter(function(l){return l.status==="new"}).length+")":"")],["clients","Clients"],["jobs","Jobs"],["schedule","Schedule"+(stops?" ("+stops+" today)":"")]].forEach(function(v){
-    var b=btn(v[1],v[0]===view?"on":"",function(){view=v[0];render()});nav.appendChild(b)});
+  var nav=$("side");nav.textContent="";
+  var tdy=today(),stops=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date===tdy}).length,newL=leads.filter(function(l){return l.status==="new"}).length;
+  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops]].forEach(function(v){
+    var b=el("button",v[0]===view?"on":"");b.type="button";b.addEventListener("click",function(){view=v[0];render()});b.innerHTML=ICONS[v[0]];b.appendChild(el("span",null,v[1]));
+    if(v[2])b.appendChild(el("span","badge",String(v[2])));b.setAttribute("aria-current",v[0]===view?"page":"false");nav.appendChild(b)});
   $("topbtns").textContent="";
   if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else renderSchedule();
 }
