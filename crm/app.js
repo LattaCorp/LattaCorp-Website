@@ -964,12 +964,14 @@ function showInvoice(inv,items){
   items.forEach(function(it){if(it.address&&addrs.indexOf(it.address)<0)addrs.push(it.address)});
   var rows=items.map(function(it){return"<tr><td>"+esc(it.service_date?dshort(it.service_date):"")+"</td><td>"+esc(it.description)+(it.address?'<div class="sm">'+esc(it.address)+"</div>":"")+'</td><td class="r">'+esc(money(it.amount))+"</td></tr>"}).join("");
   var paidBox=inv.status==="paid"?'<div class="paidstamp">PAID '+esc(inv.paid_at?dshort(String(inv.paid_at).slice(0,10)):"")+(inv.paid_method?" · "+esc(inv.paid_method):"")+"</div>":inv.status==="void"?'<div class="paidstamp void">VOID</div>':"";
-  paper.innerHTML='<div class="ihead"><div class="ibrand"><img src="../images/logo-tree-header.png" alt=""><div><div class="bn">'+esc(bizv("name","LattaCorp of Central Florida"))+'</div><div class="sm">'+[bizv("address",""),bizv("phone",""),bizv("email","")].filter(Boolean).map(esc).join("<br>")+'</div></div></div>'
-    +'<div class="imeta"><div class="it">INVOICE</div><div><b>'+esc(invNum(inv.number))+'</b></div><div class="sm">Issued '+esc(dshort(inv.issue_date))+"<br>Due "+esc(dshort(inv.due_date))+(inv.reference?"<br>Ref: "+esc(inv.reference):"")+"</div></div></div>"
-    +'<div class="bill"><div class="sm">BILL TO</div><b>'+esc(c.name||"")+"</b>"+(c.company?"<div>"+esc(c.company)+"</div>":"")+(addrs.length?'<div class="sm">Service address'+(addrs.length>1?"es":"")+": "+addrs.map(esc).join("; ")+"</div>":"")+"</div>"
-    +'<table class="itab"><thead><tr><th>Date</th><th>Service</th><th class="r">Amount</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td></td><td class="r"><b>Total due</b></td><td class="r"><b>'+esc(money(inv.total))+"</b></td></tr></tfoot></table>"+paidBox
+  var due=inv.status==="paid"?"Paid":inv.status==="void"?"Void":money(inv.total);
+  paper.innerHTML='<div class="ihead"><div class="ibrand"><div class="lg"><img src="../images/logo-tree-header.png" alt=""></div><div><div class="bn">'+esc(bizv("name","LattaCorp of Central Florida"))+'</div><div class="sm">'+[bizv("address",""),bizv("phone",""),bizv("email","")].filter(Boolean).map(esc).join("<br>")+"</div></div></div>"
+    +'<div class="it">INVOICE</div></div><div class="body">'
+    +'<div class="facts"><div class="fact"><div class="k">Invoice</div><div class="v">'+esc(invNum(inv.number))+'</div></div><div class="fact"><div class="k">Issued</div><div class="v">'+esc(dshort(inv.issue_date))+'</div></div><div class="fact"><div class="k">Due</div><div class="v">'+esc(dshort(inv.due_date))+'</div></div><div class="fact due"><div class="k">'+(inv.status==="open"?"Amount due":"Total")+'</div><div class="v">'+esc(inv.status==="open"?money(inv.total):inv.status==="paid"?money(inv.total):due)+"</div></div></div>"
+    +'<div class="bill"><div class="k">Bill to</div><b>'+esc(c.name||"")+"</b>"+(c.company?"<div>"+esc(c.company)+"</div>":"")+(inv.reference?'<div class="sm">Ref: '+esc(inv.reference)+"</div>":"")+(addrs.length?'<div class="sm">Service address'+(addrs.length>1?"es":"")+": "+addrs.map(esc).join("; ")+"</div>":"")+"</div>"
+    +'<table class="itab"><thead><tr><th>Date</th><th>Service</th><th class="r">Amount</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td></td><td class="r"><b>Total</b></td><td class="r"><b>'+esc(money(inv.total))+"</b></td></tr></tfoot></table>"+paidBox
     +'<div class="pay"><b>How to pay</b><div>'+(bizv("zelle","")?"Zelle: "+esc(biz.zelle)+"<br>":"")+esc(bizv("payment_note",""))+"</div></div>"
-    +'<div class="foot">'+esc(bizv("footer","Thank you!"))+"</div>";
+    +'<div class="foot">'+esc(bizv("footer","Thank you!"))+"</div></div>";
   var v=$("invview");v.hidden=false;document.body.classList.add("printing");v.scrollTop=0}
 function hideInvoice(){$("invview").hidden=true;document.body.classList.remove("printing")}
 
