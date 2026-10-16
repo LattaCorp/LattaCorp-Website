@@ -5,11 +5,34 @@
 
 // Used if the TO_EMAIL setting is missing in Cloudflare.
 const DEFAULT_TO = "lattacorpofcentralfl@gmail.com";
+// The CRM database (Supabase). The URL is public; the secret key SUPABASE_SECRET_KEY is set in Cloudflare (Settings > Variables and Secrets).
+const DEFAULT_SUPABASE_URL = "https://lvaofwtfxwlqwvzesckt.supabase.co";
 const KINDS = ["Quote request", "Service request", "Contact message", "Proposal request"];
 const MAX_FIELDS = 60, MAX_VALUE = 5000, MAX_PHOTOS = 8, MAX_PHOTO_BYTES = 4 * 1024 * 1024, MAX_TOTAL_BYTES = 24 * 1024 * 1024;
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
+
+// Saves the submission as a lead in the CRM database. Never throws; returns true if saved.
+async function saveLead(env, kind, lang, fields, photoCount) {
+  if (!env.SUPABASE_SECRET_KEY) return false;
+  const pick = (re) => (fields.find((f) => re.test(f.label)) || {}).value || "";
+  const row = {
+    kind, lang: String(lang || "en").slice(0, 5),
+    name: pick(/name/i).slice(0, 200), email: pick(/^e-?mail/i).slice(0, 200), phone: pick(/phone/i).slice(0, 60),
+    address: (pick(/address/i) || pick(/community/i)).slice(0, 300), service: pick(/^service(s)?\b|which services/i).slice(0, 300),
+    fields, photo_count: photoCount,
+  };
+  try {
+    const res = await fetch(`${env.SUPABASE_URL || DEFAULT_SUPABASE_URL}/rest/v1/leads`, {
+      method: "POST",
+      headers: { apikey: env.SUPABASE_SECRET_KEY, "content-type": "application/json", Prefer: "return=minimal" },
+      body: JSON.stringify(row),
+    });
+    if (!res.ok) console.log("lead save failed", res.status, (await res.text()).slice(0, 200));
+    return res.ok;
+  } catch (e) { console.log("lead save error"); return false; }
+}
 
 export async function handleSubmit(request, env) {
   // The browser sends one JSON message: { kind, lang, lc_trap_7, fields: [...], photos: [{ filename, content (base64) }] }.
@@ -61,15 +84,19 @@ export async function handleSubmit(request, env) {
   if (emailOk) payload.reply_to = email;
   if (attachments.length) payload.attachments = attachments;
 
-  let res;
-  try {
-    res = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch { return json({ error: "email service unreachable" }, 502); }
-  if (!res.ok) return json({ error: "email failed" }, 502);
+  // Save to the CRM and send the email at the same time. The visitor sees success if at least one of them worked.
+  const sendEmail = async () => {
+    try {
+      const res = await fetch("https://api.resend.com/emails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      return res.ok;
+    } catch { return false; }
+  };
+  const [emailed, saved] = await Promise.all([sendEmail(), saveLead(env, kind, data.lang, fields, attachments.length)]);
+  if (!emailed && !saved) return json({ error: "email failed" }, 502);
   return json({ ok: true });
 }
 
@@ -78,7 +105,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/api/health") {
       // Safe status check (shows whether the settings exist, never their values).
-      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), sendsTo: (env.TO_EMAIL || DEFAULT_TO) ? (env.TO_EMAIL || DEFAULT_TO).replace(/^(.).*(@.*)$/, "$1***$2") : null });
+      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), crmKeySet: Boolean(env.SUPABASE_SECRET_KEY), sendsTo: (env.TO_EMAIL || DEFAULT_TO) ? (env.TO_EMAIL || DEFAULT_TO).replace(/^(.).*(@.*)$/, "$1***$2") : null });
     }
     if (url.pathname === "/api/submit") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);

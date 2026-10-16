@@ -33,3 +33,10 @@ A plain HTML/CSS/JavaScript site. No build step: open `index.html` in a browser 
 
 ## Checking the form code
 `node test/worker.test.mjs` runs a quick automatic check of `src/worker.js`.
+
+## CRM (Phase 1: leads inbox)
+- Database: Supabase project `lvaofwtfxwlqwvzesckt` (leads table, staff list). Set it up once by running `supabase/schema.sql` in Supabase > SQL Editor.
+- Website forms save a lead to the database AND email it. The server code needs the secret `SUPABASE_SECRET_KEY` in Cloudflare (Settings > Variables and Secrets > Secret). Never put the secret key in GitHub.
+- The CRM page is at `/crm/` (`crm/index.html`). Staff sign in with email and password (create users in Supabase > Authentication > Users; turn off public sign-ups). Only emails listed in the `staff` table can see leads.
+- Check status at `/api/health` (shows `crmKeySet: true` when the secret is set).
+- Photos still arrive by email only. Saving photos in the CRM is the next step.

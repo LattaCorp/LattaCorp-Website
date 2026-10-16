@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>LattaCorp CRM</title>
+<link rel="icon" href="../images/favicon-32.png">
+<style>
+:root{--forest:#1b552b;--leaf:#4fb85a;--mint:#eff8ec;--ink:#1c2a20;--muted:#58675c;--line:#dfe8dc;--gold:#f2c94c;--red:#b3261e}
+*{box-sizing:border-box}
+body{margin:0;background:#f5f8f4;color:var(--ink);font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{background:var(--forest);color:#fff;padding:10px 16px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:5}
+header h1{font-size:1.1rem;margin:0;flex:1}
+header button{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:8px;padding:8px 12px;font:inherit;cursor:pointer}
+main{max-width:1000px;margin:0 auto;padding:16px}
+.card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:0 2px 8px rgba(27,85,43,.06)}
+button,input,select,textarea{font:inherit}
+input,textarea,select{width:100%;padding:10px 12px;border:1px solid #c9d6c6;border-radius:8px;background:#fff}
+textarea{min-height:110px;resize:vertical}
+.btn{background:var(--forest);color:#fff;border:0;border-radius:8px;padding:10px 16px;font-weight:600;cursor:pointer}
+.btn.alt{background:#fff;color:var(--forest);border:1px solid var(--forest)}
+.btn.danger{background:#fff;color:var(--red);border:1px solid var(--red)}
+.btn:disabled{opacity:.6;cursor:default}
+#login{max-width:380px;margin:12vh auto 0}
+#login h2{margin:0 0 4px;color:var(--forest)}
+#login label{display:block;font-weight:600;margin-top:12px;font-size:.9rem}
+#loginmsg,#msg{color:var(--red);min-height:1.4em;margin:10px 0 0;font-size:.92rem}
+.tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}
+.tab{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 14px;white-space:nowrap;cursor:pointer;font-weight:600;color:var(--muted)}
+.tab.on{background:var(--forest);border-color:var(--forest);color:#fff}
+.tab span{font-weight:400;opacity:.8;margin-left:4px}
+.bar{display:flex;gap:10px;margin-bottom:12px}
+.list{display:grid;gap:10px}
+.row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;background:#fff;border:1px solid var(--line);border-left:5px solid var(--leaf);border-radius:10px;padding:12px 14px;cursor:pointer;text-align:left;width:100%}
+.row:hover{box-shadow:0 4px 14px rgba(27,85,43,.12)}
+.row.new{border-left-color:var(--gold)}
+.row b{font-size:1.02rem}.row .sub{color:var(--muted);font-size:.9rem}
+.chip{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.78rem;font-weight:700;background:var(--mint);color:var(--forest);white-space:nowrap}
+.chip.new{background:#fff3c4;color:#7a5b00}.chip.lost{background:#eee;color:#666}.chip.won{background:#d6f2da}
+.empty{text-align:center;color:var(--muted);padding:40px 10px}
+#detail{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:20;overflow:auto}
+#detail.on{display:block}
+.panel{background:#fff;max-width:640px;margin:20px auto;border-radius:14px;padding:20px;position:relative}
+.panel h2{margin:0 0 2px;color:var(--forest)}
+.close{position:absolute;right:12px;top:10px;background:none;border:0;font-size:1.8rem;cursor:pointer;color:var(--muted)}
+.contact{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
+.contact a{text-decoration:none}
+table{width:100%;border-collapse:collapse;margin:8px 0}
+td{padding:6px 8px 6px 0;vertical-align:top;border-top:1px solid var(--line);font-size:.95rem}
+td:first-child{color:var(--muted);width:38%;font-weight:600}
+td:last-child{white-space:pre-wrap;word-break:break-word}
+.status{display:flex;flex-wrap:wrap;gap:6px;margin:10px 0}
+.status button{border:1px solid var(--line);background:#fff;border-radius:999px;padding:6px 12px;cursor:pointer;font-weight:600;color:var(--muted)}
+.status button.on{background:var(--forest);border-color:var(--forest);color:#fff}
+.actions{display:flex;gap:10px;justify-content:space-between;margin-top:12px;flex-wrap:wrap}
+.note{font-size:.85rem;color:var(--muted)}
+</style>
+</head>
+<body>
+<header><h1>LattaCorp CRM</h1><button id="refresh" hidden>Refresh</button><button id="signout" hidden>Sign out</button></header>
+
+<main id="loginwrap">
+  <form id="login" class="card" autocomplete="on">
+    <h2>Sign in</h2>
+    <p class="note" style="margin:0">Staff only.</p>
+    <label for="em">Email</label><input id="em" type="email" autocomplete="username" required>
+    <label for="pw">Password</label><input id="pw" type="password" autocomplete="current-password" required>
+    <p id="loginmsg" role="alert"></p>
+    <button class="btn" type="submit" style="width:100%">Sign in</button>
+  </form>
+</main>
+
+<main id="app" hidden>
+  <div class="tabs" id="tabs"></div>
+  <div class="bar"><input id="q" type="search" placeholder="Search name, phone, address, service..." aria-label="Search"></div>
+  <p id="msg" role="alert"></p>
+  <div class="list" id="list"></div>
+</main>
+
+<div id="detail" role="dialog" aria-modal="true"><div class="panel" id="panel"></div></div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script src="config.js"></script>
+<script>
+(function(){
+"use strict";
+var cfg=window.CRM_CONFIG,sb=window.supabase.createClient(cfg.url,cfg.key,{auth:{persistSession:true,autoRefreshToken:true}});
+var STATUSES=[["new","New"],["contacted","Contacted"],["quoted","Quoted"],["won","Won"],["lost","Lost"]];
+var leads=[],filter="all",query="",current=null;
+var $=function(id){return document.getElementById(id)};
+function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
+function ago(iso){var s=(Date.now()-new Date(iso).getTime())/1000;if(s<60)return"just now";if(s<3600)return Math.floor(s/60)+" min ago";if(s<86400)return Math.floor(s/3600)+" hr ago";if(s<604800)return Math.floor(s/86400)+" days ago";return new Date(iso).toLocaleDateString()}
+function label(s){var f=STATUSES.filter(function(x){return x[0]===s})[0];return f?f[1]:s}
+
+/* ---- sign in / out ---- */
+$("login").addEventListener("submit",function(e){
+  e.preventDefault();$("loginmsg").textContent="";
+  sb.auth.signInWithPassword({email:$("em").value.trim(),password:$("pw").value}).then(function(r){
+    if(r.error){$("loginmsg").textContent="That email or password didn't work.";return}
+    start();
+  });
+});
+$("signout").addEventListener("click",function(){sb.auth.signOut().then(function(){location.reload()})});
+$("refresh").addEventListener("click",load);
+
+function start(){
+  $("loginwrap").hidden=true;$("app").hidden=false;$("signout").hidden=false;$("refresh").hidden=false;load();
+}
+sb.auth.getSession().then(function(r){if(r.data&&r.data.session)start()});
+
+/* ---- data ---- */
+function load(){
+  $("msg").textContent="";
+  sb.from("leads").select("*").order("created_at",{ascending:false}).limit(500).then(function(r){
+    if(r.error){$("msg").textContent="Could not load leads. If you just signed in, make sure this email is on the staff list.";return}
+    leads=r.data||[];render();
+  });
+}
+
+/* ---- list ---- */
+function matches(l){
+  if(filter!=="all"&&l.status!==filter)return false;
+  if(!query)return true;
+  var hay=[l.name,l.email,l.phone,l.address,l.service,l.kind,l.notes].join(" ").toLowerCase();
+  return hay.indexOf(query)>-1;
+}
+function render(){
+  var tabs=$("tabs");tabs.textContent="";
+  var counts={all:leads.length};STATUSES.forEach(function(s){counts[s[0]]=0});leads.forEach(function(l){counts[l.status]=(counts[l.status]||0)+1});
+  [["all","All"]].concat(STATUSES).forEach(function(s){
+    var b=el("button","tab"+(filter===s[0]?" on":""),s[1]);b.type="button";
+    var c=el("span",null,"("+(counts[s[0]]||0)+")");b.appendChild(c);
+    b.addEventListener("click",function(){filter=s[0];render()});tabs.appendChild(b);
+  });
+  var list=$("list");list.textContent="";
+  var shown=leads.filter(matches);
+  if(!shown.length){list.appendChild(el("div","empty",leads.length?"Nothing matches that.":"No leads yet. New website submissions will show up here."));return}
+  shown.forEach(function(l){
+    var b=el("button","row "+l.status);b.type="button";
+    var left=el("div");
+    left.appendChild(el("b",null,l.name||"(no name)"));
+    left.appendChild(el("div","sub",[l.kind,l.service].filter(Boolean).join(" · ")));
+    if(l.address)left.appendChild(el("div","sub",l.address));
+    var right=el("div");right.style.textAlign="right";
+    right.appendChild(el("span","chip "+l.status,label(l.status)));
+    right.appendChild(el("div","sub",ago(l.created_at)));
+    b.appendChild(left);b.appendChild(right);
+    b.addEventListener("click",function(){open(l.id)});
+    list.appendChild(b);
+  });
+}
+$("q").addEventListener("input",function(e){query=e.target.value.trim().toLowerCase();render()});
+
+/* ---- detail ---- */
+function open(id){
+  current=leads.filter(function(l){return l.id===id})[0];if(!current)return;
+  var l=current,p=$("panel");p.textContent="";
+  var x=el("button","close","×");x.type="button";x.setAttribute("aria-label","Close");x.addEventListener("click",closeDetail);p.appendChild(x);
+  p.appendChild(el("h2",null,l.name||"(no name)"));
+  p.appendChild(el("div","note",l.kind+" · "+new Date(l.created_at).toLocaleString()+(l.lang==="es"?" · Spanish page":"")+(l.photo_count?" · "+l.photo_count+" photo(s) were sent by email":"")));
+  var c=el("div","contact");
+  var digits=(l.phone||"").replace(/[^\d+]/g,"");
+  if(digits){["Call","Text"].forEach(function(t){var a=el("a","btn alt",t);a.href=(t==="Call"?"tel:":"sms:")+digits;c.appendChild(a)})}
+  if(l.email){var m=el("a","btn alt","Email");m.href="mailto:"+l.email;c.appendChild(m)}
+  p.appendChild(c);
+  var st=el("div","status");
+  STATUSES.forEach(function(s){var b=el("button",l.status===s[0]?"on":"",s[1]);b.type="button";b.addEventListener("click",function(){setStatus(l,s[0])});st.appendChild(b)});
+  p.appendChild(st);
+  var t=document.createElement("table");
+  (Array.isArray(l.fields)?l.fields:[]).forEach(function(f){if(!f||!f.value)return;var tr=document.createElement("tr");tr.appendChild(el("td",null,f.label));tr.appendChild(el("td",null,f.value));t.appendChild(tr)});
+  p.appendChild(t);
+  p.appendChild(el("label",null,"Notes"));
+  var ta=document.createElement("textarea");ta.value=l.notes||"";ta.setAttribute("aria-label","Notes");p.appendChild(ta);
+  var a=el("div","actions");
+  var save=el("button","btn","Save notes");save.type="button";
+  save.addEventListener("click",function(){save.disabled=true;sb.from("leads").update({notes:ta.value}).eq("id",l.id).then(function(r){save.disabled=false;if(r.error){alert("Could not save notes.");return}l.notes=ta.value;save.textContent="Saved";setTimeout(function(){save.textContent="Save notes"},1500)})});
+  var del=el("button","btn danger","Delete lead");del.type="button";
+  del.addEventListener("click",function(){if(!confirm("Delete this lead for good?"))return;sb.from("leads").delete().eq("id",l.id).then(function(r){if(r.error){alert("Could not delete.");return}leads=leads.filter(function(z){return z.id!==l.id});closeDetail();render()})});
+  a.appendChild(save);a.appendChild(del);p.appendChild(a);
+  $("detail").classList.add("on");
+}
+function setStatus(l,s){
+  sb.from("leads").update({status:s}).eq("id",l.id).then(function(r){
+    if(r.error){alert("Could not change status.");return}
+    l.status=s;render();open(l.id);
+  });
+}
+function closeDetail(){$("detail").classList.remove("on");current=null}
+$("detail").addEventListener("click",function(e){if(e.target===$("detail"))closeDetail()});
+document.addEventListener("keydown",function(e){if(e.key==="Escape")closeDetail()});
+})();
+</script>
+</body>
+</html>
