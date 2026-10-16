@@ -5,6 +5,7 @@ var STATUSES=[["new","New"],["contacted","Contacted"],["quoted","Quoted"],["won"
 var TYPES=[["residential","Residential"],["hoa","HOA"],["commercial","Commercial"]];
 var leads=[],clients=[],props=[],clientsErr=false,services=[],jobs=[],visits=[],jobsErr=false;
 var view="leads",lfilter="all",cfilter="active",jfilter="active",smode="day",selDate=today(),crewF="all",query="";
+var invoices=[],biz=null,billErr=false,unbilled=[],bfilter="tobill",billThrough=lastMonthEnd();
 var crew=[],s3=false,histFrom=addDays(today(),-45),crewMe=null,cwDate=today();
 var $=function(id){return document.getElementById(id)};
 function el(tag,cls,text){var e=document.createElement(tag);if(cls)e.className=cls;if(text!=null)e.textContent=text;return e}
@@ -55,7 +56,10 @@ function load(){
     sb.from("services").select("*").order("name",{ascending:true}).limit(500),
     sb.from("jobs").select("*").order("created_at",{ascending:true}).limit(5000),
     sb.from("visits").select("*").gte("scheduled_date",addDays(today(),-45)).order("scheduled_date",{ascending:true}).limit(5000),
-    sb.from("crew").select("*").order("name",{ascending:true}).limit(200)
+    sb.from("crew").select("*").order("name",{ascending:true}).limit(200),
+    sb.from("invoices").select("*").order("number",{ascending:false}).limit(3000),
+    sb.from("business").select("*").eq("id",1),
+    sb.from("visits").select("*").eq("status","done").is("invoice_id",null).is("paid_at",null).limit(5000)
   ]).then(function(rs){
     if(rs[0].error){$("msg").textContent="Could not load leads. If you just signed in, make sure this email is on the staff list.";return}
     leads=rs[0].data||[];
@@ -63,6 +67,7 @@ function load(){
     clients=rs[1].error?[]:(rs[1].data||[]);props=rs[2].error?[]:(rs[2].data||[]);
     jobsErr=!!(rs[3].error||rs[4].error||rs[5].error||clientsErr);
     services=rs[3].error?[]:(rs[3].data||[]);jobs=rs[4].error?[]:(rs[4].data||[]);visits=rs[5].error?[]:(rs[5].data||[]);histFrom=addDays(today(),-45);s3=!rs[6].error;crew=rs[6].error?[]:(rs[6].data||[]);
+    billErr=!!(rs[7].error||rs[9].error||jobsErr);invoices=rs[7].error?[]:(rs[7].data||[]);biz=rs[8].error?null:((rs[8].data||[])[0]||null);unbilled=rs[9].error?[]:(rs[9].data||[]);
     render();topUp().then(function(n){if(n)render()});
   });
 }
@@ -71,15 +76,16 @@ function load(){
 var ICONS={leads:'<svg viewBox="0 0 24 24"><path d="M3 13l2.5-7.5A2 2 0 0 1 7.4 4h9.2a2 2 0 0 1 1.9 1.5L21 13"/><path d="M3 13v5a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-5h-5.5a2.5 2.5 0 0 1-5 0z"/></svg>',
  clients:'<svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18 14a6.5 6.5 0 0 1 3.5 6"/></svg>',
  jobs:'<svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg>',
+ billing:'<svg viewBox="0 0 24 24"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg>',
  schedule:'<svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg>'};
 function render(){
   var nav=$("side");nav.textContent="";
   var tdy=today(),stops=visits.filter(function(v){return v.status==="scheduled"&&v.scheduled_date===tdy}).length,newL=leads.filter(function(l){return l.status==="new"}).length;
-  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops]].forEach(function(v){
+  [["leads","Leads",newL],["clients","Clients",0],["jobs","Jobs",0],["schedule","Schedule",stops],["billing","Billing",invoices.filter(isOverdue).length]].forEach(function(v){
     var b=el("button",v[0]===view?"on":"");b.type="button";b.addEventListener("click",function(){view=v[0];render()});b.innerHTML=ICONS[v[0]];b.appendChild(el("span",null,v[1]));
     if(v[2])b.appendChild(el("span","badge",String(v[2])));b.setAttribute("aria-current",v[0]===view?"page":"false");nav.appendChild(b)});
   $("topbtns").textContent="";
-  if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else renderSchedule();
+  if(view==="leads")renderLeads();else if(view==="clients")renderClients();else if(view==="jobs")renderJobs();else if(view==="billing")renderBilling();else renderSchedule();
 }
 function renderLeads(){
   var tabs=$("tabs");tabs.textContent="";
@@ -133,7 +139,8 @@ function renderClients(){
 function panel(){var p=$("panel");p.textContent="";p.appendChild(btn("×","close",closeDetail)).setAttribute("aria-label","Close");$("detail").classList.add("on");return p}
 function closeDetail(){$("detail").classList.remove("on")}
 $("detail").addEventListener("click",function(e){if(e.target===$("detail"))closeDetail()});
-document.addEventListener("keydown",function(e){if(e.key==="Escape")closeDetail()});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!$("invview").hidden)hideInvoice();else closeDetail()}});
+$("invclose").addEventListener("click",function(){hideInvoice()});$("invprint").addEventListener("click",function(){window.print()});
 
 /* ---- lead detail ---- */
 function openLead(id){
@@ -197,13 +204,14 @@ function openClient(id){
   var sec=el("div","sec"),h=el("h3",null,"Properties"),addp=btn("+ Add property","btn alt sm",function(){propForm(c,null,sec,h)});h.appendChild(addp);sec.appendChild(h);p.appendChild(sec);
   var holder=el("div");sec.appendChild(holder);drawProps(c,holder);
   p.appendChild(clientJobsSection(c));
+  p.appendChild(clientBillingSection(c));
   p.appendChild(historySection(c));
   /* leads */
   var ls=leads.filter(function(l){return l.client_id===c.id});
   if(ls.length){var s2=el("div","sec");s2.appendChild(el("h3",null,"Requests from the website"));
     ls.forEach(function(l){var r=el("div","pcard");r.appendChild(el("b",null,l.kind+" · "+label(l.status)));r.appendChild(el("div","note",new Date(l.created_at).toLocaleDateString()+(l.service?" · "+l.service:"")));r.appendChild(btn("Open","btn alt sm",function(){openLead(l.id)})).style.marginTop="6px";s2.appendChild(r)});p.appendChild(s2)}
   var d=el("div","actions");d.appendChild(el("span"));
-  d.appendChild(btn("Delete client","btn danger",function(){if(!confirm("Delete this client and all their properties for good? (Archive keeps the history.)"))return;sb.from("clients").delete().eq("id",c.id).then(function(r){if(r.error){alert("Could not delete.");return}clients=clients.filter(function(z){return z.id!==c.id});props=props.filter(function(z){return z.client_id!==c.id});leads.forEach(function(l){if(l.client_id===c.id)l.client_id=null});closeDetail();render()})}));
+  d.appendChild(btn("Delete client","btn danger",function(){if(!confirm("Delete this client and all their properties for good? (Archive keeps the history.)"))return;sb.from("clients").delete().eq("id",c.id).then(function(r){if(r.error){alert("Could not delete. A client with invoices can't be deleted, so Archive them instead.");return}clients=clients.filter(function(z){return z.id!==c.id});props=props.filter(function(z){return z.client_id!==c.id});leads.forEach(function(l){if(l.client_id===c.id)l.client_id=null});closeDetail();render()})}));
   p.appendChild(d);
 }
 function drawProps(c,holder){
@@ -320,6 +328,8 @@ function openImport(){
     var ld=leads.filter(function(l){return all([l.name,l.email,l.phone,l.address,l.service,l.kind].join(" "),t)});
     sec("Clients",cl,function(c){var ps=clientProps(c.id);return[c.name+(c.company?" · "+c.company:""),[ps[0]&&ps[0].address,c.phone].filter(Boolean).join(" · "),function(){openClient(c.id)}]});
     sec("Jobs",jb,function(j){return[cname(j.client_id)+" · "+j.title,[paddr(j.property_id),flabel(j.frequency),money(j.price),j.status!=="active"?j.status:""].filter(Boolean).join(" · "),function(){openJob(j.id)}]});
+    var iv=billErr?[]:invoices.filter(function(i){return all([invNum(i.number),String(i.number),cname(i.client_id),i.reference||""].join(" "),t)});
+    sec("Invoices",iv,function(i){return[invNum(i.number)+" · "+cname(i.client_id),[money(i.total),i.status==="paid"?"Paid":i.status==="void"?"Void":"Due "+dshort(i.due_date),i.reference].filter(Boolean).join(" · "),function(){openInvoice(i.id)}]});
     sec("Leads",ld,function(l){return[l.name||"(no name)",[l.kind,l.service,l.address].filter(Boolean).join(" · "),function(){openLead(l.id)}]});
     if(!res.firstChild)res.appendChild(el("div","none","No matches."));
     res.classList.add("on")}
@@ -403,12 +413,13 @@ function visitCard(v,after,showJob,opts){
   card.appendChild(top);
   var a=el("div","acts");
   function patch(p,cb){
+    function fin(){if(!billErr&&(p.status!==undefined||p.paid_at!==undefined))loadUnbilled().then(after);else after()}
     sb.from("visits").update(p).eq("id",v.id).then(function(r){
       if(r.error){alert("Could not save that.");return}
       Object.assign(v,p);
-      if(j&&j.frequency==="once"&&(p.status==="done"||p.status==="skipped")&&j.status==="active"){sb.from("jobs").update({status:"ended"}).eq("id",j.id).then(function(){j.status="ended";after()});return}
-      if(j&&j.frequency==="once"&&p.status==="scheduled"&&j.status==="ended"){sb.from("jobs").update({status:"active"}).eq("id",j.id).then(function(){j.status="active";after()});return}
-      after()})}
+      if(j&&j.frequency==="once"&&(p.status==="done"||p.status==="skipped")&&j.status==="active"){sb.from("jobs").update({status:"ended"}).eq("id",j.id).then(function(){j.status="ended";fin()});return}
+      if(j&&j.frequency==="once"&&p.status==="scheduled"&&j.status==="ended"){sb.from("jobs").update({status:"active"}).eq("id",j.id).then(function(){j.status="active";fin()});return}
+      fin()})}
   function btns(){
     a.textContent="";
     if(v.status==="scheduled"){
@@ -417,7 +428,14 @@ function visitCard(v,after,showJob,opts){
       a.appendChild(btn("Move","btn alt sm",function(){
         a.textContent="";var di=document.createElement("input");di.type="date";di.value=v.scheduled_date;di.style.width="auto";a.appendChild(di);
         a.appendChild(btn("Save date","btn sm",function(){if(!di.value)return;patch({scheduled_date:di.value})}));a.appendChild(btn("Cancel","btn alt sm",btns))}));
-    }else a.appendChild(btn("Undo","btn alt sm",function(){patch({status:"scheduled",completed_at:null})}));
+    }else{
+      if(!v.invoice_id&&!v.paid_at)a.appendChild(btn("Undo","btn alt sm",function(){patch({status:"scheduled",completed_at:null})}));
+      if(!billErr&&v.status==="done"){
+        if(v.invoice_id){var oi=el("span","note","On an invoice");oi.style.alignSelf="center";a.appendChild(oi)}
+        else if(v.paid_at){var pn=el("span","chip won","Paid"+(v.paid_method?" · "+v.paid_method:""));pn.style.alignSelf="center";a.appendChild(pn);a.appendChild(btn("Undo paid","btn alt sm",function(){patch({paid_at:null,paid_method:""})}))}
+        else{var pl=el("span","note","Paid at visit:");pl.style.alignSelf="center";a.appendChild(pl);["Cash","Zelle","Check"].forEach(function(m){a.appendChild(btn(m,"btn alt sm",function(){patch({paid_at:new Date().toISOString(),paid_method:m})}))})}
+      }
+    }
     var pr=byId(props,v.property_id);
     if(pr){var m=el("a","btn alt sm","Map");m.href=mapsUrl(pr.address);m.target="_blank";m.rel="noopener";a.appendChild(m)}
     if(showJob!==false&&j)a.appendChild(btn("Job","btn alt sm",function(){openJob(j.id)}));
@@ -803,4 +821,182 @@ function renderCrewApp(){
       var isDone=x.status==="done";
       acts.appendChild(btn(isDone?"Undo":"Done",isDone?"btn alt":"btn",function(){sb.rpc("crew_set_done",{p_visit:x.visit_id,p_done:!isDone}).then(function(r2){if(r2.error)alert("Could not save that. Try again.");renderCrewApp()})}));
       card.appendChild(acts);body.appendChild(card)})})}
+
+/* ======================= BILLING ======================= */
+function esc(s){return String(s==null?"":s).replace(/[&<>"]/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+function r2(x){return Math.round((Number(x)||0)*100)/100}
+function invNum(n){var s=String(n||0);while(s.length<4)s="0"+s;return"LC-"+s}
+function lastMonthEnd(){return addDays(today().slice(0,8)+"01",-1)}
+function thisMonthEnd(){return addDays(addDays(today().slice(0,8)+"01",32).slice(0,8)+"01",-1)}
+function bizv(k,d){return biz&&biz[k]!=null&&biz[k]!==""?biz[k]:d}
+function jobTitle(id){var j=byId(jobs,id);return j?j.title:"Lawn service"}
+function loadUnbilled(){
+  return sb.from("visits").select("*").eq("status","done").is("invoice_id",null).is("paid_at",null).limit(5000).then(function(r){if(r.error){billErr=true;unbilled=[]}else unbilled=r.data||[]})}
+function reloadInvoices(){return sb.from("invoices").select("*").order("number",{ascending:false}).limit(3000).then(function(r){if(!r.error)invoices=r.data||[]})}
+function isOverdue(i){return i.status==="open"&&i.due_date&&i.due_date<today()}
+function openTotal(arr){return r2(arr.filter(function(i){return i.status==="open"}).reduce(function(s,i){return s+Number(i.total||0)},0))}
+function eligible(){return unbilled.filter(function(v){return v.scheduled_date<=billThrough&&Number(v.price)>0})}
+function billGroups(){
+  var g={},order=[];eligible().forEach(function(v){if(!g[v.client_id]){g[v.client_id]=[];order.push(v.client_id)}g[v.client_id].push(v)});
+  order.sort(function(a,b){return cname(a).localeCompare(cname(b))});order.forEach(function(k){g[k].sort(function(a,b){return a.scheduled_date<b.scheduled_date?-1:1})});
+  return{g:g,order:order}}
+
+function createInvoice(cid,vs,through){
+  vs=vs.slice().sort(function(a,b){return a.scheduled_date<b.scheduled_date?-1:1});
+  var issue=today(),terms=Number(bizv("terms_days",10)),total=r2(vs.reduce(function(s,v){return s+Number(v.price||0)},0));
+  var row={client_id:cid,issue_date:issue,due_date:addDays(issue,isNaN(terms)?10:terms),period_start:vs[0].scheduled_date,period_end:through,total:total};
+  return sb.from("invoices").insert(row).select().single().then(function(r){
+    if(r.error||!r.data)return Promise.reject("Could not create the invoice. Did you run the Stage 5 SQL?");
+    var inv=r.data;
+    var lines=vs.map(function(v){return{invoice_id:inv.id,visit_id:v.id,service_date:v.scheduled_date,address:paddr(v.property_id),description:jobTitle(v.job_id),amount:v.price}});
+    function undo(msg){return sb.from("invoices").delete().eq("id",inv.id).then(function(){return Promise.reject(msg)})}
+    return sb.from("invoice_items").insert(lines).then(function(r2_){
+      if(r2_.error)return undo("Could not add the invoice lines.");
+      return sb.from("visits").update({invoice_id:inv.id}).in("id",vs.map(function(v){return v.id})).is("invoice_id",null).then(function(r3){
+        if(r3.error)return undo("Could not link the visits to the invoice.");
+        invoices.unshift(inv);return inv})})})}
+
+/* ---- Billing screen ---- */
+function renderBilling(){
+  var tabs=$("tabs");tabs.textContent="";
+  var op=invoices.filter(function(i){return i.status==="open"}),pd_=invoices.filter(function(i){return i.status==="paid"}),od=op.filter(isOverdue);
+  var bg=billGroups();
+  [["tobill","To bill",bg.order.length],["open","Open",op.length],["paid","Paid",pd_.length]].forEach(function(s){
+    var b=el("button","tab"+(bfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){bfilter=s[0];render()});tabs.appendChild(b)});
+  $("topbtns").appendChild(btn("Billing settings","btn alt",openBizSettings));
+  var list=$("list");list.textContent="";
+  if(billErr){list.appendChild(el("div","empty","Billing isn't set up yet. Run the Stage 5 SQL in Supabase (SQL Editor), then press Refresh."));return}
+  var mon=today().slice(0,7),paidMonth=r2(pd_.filter(function(i){return i.paid_at&&String(i.paid_at).slice(0,7)===mon}).reduce(function(s,i){return s+Number(i.total||0)},0));
+  var stats=el("div","stats");
+  [["Outstanding",money(openTotal(invoices)),""],["Overdue",money(openTotal(od)),od.length?"bad":""],["Ready to bill",money(r2(eligible().reduce(function(s,v){return s+Number(v.price||0)},0))),""],["Paid this month",money(paidMonth),""]].forEach(function(x){
+    var c=el("div","stat "+x[2]);c.appendChild(el("span",null,x[0]));c.appendChild(el("b",null,x[1]));stats.appendChild(c)});
+  list.appendChild(stats);
+  if(bfilter==="tobill")return renderToBill(list,bg);
+  var set=(bfilter==="open"?op.slice().sort(function(a,b){return a.due_date<b.due_date?-1:1}):pd_).filter(function(i){
+    if(!query)return true;return[invNum(i.number),i.number,cname(i.client_id),i.reference].join(" ").toLowerCase().indexOf(query)>-1});
+  if(!set.length){list.appendChild(el("div","empty",bfilter==="open"?"No open invoices.":"No paid invoices yet."));return}
+  set.forEach(function(i){list.appendChild(invoiceRow(i))})}
+function invoiceRow(i){
+  var b=el("button","row client"+(isOverdue(i)?" overdue":""));b.type="button";var l=el("div");
+  l.appendChild(el("b",null,invNum(i.number)+" · "+cname(i.client_id)));
+  l.appendChild(el("div","sub",[i.period_end?monthName(i.period_end):"",i.status==="paid"?"Paid "+(i.paid_at?dshort(String(i.paid_at).slice(0,10)):"")+(i.paid_method?" ("+i.paid_method+")":""):"Due "+dshort(i.due_date),i.reference?"Ref "+i.reference:""].filter(Boolean).join(" · ")));
+  var r=el("div");r.style.textAlign="right";r.appendChild(el("b",null,money(i.total)));
+  var chip=i.status==="void"?el("span","chip lost","Void"):i.status==="paid"?el("span","chip won","Paid"):isOverdue(i)?el("span","chip od","Overdue"):el("span","chip",i.sent_at?"Sent":"Not sent");r.appendChild(el("div"));r.appendChild(chip);
+  b.appendChild(l);b.appendChild(r);b.addEventListener("click",function(){openInvoice(i.id)});return b}
+function renderToBill(list,bg){
+  var bar=el("div","billbar");
+  var lab=el("label","f");lab.style.margin="0";lab.appendChild(el("span",null,"Bill completed visits through"));var di=document.createElement("input");di.type="date";di.value=billThrough;di.style.width="auto";di.addEventListener("change",function(){if(di.value){billThrough=di.value;render()}});lab.appendChild(di);bar.appendChild(lab);
+  var q=el("span");q.appendChild(btn("End of last month","btn alt sm",function(){billThrough=lastMonthEnd();render()}));q.appendChild(document.createTextNode(" "));q.appendChild(btn("Today","btn alt sm",function(){billThrough=today();render()}));bar.appendChild(q);
+  list.appendChild(bar);
+  var zero=unbilled.filter(function(v){return v.scheduled_date<=billThrough&&!(Number(v.price)>0)});
+  if(zero.length){var zn=el("div","note","⚠ "+zero.length+" completed visit"+(zero.length>1?"s have":" has")+" no price set, so "+(zero.length>1?"they are":"it is")+" left out. Set the job's price, then they can be billed.");zn.style.cssText="color:#7a5b00;margin:6px 0";list.appendChild(zn)}
+  if(!bg.order.length){list.appendChild(el("div","empty","Nothing to bill through "+dshort(billThrough)+". Completed visits that haven't been paid or invoiced show up here."));return}
+  var all=btn("Create all invoices ("+bg.order.length+")","btn",function(){
+    if(!confirm("Create "+bg.order.length+" invoice"+(bg.order.length>1?"s":"")+" for completed visits through "+dshort(billThrough)+"?"))return;
+    all.disabled=true;var made=0,fails=[],through=billThrough;
+    bg.order.reduce(function(p,cid){return p.then(function(){return createInvoice(cid,bg.g[cid],through).then(function(){made++},function(e){fails.push(cname(cid)+": "+e)})})},Promise.resolve()).then(function(){return loadUnbilled()}).then(function(){render();alert("Created "+made+" invoice"+(made===1?"":"s")+"."+(fails.length?"\n\nProblems:\n"+fails.join("\n"):""));bfilter="open";render()})});
+  all.style.margin="8px 0 4px";list.appendChild(all);
+  bg.order.forEach(function(cid){
+    var vs=bg.g[cid],tot=r2(vs.reduce(function(s,v){return s+Number(v.price||0)},0)),card=el("div","pcard");
+    var top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
+    var l=el("div");l.appendChild(el("b",null,cname(cid)));l.appendChild(el("div","note",vs.length+" visit"+(vs.length>1?"s":"")+" · "+money(tot)));top.appendChild(l);
+    var one=btn("Create invoice","btn sm",function(){one.disabled=true;createInvoice(cid,vs,billThrough).then(function(inv){return loadUnbilled().then(function(){render();openInvoice(inv.id)})},function(e){one.disabled=false;alert(e)})});top.appendChild(one);card.appendChild(top);
+    var det=document.createElement("details");det.appendChild(el("summary",null,"See the visits"));
+    vs.forEach(function(v){det.appendChild(el("div","note",dshort(v.scheduled_date)+" · "+jobTitle(v.job_id)+" · "+paddr(v.property_id)+" · "+money(v.price)))});card.appendChild(det);list.appendChild(card)})}
+
+/* ---- Invoice detail ---- */
+function openInvoice(id){
+  var inv=byId(invoices,id);if(!inv)return;var c=byId(clients,inv.client_id),p=panel();
+  p.appendChild(el("h2",null,invNum(inv.number)+" · "+cname(inv.client_id)));
+  var st=inv.status==="paid"?"Paid":inv.status==="void"?"Void":isOverdue(inv)?"Overdue":"Open";
+  p.appendChild(el("div","note",st+" · issued "+dshort(inv.issue_date)+" · due "+dshort(inv.due_date)+(inv.sent_at?" · sent "+dshort(String(inv.sent_at).slice(0,10)):" · not sent yet")));
+  var body=el("div");body.appendChild(el("div","note","Loading..."));p.appendChild(body);
+  sb.from("invoice_items").select("*").eq("invoice_id",inv.id).order("service_date",{ascending:true}).limit(1000).then(function(r){
+    var items=r.error?[]:(r.data||[]);body.textContent="";
+    var locked=inv.status!=="open";
+    var t=document.createElement("table");t.className="itable";
+    items.forEach(function(it){var tr=document.createElement("tr");tr.appendChild(el("td",null,it.service_date?dshort(it.service_date):""));
+      var d=el("td",null,it.description+(it.address?" · "+it.address:""));tr.appendChild(d);var a=el("td","amt",money(it.amount));tr.appendChild(a);
+      if(!locked){var x=el("td");var rm=btn("×","link",function(){removeLine(inv,it,function(){openInvoice(inv.id)})});rm.setAttribute("aria-label","Remove line");rm.style.cssText="font-size:1.2rem;text-decoration:none;color:var(--red)";x.appendChild(rm);tr.appendChild(x)}t.appendChild(tr)});
+    body.appendChild(t);
+    var tot=el("div","invtotal","Total "+money(inv.total));body.appendChild(tot);
+    if(!locked){
+      var add=el("div","pcard"),g=el("div","grid2");var dsc=fld("Add a line (extra work, discount, late fee)","text",""),amt=fld("Amount ($, negative = discount)","number","");amt.input.step="0.01";amt.input.inputMode="decimal";g.appendChild(dsc);g.appendChild(amt);add.appendChild(g);
+      var ab=btn("Add line","btn alt sm",function(){var a2=parseFloat(amt.input.value);if(!dsc.input.value.trim()||isNaN(a2)){alert("Enter a description and an amount.");return}
+        sb.from("invoice_items").insert({invoice_id:inv.id,service_date:today(),description:dsc.input.value.trim(),amount:a2}).then(function(r2_){if(r2_.error){alert("Could not add the line.");return}setTotal(inv,r2(Number(inv.total)+a2),function(){openInvoice(inv.id)})})});ab.style.marginTop="8px";add.appendChild(ab);body.appendChild(add)}
+    var ref=fld("Reference / PO number (shows on the invoice)","text",inv.reference||"");body.appendChild(ref);
+    var rb=btn("Save reference","btn alt sm",function(){sb.from("invoices").update({reference:ref.input.value.trim()}).eq("id",inv.id).then(function(r2_){if(r2_.error){alert("Could not save.");return}inv.reference=ref.input.value.trim();rb.textContent="Saved";setTimeout(function(){rb.textContent="Save reference"},1200)})});rb.style.marginTop="6px";body.appendChild(rb);
+    var acts=el("div","contact");acts.style.marginTop="14px";
+    acts.appendChild(btn("View / Print / PDF","btn",function(){showInvoice(inv,items)}));
+    var msg=invMessage(inv,c);
+    if(c&&c.phone){var a1=el("a","btn alt","Text");a1.href=smsHref(c.phone,msg);a1.addEventListener("click",function(){markSent(inv)});acts.appendChild(a1)}
+    if(c&&c.email){var a2=el("a","btn alt","Email");a2.href="mailto:"+encodeURIComponent(c.email).replace("%40","@")+"?subject="+encodeURIComponent("Invoice "+invNum(inv.number)+" from Latta Corp")+"&body="+encodeURIComponent(msg+"\n\n(The invoice PDF is attached.)");a2.addEventListener("click",function(){markSent(inv)});acts.appendChild(a2)}
+    body.appendChild(acts);
+    if(c&&(!c.phone||!c.email))body.appendChild(el("div","note","Tip: add a "+(!c.phone?"phone number":"email")+" on the client page to get "+(!c.phone?"a Text":"an Email")+" button here. To email the PDF: tap View / Print / PDF, choose Save as PDF, then attach it."));
+    var pay=el("div","sec");
+    if(inv.status==="open"){
+      pay.appendChild(el("h3",null,"Record payment"));var pg=el("div","grid2");
+      var pm=fld("Method","select","Zelle",[["Zelle","Zelle"],["Cash","Cash"],["Check","Check"],["Other","Other"]]),pdt=fld("Date received","date",today());pg.appendChild(pm);pg.appendChild(pdt);pay.appendChild(pg);
+      var pb=btn("Mark paid","btn",function(){var when=(pdt.input.value||today())+"T12:00:00";sb.from("invoices").update({status:"paid",paid_at:when,paid_method:pm.input.value}).eq("id",inv.id).then(function(r2_){if(r2_.error){alert("Could not save.");return}inv.status="paid";inv.paid_at=when;inv.paid_method=pm.input.value;render();openInvoice(inv.id)})});pb.style.marginTop="8px";pay.appendChild(pb);
+    }else if(inv.status==="paid"){
+      pay.appendChild(el("div","note","Paid "+(inv.paid_at?dshort(String(inv.paid_at).slice(0,10)):"")+(inv.paid_method?" by "+inv.paid_method:"")));
+      pay.appendChild(btn("Mark unpaid","btn alt sm",function(){sb.from("invoices").update({status:"open",paid_at:null,paid_method:""}).eq("id",inv.id).then(function(r2_){if(r2_.error){alert("Could not save.");return}inv.status="open";inv.paid_at=null;inv.paid_method="";render();openInvoice(inv.id)})}));
+    }
+    var dz=el("div","actions");dz.appendChild(el("span"));
+    if(inv.status!=="void")dz.appendChild(btn("Void invoice","btn danger",function(){if(!confirm("Void this invoice? Its visits go back to 'To bill' so you can bill them again."))return;releaseVisits(inv,function(){sb.from("invoices").update({status:"void"}).eq("id",inv.id).then(function(){inv.status="void";render();openInvoice(inv.id)})})}));
+    else dz.appendChild(btn("Delete","btn danger",function(){if(!confirm("Delete this voided invoice for good?"))return;sb.from("invoices").delete().eq("id",inv.id).then(function(r2_){if(r2_.error){alert("Could not delete.");return}invoices=invoices.filter(function(z){return z.id!==inv.id});closeDetail();render()})}));
+    body.appendChild(pay);body.appendChild(dz)})}
+function setTotal(inv,total,cb){sb.from("invoices").update({total:total}).eq("id",inv.id).then(function(r){if(r.error){alert("Could not update the total.");return}inv.total=total;render();cb()})}
+function removeLine(inv,it,cb){
+  sb.from("invoice_items").delete().eq("id",it.id).then(function(r){
+    if(r.error){alert("Could not remove the line.");return}
+    var after=function(){setTotal(inv,r2(Number(inv.total)-Number(it.amount)),function(){loadUnbilled().then(cb)})};
+    if(it.visit_id)sb.from("visits").update({invoice_id:null}).eq("id",it.visit_id).then(after);else after()})}
+function releaseVisits(inv,cb){sb.from("visits").update({invoice_id:null}).eq("invoice_id",inv.id).then(function(r){if(r.error){alert("Could not release the visits.");return}loadUnbilled().then(cb)})}
+function markSent(inv){if(inv.sent_at)return;var now=new Date().toISOString();sb.from("invoices").update({sent_at:now}).eq("id",inv.id).then(function(r){if(!r.error){inv.sent_at=now;render()}})}
+function invMessage(inv,c){
+  var first=String((c&&c.name)||"").split(" ")[0]||"there";
+  return"Hi "+first+", this is "+bizv("name","Latta Corp")+". Your invoice "+invNum(inv.number)+(inv.period_end?" for "+monthName(inv.period_end):"")+" is "+money(inv.total)+", due "+dshort(inv.due_date)+"."+(bizv("zelle","")?" Pay with Zelle: "+biz.zelle+".":"")+" Thank you!"}
+
+/* ---- printable invoice (works as a PDF too) ---- */
+function showInvoice(inv,items){
+  var c=byId(clients,inv.client_id)||{},paper=$("invpaper"),addrs=[];
+  items.forEach(function(it){if(it.address&&addrs.indexOf(it.address)<0)addrs.push(it.address)});
+  var rows=items.map(function(it){return"<tr><td>"+esc(it.service_date?dshort(it.service_date):"")+"</td><td>"+esc(it.description)+(it.address?'<div class="sm">'+esc(it.address)+"</div>":"")+'</td><td class="r">'+esc(money(it.amount))+"</td></tr>"}).join("");
+  var paidBox=inv.status==="paid"?'<div class="paidstamp">PAID '+esc(inv.paid_at?dshort(String(inv.paid_at).slice(0,10)):"")+(inv.paid_method?" · "+esc(inv.paid_method):"")+"</div>":inv.status==="void"?'<div class="paidstamp void">VOID</div>':"";
+  paper.innerHTML='<div class="ihead"><div class="ibrand"><img src="../images/logo-tree-header.png" alt=""><div><div class="bn">'+esc(bizv("name","LattaCorp of Central Florida"))+'</div><div class="sm">'+[bizv("address",""),bizv("phone",""),bizv("email","")].filter(Boolean).map(esc).join("<br>")+'</div></div></div>'
+    +'<div class="imeta"><div class="it">INVOICE</div><div><b>'+esc(invNum(inv.number))+'</b></div><div class="sm">Issued '+esc(dshort(inv.issue_date))+"<br>Due "+esc(dshort(inv.due_date))+(inv.reference?"<br>Ref: "+esc(inv.reference):"")+"</div></div></div>"
+    +'<div class="bill"><div class="sm">BILL TO</div><b>'+esc(c.name||"")+"</b>"+(c.company?"<div>"+esc(c.company)+"</div>":"")+(addrs.length?'<div class="sm">Service address'+(addrs.length>1?"es":"")+": "+addrs.map(esc).join("; ")+"</div>":"")+"</div>"
+    +'<table class="itab"><thead><tr><th>Date</th><th>Service</th><th class="r">Amount</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td></td><td class="r"><b>Total due</b></td><td class="r"><b>'+esc(money(inv.total))+"</b></td></tr></tfoot></table>"+paidBox
+    +'<div class="pay"><b>How to pay</b><div>'+(bizv("zelle","")?"Zelle: "+esc(biz.zelle)+"<br>":"")+esc(bizv("payment_note",""))+"</div></div>"
+    +'<div class="foot">'+esc(bizv("footer","Thank you!"))+"</div>";
+  var v=$("invview");v.hidden=false;document.body.classList.add("printing");v.scrollTop=0}
+function hideInvoice(){$("invview").hidden=true;document.body.classList.remove("printing")}
+
+/* ---- billing settings ---- */
+function openBizSettings(){
+  var p=panel();p.appendChild(el("h2",null,"Billing settings"));p.appendChild(el("p","note","This is what appears on every invoice and in the text or email message."));
+  var f={name:fld("Business name","text",bizv("name","")),phone:fld("Phone","tel",bizv("phone","")),email:fld("Email","email",bizv("email","")),address:fld("Mailing address (optional)","text",bizv("address","")),
+    zelle:fld("Zelle info (for example: the phone number or email you receive Zelle on)","text",bizv("zelle","")),payment_note:fld("Other payment note","text",bizv("payment_note","")),
+    terms_days:fld("Payment due within (days after the invoice date; 0 = due on receipt)","number",bizv("terms_days",10)),footer:fld("Thank-you line at the bottom","text",bizv("footer",""))};
+  Object.keys(f).forEach(function(k){p.appendChild(f[k])});
+  var s=btn("Save","btn",function(){
+    var row={id:1};Object.keys(f).forEach(function(k){row[k]=k==="terms_days"?(parseInt(f[k].input.value,10)||0):f[k].input.value.trim()});
+    s.disabled=true;sb.from("business").upsert(row).select().single().then(function(r){s.disabled=false;if(r.error||!r.data){alert("Could not save. Did you run the Stage 5 SQL?");return}biz=r.data;closeDetail();render()})});
+  s.style.marginTop="14px";p.appendChild(s)}
+
+/* ---- billing on the client page ---- */
+function clientBillingSection(c){
+  var sec=el("div","sec"),h=el("h3",null,"Billing");sec.appendChild(h);
+  if(billErr){sec.appendChild(el("div","note","Run the Stage 5 SQL in Supabase to turn on billing."));return sec}
+  var mine=invoices.filter(function(i){return i.client_id===c.id}),bal=openTotal(mine),od=mine.filter(isOverdue).length,ub=unbilled.filter(function(v){return v.client_id===c.id&&Number(v.price)>0});
+  var ubt=r2(ub.reduce(function(s,v){return s+Number(v.price||0)},0));
+  var sm=el("div","note",[bal?"Balance due "+money(bal)+(od?" ("+od+" overdue)":""):"Nothing owed",ubt?money(ubt)+" not yet billed":""].filter(Boolean).join(" · "));sm.style.fontWeight="700";sec.appendChild(sm);
+  if(ub.length){var cb=btn("Create invoice for completed visits ("+ub.length+")","btn alt sm",function(){cb.disabled=true;createInvoice(c.id,ub,today()).then(function(inv){return loadUnbilled().then(function(){render();openInvoice(inv.id)})},function(e){cb.disabled=false;alert(e)})});cb.style.margin="6px 0";sec.appendChild(cb)}
+  mine.slice(0,8).forEach(function(i){var r=el("div","pcard");r.style.cssText="display:flex;justify-content:space-between;gap:10px;align-items:center;cursor:pointer";
+    var l=el("div");l.appendChild(el("b",null,invNum(i.number)+" · "+money(i.total)));l.appendChild(el("div","note",(i.period_end?monthName(i.period_end)+" · ":"")+(i.status==="paid"?"Paid":i.status==="void"?"Void":"Due "+dshort(i.due_date))));
+    r.appendChild(l);r.appendChild(el("span","chip "+(i.status==="paid"?"won":i.status==="void"?"lost":isOverdue(i)?"od":""),i.status==="paid"?"Paid":i.status==="void"?"Void":isOverdue(i)?"Overdue":"Open"));r.addEventListener("click",function(){openInvoice(i.id)});sec.appendChild(r)});
+  if(mine.length>8)sec.appendChild(el("div","note","+ "+(mine.length-8)+" older invoices in the Billing tab."));
+  return sec}
+
 })();
