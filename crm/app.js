@@ -1858,6 +1858,23 @@ function invToks(q){return String(q||"").toLowerCase().split(/\s+/).filter(Boole
 function invHas(c,r,t){var h=invHay(c,r);return t.every(function(x){return h.indexOf(x)>-1})}
 function invTitle(c,r){var cols=invCols(c);for(var i=0;i<cols.length;i++){var v=invVal(r,cols[i].k);if(v)return v}return"(empty row)"}
 function invVisible(){return invCats.filter(function(c){return!c.kind})}
+/* Colour code per category: 24 distinct colours (12 light with dark text, 12 dark with white text; every pair is at least 6.5:1 contrast). */
+var INV_COLORS=[["Yellow","#fde68a","#1f2a1f"],["Orange","#fdba74","#1f2a1f"],["Pink","#f9a8d4","#1f2a1f"],["Lavender","#d8b4fe","#1f2a1f"],["Sky","#93c5fd","#1f2a1f"],["Mint","#86efac","#1f2a1f"],["Aqua","#67e8f9","#1f2a1f"],["Lime","#d9f99d","#1f2a1f"],["Rose","#fecaca","#1f2a1f"],["Sand","#e7d3a7","#1f2a1f"],["Periwinkle","#c7d2fe","#1f2a1f"],["Seafoam","#99f6e4","#1f2a1f"],
+["Navy","#1e3a8a","#ffffff"],["Forest","#166534","#ffffff"],["Maroon","#7f1d1d","#ffffff"],["Purple","#581c87","#ffffff"],["Teal","#115e59","#ffffff"],["Brown","#78350f","#ffffff"],["Magenta","#9d174d","#ffffff"],["Slate","#334155","#ffffff"],["Olive","#4d5d0f","#ffffff"],["Red","#b91c1c","#ffffff"],["Indigo","#3730a3","#ffffff"],["Rust","#9a3412","#ffffff"]];
+function invPal(name){return INV_COLORS.filter(function(x){return x[0]===name})[0]}
+/* Chosen colour if saved, otherwise the first colour nobody else is using (same order every time). */
+function invColorMap(){
+  var vis=invVisible().slice().sort(function(a,b){return String(a.created_at||"").localeCompare(String(b.created_at||""))||(a.sort||0)-(b.sort||0)}),used={},m={};
+  vis.forEach(function(c){if(invPal(c.color)&&!used[c.color]){used[c.color]=1;m[c.id]=invPal(c.color)}});
+  vis.forEach(function(c){if(m[c.id])return;var f=INV_COLORS.filter(function(x){return!used[x[0]]})[0]||INV_COLORS[(Object.keys(m).length)%INV_COLORS.length];used[f[0]]=1;m[c.id]=f});
+  return m}
+function invCol_(c){return invColorMap()[c.id]||INV_COLORS[0]}
+function invPaint(node,c){var k=invCol_(c);node.style.background=k[1];node.style.color=k[2];node.style.borderColor=k[1];return node}
+function invChip(c){var ch=el("span","invchip",c.name);return invPaint(ch,c)}
+/* Save the automatic colours so they never change when a category is added or deleted (needs the Stage 14 column). */
+function ensureInvColors(){
+  if(!invCats.length||!("color" in invCats[0]))return;var m=invColorMap();
+  invVisible().forEach(function(c){if(invPal(c.color))return;var k=m[c.id];if(!k)return;c.color=k[0];sb.from("inventory_cats").update({color:k[0]}).eq("id",c.id).then(function(){})})}
 function renderInventory(){
   var tabs=$("tabs");tabs.textContent="";var list=$("list");list.textContent="";
   $("topbtns").appendChild(btn("+ New category","btn",openInvCatForm));
@@ -1866,9 +1883,10 @@ function renderInventory(){
   if(!vis.length){list.appendChild(el("div","empty","No inventory yet. Tap New category to start a sheet, for example Equipment, Supplies, or Fuel & Oil."));return}
   if(invCat!=="all"&&!byId(vis,invCat))invCat="all";
   var tb=[];
-  function paintTabs(){var on=invToks(invq).length===0;tb.forEach(function(x){x[1].className="tab"+((x[0].id==="all"?invCat==="all":(on&&x[0].id===invCat))?" on":"")})}
+  function paintTabs(){var on=invToks(invq).length===0;tb.forEach(function(x){x[1].className="tab"+(x[0].id==="all"?"":" ctab")+((x[0].id==="all"?invCat==="all":(on&&x[0].id===invCat))?" on":"")})}
   var ab_=el("button","tab","All inventory");ab_.type="button";ab_.appendChild(el("span",null,"("+invItems.filter(function(r){return vis.some(function(c){return c.id===r.cat_id})}).length+")"));ab_.addEventListener("click",function(){invCat="all";render()});tabs.appendChild(ab_);tb.push([{id:"all"},ab_]);
-  vis.forEach(function(c){var n=invItems.filter(function(r){return r.cat_id===c.id}).length,b=el("button","tab",c.name);b.type="button";b.appendChild(el("span",null,"("+n+")"));b.addEventListener("click",function(){invCat=c.id;invq="";render()});tabs.appendChild(b);tb.push([c,b])});
+  vis.forEach(function(c){var n=invItems.filter(function(r){return r.cat_id===c.id}).length,b=el("button","tab",c.name);b.type="button";b.appendChild(el("span",null,"("+n+")"));invPaint(b,c);b.addEventListener("click",function(){invCat=c.id;invq="";render()});tabs.appendChild(b);tb.push([c,b])});
+  ensureInvColors();
   var bar=el("div","invbar"),si=document.createElement("input");si.type="search";si.placeholder="Search inventory: items, categories, notes...";si.value=invq;si.setAttribute("aria-label","Search inventory");bar.appendChild(si);
   if(invCat!=="all")bar.appendChild(btn("Sheet settings","btn alt sm",function(){var c=byId(invCats,invCat);if(c)openInvCat(c)}));
   list.appendChild(bar);var body=el("div");list.appendChild(body);
@@ -1879,10 +1897,10 @@ function drawInvBody(body){
   if(invCat==="all"){body.appendChild(invAllGrid(invVisible(),t));return}
   if(t.length){var any=false;
     invVisible().forEach(function(c){var rows=invRows(c).filter(function(r){return invHas(c,r,t)});if(!rows.length)return;any=true;
-      var h=el("div",null,c.name+" · "+rows.length+" match"+(rows.length>1?"es":"")+" (tap to open this sheet)");h.style.cssText="font-weight:700;color:var(--forest);margin:14px 0 4px;cursor:pointer";h.addEventListener("click",function(){invCat=c.id;invq="";render()});
+      var h=el("div",null);h.appendChild(invChip(c));h.appendChild(document.createTextNode(" "+rows.length+" match"+(rows.length>1?"es":"")+" (tap to open this sheet)"));h.style.cssText="font-weight:700;color:var(--forest);margin:14px 0 4px;cursor:pointer";h.addEventListener("click",function(){invCat=c.id;invq="";render()});
       body.appendChild(h);body.appendChild(invGrid(c,rows,true))});
     if(!any)body.appendChild(el("div","empty","Nothing in your inventory matches that."));return}
-  var c=byId(invVisible(),invCat);if(c)body.appendChild(invGrid(c,invRows(c),false))}
+  var c=byId(invVisible(),invCat);if(c){var hd=el("div","invhead");hd.appendChild(invChip(c));body.appendChild(hd);body.appendChild(invGrid(c,invRows(c),false))}}
 /* "All inventory": every item from every category in one sheet. Columns are matched by name; a cell is greyed out when an item's category doesn't have that column. */
 function invAllGrid(cats,t){
   var names=[],info={};cats.forEach(function(c){invCols(c).forEach(function(col){var k=col.n.toLowerCase();if(names.indexOf(k)<0){names.push(k);info[k]={n:col.n,t:col.t}}})});
@@ -1900,7 +1918,7 @@ function invAllGrid(cats,t){
   var th_=document.createElement("thead");th_.appendChild(hr);tbl.appendChild(th_);
   var tb=document.createElement("tbody");
   rows.forEach(function(x,ri){var c=x[0],r=x[1],tr=document.createElement("tr");tr.appendChild(el("td","rn",String(ri+1)));
-    var cd=document.createElement("td"),cb=btn(c.name,"hcol",function(){invCat=c.id;invq="";render()});cb.title="Open the "+c.name+" sheet";cb.style.cssText="padding:8px;color:var(--forest)";cd.appendChild(cb);tr.appendChild(cd);
+    var cd=document.createElement("td"),cb=btn(c.name,"hcol",function(){invCat=c.id;invq="";render()});cb.title="Open the "+c.name+" sheet";cb.className="hcol invchip";cb.style.cssText="margin:4px 8px;cursor:pointer;font:inherit;font-weight:700";invPaint(cb,c);cd.appendChild(cb);tr.appendChild(cd);
     names.forEach(function(k){var td=document.createElement("td"),col=cellOf(c,k);
       if(!col){td.style.background="#f1f3f0";tr.appendChild(td);return}
       var inp=document.createElement("input");inp.type="text";inp.value=invVal(r,col.k);inp.dataset.v=inp.value;inp.dataset.r=r.id;inp.dataset.k=col.k;inp.dataset.n=k;inp.setAttribute("aria-label",info[k].n);inp.autocomplete="off";if(col.t==="number"){inp.inputMode="decimal";inp.className="num"}
@@ -2020,6 +2038,10 @@ function openInvCat(c){
   var p=panel();p.appendChild(el("h2",null,c.name+" · sheet settings"));
   var nm=fld("Category name","text",c.name);p.appendChild(nm);
   var sv=btn("Rename","btn alt sm",function(){var n=nm.input.value.trim();if(!n){alert("Give it a name.");return}sb.from("inventory_cats").update({name:n}).eq("id",c.id).then(function(r){if(r.error){alert("Could not save.");return}c.name=n;closeDetail();render()})});sv.style.marginTop="6px";p.appendChild(sv);
+  var cl=el("div",null);cl.style.marginTop="16px";cl.appendChild(el("div","note","Colour code (shown on the tab and in the All inventory sheet)"));var used={};invVisible().forEach(function(z){if(z.id!==c.id)used[invCol_(z)[0]]=1});var sw=el("div","swatches"),cur=invCol_(c)[0];
+  INV_COLORS.forEach(function(k){var b=el("button","sw"+(k[0]===cur?" on":""),"Aa");b.type="button";b.style.background=k[1];b.style.color=k[2];b.title=k[0]+(used[k[0]]?" (already used by another category)":"");b.setAttribute("aria-label",k[0]);if(used[k[0]])b.style.opacity=".45";
+    b.addEventListener("click",function(){if(used[k[0]]&&!confirm("Another category already uses "+k[0]+". Use it for both?"))return;sb.from("inventory_cats").update({color:k[0]}).eq("id",c.id).then(function(r){if(r.error){alert("Could not save the colour. Run the Stage 14 SQL in Supabase first.");return}c.color=k[0];closeDetail();render()})});sw.appendChild(b)});
+  cl.appendChild(sw);p.appendChild(cl);
   var ex=btn("Download as CSV (opens in Excel)","btn alt",function(){var cols=invCols(c);downloadCsv("inventory-"+c.name.replace(/[^\w-]+/g,"_")+".csv",[cols.map(function(x){return x.n})].concat(invRows(c).map(function(r){return cols.map(function(x){return invVal(r,x.k)})})))});ex.style.cssText="display:block;margin-top:16px";p.appendChild(ex);
   var n=invItems.filter(function(r){return r.cat_id===c.id}).length,dz=el("div","actions");dz.style.marginTop="22px";dz.appendChild(el("span"));
   dz.appendChild(btn("Delete category","btn danger",function(){if(!confirm('Delete "'+c.name+'" and its '+n+" row"+(n===1?"":"s")+" for good?"))return;sb.from("inventory_cats").delete().eq("id",c.id).then(function(r){if(r.error){alert("Could not delete.");return}invCats=invCats.filter(function(x){return x.id!==c.id});invItems=invItems.filter(function(x){return x.cat_id!==c.id});invCat=null;closeDetail();render()})}));p.appendChild(dz)}

@@ -52,7 +52,9 @@ textarea{min-height:110px;resize:vertical}
 .tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}
 .tab{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 14px;white-space:nowrap;cursor:pointer;font-weight:600;color:var(--muted)}
 .tab.on{background:var(--forest);border-color:var(--forest);color:#fff}
-.tab span{font-weight:400;opacity:.8;margin-left:4px}
+.tab span{font-weight:400;opacity:.8;margin-left:4px}.tab.ctab span{opacity:.9}.tab.ctab.on{box-shadow:0 0 0 2px #fff,0 0 0 4px #1f2a1f;font-weight:800}
+.invchip{display:inline-block;border:1px solid transparent;border-radius:999px;padding:3px 12px;font-weight:700;font-size:.92rem}.invhead{margin:2px 0 8px}
+.swatches{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.sw{width:44px;height:36px;border-radius:8px;border:2px solid transparent;font-weight:800;cursor:pointer}.sw.on{border-color:#1f2a1f;box-shadow:0 0 0 2px #fff inset}
 .bar{display:flex;gap:10px;margin-bottom:12px}
 .list{display:grid;gap:10px}
 .row{display:grid;grid-template-columns:1fr auto;gap:4px 12px;background:#fff;border:1px solid var(--line);border-left:5px solid var(--leaf);border-radius:10px;padding:12px 14px;cursor:pointer;text-align:left;width:100%}
@@ -260,7 +262,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=30"></script>
+<script src="app.js?v=31"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
