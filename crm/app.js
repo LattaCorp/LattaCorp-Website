@@ -1897,10 +1897,10 @@ function drawInvBody(body){
   if(invCat==="all"){body.appendChild(invAllGrid(invVisible(),t));return}
   if(t.length){var any=false;
     invVisible().forEach(function(c){var rows=invRows(c).filter(function(r){return invHas(c,r,t)});if(!rows.length)return;any=true;
-      var h=el("div",null);h.appendChild(invChip(c));h.appendChild(document.createTextNode(" "+rows.length+" match"+(rows.length>1?"es":"")+" (tap to open this sheet)"));h.style.cssText="font-weight:700;color:var(--forest);margin:14px 0 4px;cursor:pointer";h.addEventListener("click",function(){invCat=c.id;invq="";render()});
+      var h=el("div",null,c.name+" · "+rows.length+" match"+(rows.length>1?"es":"")+" (tap to open this sheet)");h.style.cssText="font-weight:700;margin:14px 0 4px;cursor:pointer;padding:8px 14px;border-radius:8px";invPaint(h,c);h.addEventListener("click",function(){invCat=c.id;invq="";render()});
       body.appendChild(h);body.appendChild(invGrid(c,rows,true))});
     if(!any)body.appendChild(el("div","empty","Nothing in your inventory matches that."));return}
-  var c=byId(invVisible(),invCat);if(c){var hd=el("div","invhead");hd.appendChild(invChip(c));body.appendChild(hd);body.appendChild(invGrid(c,invRows(c),false))}}
+  var c=byId(invVisible(),invCat);if(c){var hd=el("div","invhead",c.name+" · "+invRows(c).length+" item"+(invRows(c).length===1?"":"s"));invPaint(hd,c);body.appendChild(hd);body.appendChild(invGrid(c,invRows(c),false))}}
 /* "All inventory": every item from every category in one sheet. Columns are matched by name; a cell is greyed out when an item's category doesn't have that column. */
 function invAllGrid(cats,t){
   var names=[],info={};cats.forEach(function(c){invCols(c).forEach(function(col){var k=col.n.toLowerCase();if(names.indexOf(k)<0){names.push(k);info[k]={n:col.n,t:col.t}}})});
@@ -1918,7 +1918,7 @@ function invAllGrid(cats,t){
   var th_=document.createElement("thead");th_.appendChild(hr);tbl.appendChild(th_);
   var tb=document.createElement("tbody");
   rows.forEach(function(x,ri){var c=x[0],r=x[1],tr=document.createElement("tr");tr.appendChild(el("td","rn",String(ri+1)));
-    var cd=document.createElement("td"),cb=btn(c.name,"hcol",function(){invCat=c.id;invq="";render()});cb.title="Open the "+c.name+" sheet";cb.className="hcol invchip";cb.style.cssText="margin:4px 8px;cursor:pointer;font:inherit;font-weight:700";invPaint(cb,c);cd.appendChild(cb);tr.appendChild(cd);
+    var cd=document.createElement("td"),cb=btn(c.name,"hcol",function(){invCat=c.id;invq="";render()});cb.title="Open the "+c.name+" sheet";cb.className="hcol";cb.style.cssText="display:block;width:100%;height:100%;min-height:36px;padding:8px 10px;text-align:left;background:transparent;color:inherit;border:0;border-radius:0;cursor:pointer;font:inherit;font-weight:700";invPaint(cd,c);cd.style.padding="0";cd.appendChild(cb);tr.appendChild(cd);
     names.forEach(function(k){var td=document.createElement("td"),col=cellOf(c,k);
       if(!col){td.style.background="#f1f3f0";tr.appendChild(td);return}
       var inp=document.createElement("input");inp.type="text";inp.value=invVal(r,col.k);inp.dataset.v=inp.value;inp.dataset.r=r.id;inp.dataset.k=col.k;inp.dataset.n=k;inp.setAttribute("aria-label",info[k].n);inp.autocomplete="off";if(col.t==="number"){inp.inputMode="decimal";inp.className="num"}
