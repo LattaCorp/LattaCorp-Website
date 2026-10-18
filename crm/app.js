@@ -1110,7 +1110,16 @@ function openExpPaste(){
   go.style.marginTop="8px";p.appendChild(go)}
 
 /* ---- Reports > Tax Report ---- */
-function printReport(){document.body.classList.add("printreport");setTimeout(function(){window.print();setTimeout(function(){document.body.classList.remove("printreport")},800)},60)}
+/* One-page print: lay the report out landscape and shrink it (zoom) until the whole page fits on one sheet. */
+function printReport(){
+  document.body.classList.add("printreport");
+  var ps=document.createElement("style");ps.textContent="@page{size:landscape;margin:8mm}";document.head.appendChild(ps);
+  setTimeout(function(){
+    var tp=document.querySelector(".taxpage");
+    if(tp){var W=990,H=725,lo=.3,hi=1,z=1;for(var i=0;i<12;i++){z=(lo+hi)/2;tp.style.zoom="";tp.style.width=Math.round(W/z)+"px";if(tp.offsetHeight*z<=H)lo=z;else hi=z}
+      z=lo;tp.style.width=Math.round(W/z)+"px";tp.style.zoom=String(z)}
+    window.print();
+    setTimeout(function(){document.body.classList.remove("printreport");ps.remove();if(tp){tp.style.zoom="";tp.style.width=""}},800)},80)}
 var TAX_ROWS=[["New Blowers","N.B"],["New Chainsaws","N.C"],["New Edgers","N.E"],["New Hand Tools","N.HT"],["New Mowers","N.M"],["New Trimmers","N.T"]];
 var TAX_OLD=[["Blowers"],["Chainsaws"],["Edgers"],["Hand Tools"],["Mowers"],["Trimmers"]];
 var TAX_COLS=["Category","Code","SN","Purchase date","Totals"];
@@ -1125,15 +1134,43 @@ function ensureTaxSheets(){
     if(adopt)return sb.from("inventory_cats").update({kind:x[0],name:x[1]}).eq("id",adopt.id).then(function(r){if(r.error)return Promise.reject("Run the Stage 13 SQL in Supabase first.");adopt.kind=x[0];adopt.name=x[1]});
     return makeSheet(x[1],["",TAX_COLS,x[3]],x[0]).then(function(){},function(m){return Promise.reject(m)})})},Promise.resolve()).then(function(){taxMaking=false;return true},function(m){taxMaking=false;taxErr=String(m||"Could not set up the equipment lists.");return true})}
 var taxErr="";
+function invDateYear(s){var d=parseDateLoose(s);if(d)return+d.slice(0,4);var m=String(s||"").match(/(?:^|\D)((?:19|20)\d{2})(?:\D|$)/);return m?+m[1]:null}
+/* Every inventory category in one small box: how many items, what was bought in the tax year, what is older (older = light red so the accountant can tell). */
+function inventorySummaryBox(year){
+  var y=+year,box=el("div","taxbox"),t=document.createElement("table"),hr=document.createElement("tr");
+  ["Category","Items","Bought "+year,"Older"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i)th.className="r";hr.appendChild(th)});t.appendChild(hr);
+  var tn=0,tNew=0,tOld=0,tUn=0,later=0;
+  invVisible().forEach(function(c){var n=0,nw=0,od=0,un=0;
+    invRows(c).forEach(function(r){var dc=invAllCol(c,"purchase date",r),pc=invAllCol(c,"price",r),yr=dc?invDateYear(invVal(r,dc.k)):null,pr=pc?(invNumber(invVal(r,pc.k))||0):0;
+      if(yr!=null&&yr>y){later++;return}n++;if(yr==null)un+=pr;else if(yr===y)nw+=pr;else od+=pr});
+    if(!n)return;tn+=n;tNew+=nw;tOld+=od;tUn+=un;
+    var tr=document.createElement("tr");[[c.name,""],[String(n),"r"],[nw?m2(nw):"","r"],[od?m2(od):"","r old"]].forEach(function(x,i){var td=document.createElement("td");td.textContent=x[0];if(x[1])td.className=x[1];if(i===0)invPaint(td,c);tr.appendChild(td)});t.appendChild(tr)});
+  if(!tn){var e=document.createElement("tr"),ed=document.createElement("td");ed.colSpan=4;ed.textContent="No inventory items yet.";e.appendChild(ed);t.appendChild(e)}
+  var ft=document.createElement("tr");ft.className="tot";[["Total",""],[String(tn),"r"],[m2(r2(tNew)),"r"],[m2(r2(tOld)),"r old"]].forEach(function(x){var td=document.createElement("td");td.textContent=x[0];if(x[1])td.className=x[1];ft.appendChild(td)});t.appendChild(ft);
+  box.appendChild(t);
+  var nt=[];nt.push("Light red = bought before "+year+" (older equipment).");if(tUn)nt.push("Items with no purchase date: "+m2(r2(tUn))+" (not in the columns above).");if(later)nt.push(later+" item"+(later>1?"s":"")+" bought after "+year+" not shown.");
+  box.appendChild(el("div","taxnote",nt.join(" ")));return box}
+/* Reserved spot for employee pay (filled in once the Employee Pay feature is built). */
+function employeeBox(year){
+  var box=el("div","taxbox"),t=document.createElement("table"),hr=document.createElement("tr");
+  ["Employee","Regular","Overtime","Total"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i)th.className="r";hr.appendChild(th)});t.appendChild(hr);
+  for(var i=0;i<4;i++){var tr=document.createElement("tr");for(var j=0;j<4;j++){var td=document.createElement("td");td.innerHTML="&nbsp;";if(j)td.className="r";tr.appendChild(td)}t.appendChild(tr)}
+  var ft=document.createElement("tr");ft.className="tot";["Total employee pay","","",""].forEach(function(x,i){var td=document.createElement("td");td.textContent=x;if(i)td.className="r";ft.appendChild(td)});t.appendChild(ft);
+  box.appendChild(t);box.appendChild(el("div","taxnote tax-noprint","Reserved spot: employee hours and pay for "+year+" will fill in here once Employee Pay is added."));return box}
 function renderTaxReport(list){
-  var tb=$("topbtns");tb.appendChild(btn("Print / Save PDF","btn",printReport));tb.appendChild(document.createTextNode(" "));
+  var tb=$("topbtns");tb.appendChild(btn("Print / Save PDF (one page)","btn",printReport));tb.appendChild(document.createTextNode(" "));
   tb.appendChild(btn("Expenses CSV","btn alt",function(){downloadCsv("expenses_"+taxYear+".csv",expCsv(expInYear(taxYear)))}));
   var bar=el("div","invbar tax-noprint"),ys=fld("Tax year","select",taxYear,expYears(taxYear).map(function(y){return[y,y]}));ys.style.cssText="margin:0;min-width:130px";ys.input.addEventListener("change",function(){taxYear=ys.input.value;render()});bar.appendChild(ys);
-  bar.appendChild(el("span","note","Expense totals include tax. Equipment lists below are editable. Click a cell to type, or use Sheet settings to rename."));list.appendChild(bar);
-  var h=el("h2",null,"Tax Report · "+taxYear);h.className="taxh";list.appendChild(h);
+  bar.appendChild(el("span","note","Everything is on one page. Expense totals include tax. Equipment lists are editable: click a cell to type."));list.appendChild(bar);
+  var pg=el("div","taxpage");list.appendChild(pg);
+  pg.appendChild(el("h2","taxh","Tax Report · "+taxYear+" · LattaCorp of Central Florida"));
+  var grid=el("div","taxgrid");pg.appendChild(grid);var c1=el("div"),c2=el("div"),c3=el("div");grid.appendChild(c1);grid.appendChild(c2);grid.appendChild(c3);
   var s1=el("div","taxsec");s1.appendChild(el("h3",null,"Expenses"));
-  if(expErr)s1.appendChild(el("div","note","Expenses aren't set up yet (Stage 9 SQL)."));else s1.appendChild(expenseBox(taxYear));list.appendChild(s1);
-  var host=el("div");list.appendChild(host);
+  if(expErr)s1.appendChild(el("div","note","Expenses aren't set up yet (Stage 9 SQL)."));else s1.appendChild(expenseBox(taxYear));c1.appendChild(s1);
+  var s3=el("div","taxsec");s3.appendChild(el("h3",null,"Employee pay"));s3.appendChild(employeeBox(taxYear));c3.appendChild(s3);
+  var s4=el("div","taxsec");s4.appendChild(el("h3",null,"Inventory"));
+  if(invErr)s4.appendChild(el("div","note","Run the Stage 12 SQL (Inventory) in Supabase."));else s4.appendChild(inventorySummaryBox(taxYear));c3.appendChild(s4);
+  var host=c2;
   if(invErr){host.appendChild(el("div","note","Run the Stage 12 SQL (Inventory) and Stage 13 SQL in Supabase to turn on the equipment lists."));return}
   function drawSheets(){
     host.textContent="";
