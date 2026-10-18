@@ -1846,9 +1846,9 @@ function openEstimate(id){
 function setEstTotal(e,total,cb){sb.from("estimates").update({total:total}).eq("id",e.id).then(function(r){if(r.error){alert("Could not update the total.");return}e.total=total;render();cb()})}
 
 /* ---- Inventory: Excel-style sheets with your own categories and columns ---- */
-var INV_PRESETS=[["Blank sheet",["Item","Qty","Notes"]],["Equipment",["Item","Qty","Serial number","Condition","Location","Notes"]],["Supplies",["Item","Qty","Unit","Min","Cost","Location"]]];
+var INV_PRESETS=[["Blank sheet",["Item","Qty","Notes"]],["Equipment",["Item","Qty","Serial number","Condition","Location","Notes"]],["Supplies",["Item","Qty","Unit","Min","Cost","Location"]],["Equipment & vehicles (brand, model, serial, VIN)",["Brand","Model","Model #","Serial #","Price","Purchase Date","Vin #","Plate","Year"]]];
 function invKey(){return"c"+Math.random().toString(36).slice(2,8)}
-function invColType(n){return/^(qty|quantity|min|cost|price|count|totals?( for each)?|amount|hours)$/i.test(n)?"number":"text"}
+function invColType(n){return/^(qty|quantity|min|cost|price|paid|count|totals?( for each)?|amount|hours)$/i.test(n)?"number":"text"}
 function invCols(c){return Array.isArray(c.columns)?c.columns:[]}
 function invRows(c){return invItems.filter(function(r){return r.cat_id===c.id}).sort(function(a,b){return((a.sort||0)-(b.sort||0))||(String(a.created_at)<String(b.created_at)?-1:1)})}
 function invVal(r,k){var v=r.data&&r.data[k];return v==null?"":String(v)}
@@ -1904,13 +1904,19 @@ function drawInvBody(body){
     if(!any)body.appendChild(el("div","empty","Nothing in your inventory matches that."));return}
   var c=byId(invVisible(),invCat);if(c){var hd=el("div","invhead",c.name+" · "+invRows(c).length+" item"+(invRows(c).length===1?"":"s"));invPaint(hd,c);body.appendChild(hd);body.appendChild(invGrid(c,invRows(c),false))}}
 /* "All inventory": every item from every category in one sheet. Columns are matched by name; a cell is greyed out when an item's category doesn't have that column. */
+/* The All sheet shows only these columns. Older names in your category sheets are matched to them (Series->Model, Paid / Purchase Price->Price, Purchased->Purchase Date, VIN->Vin #). */
+var ALL_COLS=[["Brand",["brand"],"text"],["Model",["model","series"],"text"],["Model #",["model #","model no","model no.","model number"],"text"],["Serial #",["serial #","serial no","serial no.","serial number"],"text"],["Price",["price","purchase price","paid","cost"],"number"],["Purchase Date",["purchase date","purchased","purcased","purchased on","date purchased"],"text"],["Vin #",["vin #","vin","vin no","vin number"],"text"],["Plate",["plate","plate #","license plate","tag"],"text"],["Year",["year"],"text"]];
+function invNorm(n){return String(n||"").toLowerCase().replace(/\s*#\s*/g," # ").replace(/\s+/g," ").trim()}
+function invAllCol(c,k,r){var a=ALL_COLS.filter(function(x){return x[0].toLowerCase()===k})[0],cols=invCols(c),m=[];if(!a)return null;
+  a[1].forEach(function(al){cols.forEach(function(x){if(invNorm(x.n)===al&&m.indexOf(x)<0)m.push(x)})});
+  if(r)for(var i=0;i<m.length;i++)if(invVal(r,m[i].k)!=="")return m[i];return m[0]||null}
 function invAllGrid(cats,t){
-  var names=[],info={};cats.forEach(function(c){invCols(c).forEach(function(col){var k=col.n.toLowerCase();if(names.indexOf(k)<0){names.push(k);info[k]={n:col.n,t:col.t}}})});
+  var names=ALL_COLS.map(function(x){return x[0].toLowerCase()}),info={};ALL_COLS.forEach(function(x){info[x[0].toLowerCase()]={n:x[0],t:x[2]}});
   var rows=[];cats.forEach(function(c){invRows(c).forEach(function(r){if(!t.length||invHas(c,r,t))rows.push([c,r])})});
   var box=el("div"),wrap=el("div","invwrap"),tbl=document.createElement("table");tbl.className="invgrid";
-  function cellOf(c,k){return invCols(c).filter(function(x){return x.n.toLowerCase()===k})[0]}
+  function cellOf(c,k,r){return invAllCol(c,k,r)}
   if(invSort&&invSort.cat==="all"){var sk=invSort.k;rows.sort(function(a,b){var x,y,r;
-    if(sk==="__cat"){x=a[0].name.toLowerCase();y=b[0].name.toLowerCase()}else{var ca=cellOf(a[0],sk),cb=cellOf(b[0],sk);x=ca?invVal(a[1],ca.k):"";y=cb?invVal(b[1],cb.k):"";
+    if(sk==="__cat"){x=a[0].name.toLowerCase();y=b[0].name.toLowerCase()}else{var ca=cellOf(a[0],sk,a[1]),cb=cellOf(b[0],sk,b[1]);x=ca?invVal(a[1],ca.k):"";y=cb?invVal(b[1],cb.k):"";
       if(info[sk].t==="number"){var nx=invNumber(x),ny=invNumber(y);if(nx==null||ny==null)return nx==null&&ny==null?0:(nx==null?1:-1);return invSort.dir*(nx-ny)}x=x.toLowerCase();y=y.toLowerCase()}
     r=x<y?-1:x>y?1:0;return invSort.dir*r})}
   var hr=document.createElement("tr");hr.appendChild(el("th","rn","#"));
@@ -1921,7 +1927,7 @@ function invAllGrid(cats,t){
   var tb=document.createElement("tbody");
   rows.forEach(function(x,ri){var c=x[0],r=x[1],tr=document.createElement("tr");tr.appendChild(el("td","rn",String(ri+1)));
     var cd=document.createElement("td"),cb=btn(c.name,"hcol",function(){invCat=c.id;invq="";render()});cb.title="Open the "+c.name+" sheet";cb.className="hcol";cb.style.cssText="display:block;width:100%;height:100%;min-height:36px;padding:8px 10px;text-align:left;background:transparent;color:inherit;border:0;border-radius:0;cursor:pointer;font:inherit;font-weight:700";invPaint(cd,c);cd.style.padding="0";cd.appendChild(cb);tr.appendChild(cd);
-    names.forEach(function(k){var td=document.createElement("td"),col=cellOf(c,k);
+    names.forEach(function(k){var td=document.createElement("td"),col=cellOf(c,k,r);
       if(!col){td.style.background="#f1f3f0";tr.appendChild(td);return}
       var inp=document.createElement("input");inp.type="text";inp.value=invVal(r,col.k);inp.dataset.v=inp.value;inp.dataset.r=r.id;inp.dataset.k=col.k;inp.dataset.n=k;inp.setAttribute("aria-label",info[k].n);inp.autocomplete="off";if(col.t==="number"){inp.inputMode="decimal";inp.className="num"}
       inp.addEventListener("change",function(){invCommit(inp)});inp.addEventListener("focus",function(){inp.select()});
@@ -1936,7 +1942,7 @@ function invAllGrid(cats,t){
   if(!rows.length)box.appendChild(el("div","empty",t.length?"Nothing in your inventory matches that.":"No items yet. Open a category tab and add a row, or add one below."));
   var acts=el("div","invacts"),sel=document.createElement("select");sel.style.cssText="width:auto";cats.forEach(function(c){var o=document.createElement("option");o.value=c.id;o.textContent=c.name;sel.appendChild(o)});
   acts.appendChild(el("span","note","Add an item to:"));acts.appendChild(sel);acts.appendChild(btn("+ Add row","btn sm",function(){var c=byId(cats,sel.value);if(!c)return;invq="";invCat=c.id;addInvRow(c)}));
-  acts.appendChild(el("span","note","Greyed cells mean that category doesn't have that column. Click a category name to open its sheet."));box.appendChild(acts);
+  acts.appendChild(el("span","note","Shows Brand, Model, Model #, Serial #, Price, Purchase Date, Vin #, Plate and Year. Other columns are on each category's own sheet. Greyed cells mean that category has no such column. Click a category to open its sheet."));box.appendChild(acts);
   return box}
 function invCommit(inp){
   if(inp.value===inp.dataset.v)return Promise.resolve();
@@ -2031,7 +2037,7 @@ function makeSheet(name,pre,kind){
 function openInvCatForm(){
   if(invErr){alert("Run the Stage 12 SQL in Supabase first, then press Refresh.");return}
   var p=panel();p.appendChild(el("h2",null,"New category"));p.appendChild(el("p","note","A category is a sheet, like a tab in Excel. You can add, rename and reorder columns afterwards."));
-  var nm=fld("Category name (for example: Equipment, Chemicals, Fuel & Oil)","text",""),st=fld("Start with","select","1",INV_PRESETS.map(function(x,i){return[String(i),x[0]+" ("+x[1].join(", ")+")"]}));p.appendChild(nm);p.appendChild(st);
+  var nm=fld("Category name (for example: Equipment, Chemicals, Fuel & Oil)","text",""),st=fld("Start with","select","3",INV_PRESETS.map(function(x,i){return[String(i),x[0]+" ("+x[1].join(", ")+")"]}));p.appendChild(nm);p.appendChild(st);
   var go=btn("Create category","btn",function(){var n=nm.input.value.trim();if(!n){alert("Give the category a name.");return}
     if(invCats.some(function(x){return x.name.toLowerCase()===n.toLowerCase()})){alert("You already have a category with that name.");return}
     go.disabled=true;makeSheet(n,INV_PRESETS[parseInt(st.input.value,10)]).then(function(c){invCat=c.id;invq="";closeDetail();render()},function(msg){go.disabled=false;alert(msg)})});
