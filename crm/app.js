@@ -955,6 +955,7 @@ function renderExpensesView(){
     var hd=el("div","note",rows.length+" expense"+(rows.length===1?"":"s")+" · Amount "+m2(r2(sn))+" · Tax "+m2(r2(st))+" · Total "+m2(r2(sT)));hd.style.cssText="font-weight:700;margin:12px 0 6px";body.appendChild(hd);
     if(!rows.length){body.appendChild(el("div","empty",expenses.length?"Nothing matches. Try another year or category.":"No expenses yet. Tap + Add expense, Scan receipt, or Paste from Excel."));return}
     var wrap=el("div","invwrap"),t2=document.createElement("table");t2.className="exgrid";
+    var cg=document.createElement("colgroup");[4.5,8.5,9,20.5,14.5,7.5,11,8.5,7,8.5].forEach(function(w){var c=document.createElement("col");c.style.width=w+"%";cg.appendChild(c)});t2.appendChild(cg);
     var hr=document.createElement("tr");LCOLS.forEach(function(c,i){var th=document.createElement("th");if(i>=7)th.className="num";
       if(c==="Date"){var b=btn("Date "+(exSort<0?"▼":"▲"),"hcol",function(){exSort=-exSort;draw()});th.appendChild(b)}else th.textContent=c;hr.appendChild(th)});
     var th_=document.createElement("thead");th_.appendChild(hr);t2.appendChild(th_);
@@ -975,7 +976,7 @@ function openExpense(e,pre,scanFile){
   var codes={},vendors={};expenses.forEach(function(x){if(x.code)codes[x.code]=1;if(x.vendor)vendors[x.vendor]=1});
   function dl(id,obj){var d=document.createElement("datalist");d.id=id;Object.keys(obj).sort().forEach(function(k){var o=document.createElement("option");o.value=k;d.appendChild(o)});p.appendChild(d)}
   dl("exCodes",codes);dl("exVendors",vendors);
-  var code=fld("Code","text",src.code||""),dt=fld("Date","date",e?e.spent_on:(pre.date||today()));code.input.setAttribute("list","exCodes");
+  var code=fld("Code (up to 4 characters)","text",src.code||""),dt=fld("Date","date",e?e.spent_on:(pre.date||today()));code.input.setAttribute("list","exCodes");code.input.maxLength=4;
   var g1=el("div","grid2");g1.appendChild(code);g1.appendChild(dt);p.appendChild(g1);
   var ve=fld("Vendor","text",src.vendor||"");ve.input.setAttribute("list","exVendors");p.appendChild(ve);
   var no=fld("Description","text",e?e.note:(pre.description||""));p.appendChild(no);
