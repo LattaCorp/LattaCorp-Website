@@ -1632,9 +1632,13 @@ function openEstimate(id){
 function setEstTotal(e,total,cb){sb.from("estimates").update({total:total}).eq("id",e.id).then(function(r){if(r.error){alert("Could not update the total.");return}e.total=total;render();cb()})}
 
 /* ---- Inventory: Excel-style sheets with your own categories and columns ---- */
-var INV_PRESETS=[["Blank sheet",["Item","Qty","Notes"]],["Equipment",["Item","Qty","Serial number","Condition","Location","Notes"]],["Supplies",["Item","Qty","Unit","Min","Cost","Location"]]];
+var EXP_LIST=["Chemicals","Dump/Recycling","Entertainment","Equipment","Equipment Repairs & Maintenance","Fuel","Groceries","Insurance","Licensing & Permits","Meal","Office Repairs & Maintenance","Office Supplies","Postage & Shipping","Repairs & Maintenance","Safety Supplies","Supplies","Tools","Transportation","Travel","Uniform","Vehicle Repairs & Maintenance"];
+var INV_PRESETS=[["Blank sheet",["Item","Qty","Notes"]],["Equipment",["Item","Qty","Serial number","Condition","Location","Notes"]],["Supplies",["Item","Qty","Unit","Min","Cost","Location"]],
+ ["Year-end: New equipment purchases (template, no prices)",["Category","Code","SN","Purchase date","Totals"],[["New Blowers","N.B"],["New Chainsaws","N.C"],["New Edgers","N.E"],["New Hand Tools","N.HT"],["New Mowers","N.M"],["New Trimmers","N.T"]],"New Equipment Purchases"],
+ ["Year-end: Expenses by category (template, no prices)",["Category","Totals for each"],EXP_LIST.map(function(x){return[x]}),"Expenses by Category"],
+ ["Year-end: Income summary (template, no prices)",["Item","Amount"],[["Bad Debt"],["Total Income"],["Employee Payments"],["Expenses"]],"Income Summary"]];
 function invKey(){return"c"+Math.random().toString(36).slice(2,8)}
-function invColType(n){return/^(qty|quantity|min|cost|price|count|total|amount|hours)$/i.test(n)?"number":"text"}
+function invColType(n){return/^(qty|quantity|min|cost|price|count|totals?( for each)?|amount|hours)$/i.test(n)?"number":"text"}
 function invCols(c){return Array.isArray(c.columns)?c.columns:[]}
 function invRows(c){return invItems.filter(function(r){return r.cat_id===c.id}).sort(function(a,b){return((a.sort||0)-(b.sort||0))||(String(a.created_at)<String(b.created_at)?-1:1)})}
 function invVal(r,k){var v=r.data&&r.data[k];return v==null?"":String(v)}
@@ -1725,7 +1729,7 @@ function invGrid(c,rows,searching){
   cols.forEach(function(col){var td=document.createElement("td");td.className="foot"+(col.t==="number"?" num":"");fc[col.k]=td;fr.appendChild(td)});fr.appendChild(el("td","xc",""));tf.appendChild(fr);t.appendChild(tf);
   t._foot=function(){cols.forEach(function(col,i){var td=fc[col.k];
     if(col.t==="number"){var sum=0,n=0;vr.forEach(function(r){var v=invNumber(invVal(r,col.k));if(v!=null){sum+=v;n++}});td.textContent=n?String(Math.round(sum*100)/100):""}
-    else td.textContent=i===0?vr.length+" row"+(vr.length===1?"":"s"):""})};t._foot();
+    else td.textContent=i===0?"Overall total · "+vr.length+" row"+(vr.length===1?"":"s"):""})};t._foot();
   wrap.appendChild(t);box.appendChild(wrap);
   if(!searching){
     var acts=el("div","invacts");acts.appendChild(btn("+ Add row","btn sm",function(){addInvRow(c)}));acts.appendChild(btn("+ Add column","btn alt sm",function(){openInvCol(c,null)}));
@@ -1747,14 +1751,28 @@ function openInvCol(c,col){
     function move(d){var a=cols.slice(),x=a.splice(i,1)[0];a.splice(i+d,0,x);saveCols(c,a)}
     if(i>0)mv.appendChild(btn("← Move left","btn alt sm",function(){move(-1)}));if(i<cols.length-1)mv.appendChild(btn("Move right →","btn alt sm",function(){move(1)}));p.appendChild(mv);
     if(cols.length>1){var dz=el("div","actions");dz.style.marginTop="18px";dz.appendChild(el("span"));dz.appendChild(btn("Delete column","btn danger",function(){if(!confirm('Delete the "'+col.n+'" column? Its values are removed from view.'))return;saveCols(c,cols.filter(function(x){return x!==col}))}));p.appendChild(dz)}}}
+function makeSheet(name,pre){
+  var cols=pre[1].map(function(x){return{k:invKey(),n:x,t:invColType(x)}}),mx=invCats.reduce(function(m,x){return Math.max(m,x.sort||0)},0);
+  return sb.from("inventory_cats").insert({name:name,columns:cols,sort:mx+1}).select().single().then(function(r){
+    if(r.error||!r.data)return Promise.reject("Could not create it. Did you run the Stage 12 SQL?");
+    var cat=r.data;invCats.push(cat);
+    var rows=(pre[2]||[]).map(function(vals,i){var d={};vals.forEach(function(v,j){if(v)d[cols[j].k]=v});return{cat_id:cat.id,data:d,sort:i+1}});
+    if(!rows.length)return cat;
+    return sb.from("inventory_items").insert(rows).select().then(function(r2_){if(r2_.error)return Promise.reject("The sheet was made but its starting rows could not be added.");(r2_.data||[]).forEach(function(x){invItems.push(x)});return cat})})}
 function openInvCatForm(){
   if(invErr){alert("Run the Stage 12 SQL in Supabase first, then press Refresh.");return}
-  var p=panel();p.appendChild(el("h2",null,"New category"));p.appendChild(el("p","note","A category is a sheet, like a tab in Excel. You can add, rename and reorder columns afterwards."));
-  var nm=fld("Category name (for example: Equipment, Chemicals, Fuel & Oil)","text",""),st=fld("Start with","select","1",INV_PRESETS.map(function(x,i){return[String(i),x[0]+" ("+x[1].join(", ")+")"]}));p.appendChild(nm);p.appendChild(st);
-  var go=btn("Create category","btn",function(){var n=nm.input.value.trim();if(!n){alert("Give the category a name.");return}
-    if(invCats.some(function(x){return x.name.toLowerCase()===n.toLowerCase()})){alert("You already have a category with that name.");return}
-    var cols=INV_PRESETS[parseInt(st.input.value,10)][1].map(function(x){return{k:invKey(),n:x,t:invColType(x)}}),mx=invCats.reduce(function(m,x){return Math.max(m,x.sort||0)},0);
-    go.disabled=true;sb.from("inventory_cats").insert({name:n,columns:cols,sort:mx+1}).select().single().then(function(r){go.disabled=false;if(r.error||!r.data){alert("Could not create it. Did you run the Stage 12 SQL?");return}invCats.push(r.data);invCat=r.data.id;invq="";closeDetail();render()})});
+  var p=panel();p.appendChild(el("h2",null,"New category"));p.appendChild(el("p","note","A category is a sheet, like a tab in Excel. You can add, rename and reorder columns afterwards. The year-end templates come with your usual rows and no prices."));
+  var opts=INV_PRESETS.map(function(x,i){return[String(i),x[0]+" ("+x[1].join(", ")+")"]}).concat([["set","Year-end totals: all 3 templates at once (equipment purchases, expenses by category, income summary)"]]);
+  var nm=fld("Category name (for example: Equipment, Chemicals, Fuel & Oil)","text",""),st=fld("Start with","select","1",opts);p.appendChild(st);p.appendChild(nm);
+  st.input.addEventListener("change",function(){var pr=INV_PRESETS[parseInt(st.input.value,10)];nm.hidden=st.input.value==="set";if(pr&&pr[3])nm.input.value=pr[3]});
+  var go=btn("Create","btn",function(){
+    var set=st.input.value==="set",n=nm.input.value.trim();
+    var todo=set?INV_PRESETS.filter(function(x){return x[3]}).map(function(x){return[x[3],x]}):[[n,INV_PRESETS[parseInt(st.input.value,10)]]];
+    if(!set&&!n){alert("Give the category a name.");return}
+    var dup=todo.filter(function(t){return invCats.some(function(x){return x.name.toLowerCase()===t[0].toLowerCase()})})[0];
+    if(dup){alert('You already have a category named "'+dup[0]+'". Pick another name or rename the old one.');return}
+    go.disabled=true;var last=null;
+    todo.reduce(function(pr,t){return pr.then(function(){return makeSheet(t[0],t[1]).then(function(c){last=c})})},Promise.resolve()).then(function(){invCat=(set?invCats.filter(function(x){return x.name===todo[0][0]})[0]:last).id;invq="";closeDetail();render()},function(msg){go.disabled=false;alert(msg);render()})});
   go.style.marginTop="12px";p.appendChild(go)}
 function openInvCat(c){
   var p=panel();p.appendChild(el("h2",null,c.name+" · sheet settings"));
