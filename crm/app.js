@@ -1869,8 +1869,10 @@ function invColorMap(){
   vis.forEach(function(c){if(m[c.id])return;var f=INV_COLORS.filter(function(x){return!used[x[0]]})[0]||INV_COLORS[(Object.keys(m).length)%INV_COLORS.length];used[f[0]]=1;m[c.id]=f});
   return m}
 function invCol_(c){return invColorMap()[c.id]||INV_COLORS[0]}
-function invPaint(node,c){var k=invCol_(c);node.style.background=k[1];node.style.color=k[2];node.style.borderColor=k[1];return node}
-function invChip(c){var ch=el("span","invchip",c.name);return invPaint(ch,c)}
+function invTint(k,solid){if(solid)return k[1];var a=k[2]==="#ffffff"?.2:.5,h=k[1],r=parseInt(h.substr(1,2),16),g=parseInt(h.substr(3,2),16),b=parseInt(h.substr(5,2),16);return"rgba("+r+","+g+","+b+","+a+")"}
+/* Muted look: a see-through tint with normal dark text, plus a thin solid edge in the full colour. Never touches the cell's own grid-line border. */
+function invPaint(node,c,pill){var k=invCol_(c);node.style.background=invTint(k);node.style.color="#1f2a1f";if(pill)node.style.borderColor=k[1];else node.style.boxShadow="inset 4px 0 0 "+k[1];return node}
+function invChip(c){var ch=el("span","invchip",c.name);return invPaint(ch,c,true)}
 /* Save the automatic colours so they never change when a category is added or deleted (needs the Stage 14 column). */
 function ensureInvColors(){
   if(!invCats.length||!("color" in invCats[0]))return;var m=invColorMap();
@@ -1885,7 +1887,7 @@ function renderInventory(){
   var tb=[];
   function paintTabs(){var on=invToks(invq).length===0;tb.forEach(function(x){x[1].className="tab"+(x[0].id==="all"?"":" ctab")+((x[0].id==="all"?invCat==="all":(on&&x[0].id===invCat))?" on":"")})}
   var ab_=el("button","tab","All inventory");ab_.type="button";ab_.appendChild(el("span",null,"("+invItems.filter(function(r){return vis.some(function(c){return c.id===r.cat_id})}).length+")"));ab_.addEventListener("click",function(){invCat="all";render()});tabs.appendChild(ab_);tb.push([{id:"all"},ab_]);
-  vis.forEach(function(c){var n=invItems.filter(function(r){return r.cat_id===c.id}).length,b=el("button","tab",c.name);b.type="button";b.appendChild(el("span",null,"("+n+")"));invPaint(b,c);b.addEventListener("click",function(){invCat=c.id;invq="";render()});tabs.appendChild(b);tb.push([c,b])});
+  vis.forEach(function(c){var n=invItems.filter(function(r){return r.cat_id===c.id}).length,b=el("button","tab",c.name);b.type="button";b.appendChild(el("span",null,"("+n+")"));invPaint(b,c,true);b.addEventListener("click",function(){invCat=c.id;invq="";render()});tabs.appendChild(b);tb.push([c,b])});
   ensureInvColors();
   var bar=el("div","invbar"),si=document.createElement("input");si.type="search";si.placeholder="Search inventory: items, categories, notes...";si.value=invq;si.setAttribute("aria-label","Search inventory");bar.appendChild(si);
   if(invCat!=="all")bar.appendChild(btn("Sheet settings","btn alt sm",function(){var c=byId(invCats,invCat);if(c)openInvCat(c)}));
@@ -2039,7 +2041,7 @@ function openInvCat(c){
   var nm=fld("Category name","text",c.name);p.appendChild(nm);
   var sv=btn("Rename","btn alt sm",function(){var n=nm.input.value.trim();if(!n){alert("Give it a name.");return}sb.from("inventory_cats").update({name:n}).eq("id",c.id).then(function(r){if(r.error){alert("Could not save.");return}c.name=n;closeDetail();render()})});sv.style.marginTop="6px";p.appendChild(sv);
   var cl=el("div",null);cl.style.marginTop="16px";cl.appendChild(el("div","note","Colour code (shown on the tab and in the All inventory sheet)"));var used={};invVisible().forEach(function(z){if(z.id!==c.id)used[invCol_(z)[0]]=1});var sw=el("div","swatches"),cur=invCol_(c)[0];
-  INV_COLORS.forEach(function(k){var b=el("button","sw"+(k[0]===cur?" on":""),"Aa");b.type="button";b.style.background=k[1];b.style.color=k[2];b.title=k[0]+(used[k[0]]?" (already used by another category)":"");b.setAttribute("aria-label",k[0]);if(used[k[0]])b.style.opacity=".45";
+  INV_COLORS.forEach(function(k){var b=el("button","sw"+(k[0]===cur?" on":""),"Aa");b.type="button";b.style.background=invTint(k);b.style.color="#1f2a1f";b.style.boxShadow="inset 4px 0 0 "+k[1];b.title=k[0]+(used[k[0]]?" (already used by another category)":"");b.setAttribute("aria-label",k[0]);if(used[k[0]])b.style.opacity=".45";
     b.addEventListener("click",function(){if(used[k[0]]&&!confirm("Another category already uses "+k[0]+". Use it for both?"))return;sb.from("inventory_cats").update({color:k[0]}).eq("id",c.id).then(function(r){if(r.error){alert("Could not save the colour. Run the Stage 14 SQL in Supabase first.");return}c.color=k[0];closeDetail();render()})});sw.appendChild(b)});
   cl.appendChild(sw);p.appendChild(cl);
   var ex=btn("Download as CSV (opens in Excel)","btn alt",function(){var cols=invCols(c);downloadCsv("inventory-"+c.name.replace(/[^\w-]+/g,"_")+".csv",[cols.map(function(x){return x.n})].concat(invRows(c).map(function(r){return cols.map(function(x){return invVal(r,x.k)})})))});ex.style.cssText="display:block;margin-top:16px";p.appendChild(ex);
