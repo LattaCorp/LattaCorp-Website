@@ -77,6 +77,22 @@ textarea{min-height:110px;resize:vertical}
 .invgrid tfoot td{position:sticky;bottom:0;background:#f1f5ef;font-weight:700;padding:7px 8px;font-size:.9rem}
 .invgrid tfoot td.rn{z-index:1}
 .invacts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px}
+.exgrid{border-collapse:separate;border-spacing:0;width:100%;min-width:900px;font-size:.92rem}
+.exgrid th,.exgrid td{border-right:1px solid #e3eae0;border-bottom:1px solid #e3eae0;padding:7px 9px;white-space:nowrap;background:#fff;text-align:left;vertical-align:top}
+.exgrid thead th{position:sticky;top:0;z-index:2;background:var(--forest);color:#fff;font-weight:700;padding:9px}
+.exgrid thead th .hcol{color:#fff;padding:0}
+.exgrid tbody tr:nth-child(even) td{background:#f6faf4}.exgrid tbody tr{cursor:pointer}.exgrid tbody tr:hover td{background:#e3f1de}.exgrid tbody tr:focus{outline:2px solid var(--leaf)}
+.exgrid td.num,.exgrid th.num{text-align:right;white-space:nowrap}
+.exgrid td:nth-child(3),.exgrid td:nth-child(4){white-space:normal;min-width:150px}
+.exgrid tfoot td{position:sticky;bottom:0;background:#e3efdf;font-weight:800}
+.exlayout .exmain{min-width:0}.exlayout .exside{margin-top:22px}@media(min-width:1600px){.exlayout{display:grid;grid-template-columns:minmax(0,1fr) 360px;gap:20px;align-items:start}.exlayout .exside{order:2;margin-top:0;position:sticky;top:90px}.exlayout .exmain{order:1}}
+.exgrid .hcol{background:none;border:0;font:inherit;font-weight:700;cursor:pointer;color:#fff;padding:0}
+.exbox{margin:10px 0}.exbox summary{cursor:pointer;font-weight:700;color:var(--forest);padding:6px 0}
+.taxbox{max-width:480px;border:1px solid #cfd9cc;border-radius:8px;overflow:hidden;background:#fff}.taxbox table{width:100%;border-collapse:collapse}
+.taxbox th{background:var(--forest);color:#fff;text-align:left;padding:7px 12px;font-size:.85rem}.taxbox td{color:var(--ink);font-weight:400;padding:6px 12px;border-bottom:1px solid #e3eae0;white-space:normal}
+.taxbox th.r,.taxbox td.r{text-align:right}.taxbox tr.tot td{background:#d9ecd3;font-weight:800;border-bottom:0}
+.taxsec{margin:22px 0}.taxsec h3{margin:0 0 8px;color:var(--forest)}.taxh{margin:12px 0 0;color:var(--forest)}
+@media print{body.printreport header,body.printreport #side,body.printreport #tabs,body.printreport .top,body.printreport .tax-noprint,body.printreport .invacts,body.printreport .hgear,body.printreport .xc,body.printreport #detail{display:none!important}body.printreport main.wide{padding:0}body.printreport .invwrap{max-height:none;overflow:visible;border:0}body.printreport .invgrid td input{border:0}}
 .chip{display:inline-block;border-radius:999px;padding:2px 10px;font-size:.78rem;font-weight:700;background:var(--mint);color:var(--forest);white-space:nowrap}
 .chip.new{background:#fff3c4;color:#7a5b00}.chip.lost{background:#eee;color:#666}.chip.won{background:#d6f2da}
 .empty{text-align:center;color:var(--muted);padding:40px 10px}
@@ -244,7 +260,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=19"></script>
+<script src="app.js?v=23"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
