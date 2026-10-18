@@ -916,6 +916,14 @@ function expNet(e){return r2(expTotal(e)-expTax(e))}
 function expYears(extra){var ys={};ys[String(new Date().getFullYear())]=1;if(extra)ys[extra]=1;expenses.forEach(function(e){if(e.spent_on)ys[String(e.spent_on).slice(0,4)]=1});return Object.keys(ys).sort().reverse()}
 function expInYear(y){return expenses.filter(function(e){return String(e.spent_on).slice(0,4)===y})}
 function lastBy(fn){for(var i=0;i<expenses.length;i++){if(fn(expenses[i]))return expenses[i]}return null}
+/* duplicate check: same receipt # from the same vendor, or same vendor + date + total */
+function findDup(r,ignoreId){
+  var v=String(r.vendor||"").trim().toLowerCase(),rn=String(r.receipt_no||"").trim().toLowerCase(),tot=Number(r.amount);
+  for(var i=0;i<expenses.length;i++){var x=expenses[i];if(ignoreId&&x.id===ignoreId)continue;var xv=String(x.vendor||"").trim().toLowerCase();if(xv!==v)continue;
+    if(rn&&String(x.receipt_no||"").trim().toLowerCase()===rn)return x;
+    if(x.spent_on===r.spent_on&&Math.abs(expTotal(x)-tot)<0.005)return x}
+  return null}
+function dupText(x){return(x.vendor||"(no vendor)")+" on "+mdy(x.spent_on)+" for "+m2(expTotal(x))+(x.receipt_no?" (receipt # "+x.receipt_no+")":"")}
 function expCells(e){return[e.code||"",mdy(e.spent_on),e.vendor||"",e.note||"",e.category||"",e.payment||"",e.receipt_no||"",m2(expNet(e)),expTax(e)?m2(expTax(e)):"",m2(expTotal(e))]}
 function expCsv(rows){return[LCOLS].concat(rows.slice().sort(function(a,b){return a.spent_on<b.spent_on?-1:a.spent_on>b.spent_on?1:0}).map(function(e){return[e.code||"",mdy(e.spent_on),e.vendor||"",e.note||"",e.category||"",e.payment||"",e.receipt_no||"",expNet(e).toFixed(2),expTax(e).toFixed(2),expTotal(e).toFixed(2)]}))}
 /* the small "Expenses" box: every category with its total for the year */
@@ -981,6 +989,10 @@ function openExpense(e,pre,scanFile){
   [am,tx].forEach(function(f){f.input.step="0.01";f.input.inputMode="decimal"});
   var g3=el("div","grid2");g3.appendChild(am);g3.appendChild(tx);p.appendChild(g3);
   var tot=el("div","invtotal");function upd(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;tot.textContent="Total "+m2(r2(a+t))}upd();am.input.addEventListener("input",upd);tx.input.addEventListener("input",upd);p.appendChild(tot);
+  var dw=el("div","pcard");dw.style.cssText="background:#fff3c4;border-color:#e0c25a;color:#7a5b00;font-weight:600";dw.hidden=true;p.appendChild(dw);
+  function cur(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;return{spent_on:dt.input.value,amount:r2(a+t),vendor:ve.input.value,receipt_no:rn.input.value}}
+  function chk(){var d=findDup(cur(),e&&e.id);dw.hidden=!d;if(d)dw.textContent="⚠ Possible duplicate: "+dupText(d)+" is already saved."}
+  [dt,ve,rn,am,tx].forEach(function(f){f.input.addEventListener("input",chk);f.input.addEventListener("change",chk)});setTimeout(chk,0);
   var cl=fld("For a client's job (optional)","select",e&&e.client_id?e.client_id:"",[["","None"]].concat(clients.filter(function(c){return!c.archived||(e&&e.client_id===c.id)}).map(function(c){return[c.id,c.name]})));p.appendChild(cl);
   /* remember the code and details you used last time for the same category or vendor */
   var touched={code:!!(e||pre.code),cat:!!(e||pre.category)};
@@ -1003,7 +1015,8 @@ function openExpense(e,pre,scanFile){
   var sv=btn("Save","btn",function(){
     var a=parseFloat(am.input.value),t=parseFloat(tx.input.value);if(isNaN(t))t=0;
     if(isNaN(a)||a<0||t<0){alert("Enter the amount (and tax if any).");return}if(!dt.input.value){alert("Pick the date.");return}if(!cat.input.value){alert("Pick a category.");return}
-    var row={spent_on:dt.input.value,amount:r2(a+t),tax:r2(t),category:cat.input.value,vendor:ve.input.value.trim(),note:no.input.value.trim(),code:code.input.value.trim(),payment:pay.input.value,receipt_no:rn.input.value.trim(),client_id:cl.input.value||null};sv.disabled=true;
+    var row={spent_on:dt.input.value,amount:r2(a+t),tax:r2(t),category:cat.input.value,vendor:ve.input.value.trim(),note:no.input.value.trim(),code:code.input.value.trim(),payment:pay.input.value,receipt_no:rn.input.value.trim(),client_id:cl.input.value||null};
+    var dup=findDup(row,e&&e.id);if(dup&&!confirm("This looks like a duplicate of "+dupText(dup)+".\n\nSave it anyway?"))return;sv.disabled=true;
     var q=e?sb.from("expenses").update(row).eq("id",e.id).select().single():sb.from("expenses").insert(Object.assign({created_by:myEmail||""},row)).select().single();
     q.then(function(r){sv.disabled=false;if(r.error||!r.data){alert("Could not save. Did you run the Stage 9 and Stage 13 SQL in Supabase?");return}if(e)Object.assign(e,r.data);else expenses.unshift(r.data);repData=null;
       var files=pend.slice();if(keep&&keep.checked&&scanFile)files.push(scanFile);
@@ -1074,10 +1087,11 @@ function openExpPaste(){
   var p=panel();p.appendChild(el("h2",null,"Paste from Excel"));
   p.appendChild(el("p","note","In your spreadsheet, select the rows, copy, and paste them below. Columns must be in this order: Code, Date, Vendor, Description, Category, Payment, Receipt #, Amount, Tax, Total. A header row is skipped. If Total is filled in, it is used; otherwise Total = Amount + Tax."));
   var ta=document.createElement("textarea");ta.style.cssText="width:100%;min-height:180px;font:13px/1.3 monospace";ta.placeholder="Paste here";p.appendChild(ta);
-  var out=el("div","note");out.style.cssText="margin:8px 0;font-weight:700";p.appendChild(out);var ready=[];
+  var out=el("div","note");out.style.cssText="margin:8px 0;font-weight:700";p.appendChild(out);var ready=[],dupes=[];
+  var sl=el("label");sl.style.cssText="display:flex;gap:8px;align-items:center;font-weight:600;margin:6px 0";var skip=document.createElement("input");skip.type="checkbox";skip.checked=true;skip.style.width="auto";sl.appendChild(skip);sl.appendChild(document.createTextNode(" Skip possible duplicates (recommended)"));sl.hidden=true;p.appendChild(sl);
   var go=btn("Import","btn",function(){
-    if(!ready.length)return;go.disabled=true;go.textContent="Importing...";var chunks=[];for(var i=0;i<ready.length;i+=200)chunks.push(ready.slice(i,i+200));
-    chunks.reduce(function(pr,ch){return pr.then(function(){return sb.from("expenses").insert(ch).select().then(function(r){if(r.error)return Promise.reject(r.error);(r.data||[]).forEach(function(x){expenses.push(x)})})})},Promise.resolve()).then(function(){repData=null;closeDetail();render();alert("Imported "+ready.length+" expenses.")},function(){go.disabled=false;go.textContent="Import";alert("Something went wrong part way. Check the list before trying again, so nothing is added twice. Did you run the Stage 13 SQL?");render()})});
+    var use=skip.checked?ready.filter(function(r){return dupes.indexOf(r)<0}):ready;if(!use.length){alert("Nothing to import. Every row looks like a duplicate.");return}go.disabled=true;go.textContent="Importing...";var chunks=[];for(var i=0;i<use.length;i+=200)chunks.push(use.slice(i,i+200));
+    chunks.reduce(function(pr,ch){return pr.then(function(){return sb.from("expenses").insert(ch).select().then(function(r){if(r.error)return Promise.reject(r.error);(r.data||[]).forEach(function(x){expenses.push(x)})})})},Promise.resolve()).then(function(){repData=null;closeDetail();render();alert("Imported "+use.length+" expenses."+(use.length<ready.length?" Skipped "+(ready.length-use.length)+" possible duplicates.":""))},function(){go.disabled=false;go.textContent="Import";alert("Something went wrong part way. Check the list before trying again, so nothing is added twice. Did you run the Stage 13 SQL?");render()})});
   go.disabled=true;
   ta.addEventListener("input",function(){
     ready=[];var skipped=0,lines=ta.value.replace(/\r/g,"").split("\n").filter(function(l){return l.trim()});
@@ -1086,8 +1100,11 @@ function openExpPaste(){
       var amt=numLoose(c[7]),tx=numLoose(c[8])||0,tot=numLoose(c[9]);if(tot==null&&amt==null){skipped++;return}if(tot==null)tot=Math.round(((amt||0)+tx)*100)/100;
       if(tot<0||tx<0){skipped++;return}
       ready.push({spent_on:d,amount:tot,tax:tx,code:c[0],vendor:c[2],note:c[3],category:c[4]||"Other",payment:c[5],receipt_no:c[6],created_by:myEmail||""})});
+    dupes=[];var seen={};ready.forEach(function(r){var k=[r.spent_on,String(r.vendor).toLowerCase(),r.amount.toFixed(2)].join("|"),k2=r.receipt_no?[String(r.vendor).toLowerCase(),String(r.receipt_no).toLowerCase()].join("|"):"";
+      if(findDup(r)||seen[k]||(k2&&seen[k2]))dupes.push(r);seen[k]=1;if(k2)seen[k2]=1});
+    sl.hidden=!dupes.length;
     var sum=ready.reduce(function(s,x){return s+x.amount},0);
-    out.textContent=ready.length?"Ready to import "+ready.length+" expense"+(ready.length===1?"":"s")+" totaling "+m2(Math.round(sum*100)/100)+(skipped?" ("+skipped+" row"+(skipped>1?"s":"")+" skipped)":""):(ta.value.trim()?"No usable rows found. Check the column order.":"");
+    out.textContent=ready.length?"Ready to import "+ready.length+" expense"+(ready.length===1?"":"s")+" totaling "+m2(Math.round(sum*100)/100)+(skipped?" ("+skipped+" row"+(skipped>1?"s":"")+" skipped)":"")+(dupes.length?". "+dupes.length+" look like duplicates of saved expenses or repeats in this paste":""):(ta.value.trim()?"No usable rows found. Check the column order.":"");
     go.disabled=!ready.length});
   go.style.marginTop="8px";p.appendChild(go)}
 
