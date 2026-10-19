@@ -53,7 +53,7 @@ document.getElementById("comm").addEventListener("change",refresh);sv.addEventLi
 
 function walkText(){var w=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null),n;while(n=w.nextNode()){var p=n.parentNode;if(p.closest&&p.closest("#svcs,script,style"))continue;if(n._o===undefined)n._o=n.data;var k=n._o.trim();n.data=(lang==="es"&&k&&ES[k])?n._o.replace(k,function(){return ES[k]}):n._o}}
 function walkAttrs(){["placeholder","aria-label","alt"].forEach(function(a){[].forEach.call(document.querySelectorAll("["+a+"]"),function(e){if(e.id==="langsw"||e.closest("#svcs"))return;var key="_o_"+a;if(e[key]===undefined)e[key]=e.getAttribute(a);e.setAttribute(a,lang==="es"&&ES[e[key]]?ES[e[key]]:e[key])})})}
-function applyLang(){document.documentElement.lang=lang;walkText();walkAttrs();build(curList);refresh();showDisc();
+function applyLang(){document.documentElement.lang=lang;[].forEach.call(document.querySelectorAll("a[data-seo]"),function(x){x.setAttribute("href",(lang==="es"?"/es":"")+x.getAttribute("data-seo"))});walkText();walkAttrs();build(curList);refresh();showDisc();
 var sw=document.getElementById("langsw");sw.setAttribute("aria-checked",lang==="es"?"true":"false");sw.setAttribute("aria-label",lang==="es"?ES["Switch to English"]:"Switch to Spanish");
 document.getElementById("l-en").classList.toggle("on",lang==="en");document.getElementById("l-es").classList.toggle("on",lang==="es");renderPlan()}
 document.getElementById("langsw").addEventListener("click",function(){lang=lang==="es"?"en":"es";try{localStorage.setItem("lang",lang)}catch(e){}applyLang()});

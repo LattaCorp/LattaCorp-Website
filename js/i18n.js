@@ -1,5 +1,6 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"Lawn care in Kissimmee, FL | Latta Corp of Central Florida": "Cuidado de césped en Kissimmee, FL | Latta Corp of Central Florida",
 "Residential, HOA & commercial": "Residencial, HOA y comercial",
 "Get a quick quote": "Solicite una cotización rápida",
 "Just three details to start. We'll take it from there.": "Solo tres datos para empezar. Nosotros nos encargamos del resto.",

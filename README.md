@@ -40,3 +40,11 @@ A plain HTML/CSS/JavaScript site. No build step: open `index.html` in a browser 
 - The CRM page is at `/crm/` (`crm/index.html`). Staff sign in with email and password (create users in Supabase > Authentication > Users; turn off public sign-ups). Only emails listed in the `staff` table can see leads.
 - Check status at `/api/health` (shows `crmKeySet: true` when the secret is set).
 - Photos still arrive by email only. Saving photos in the CRM is the next step.
+
+## Search-engine pages (SEO)
+
+The site is one page that switches content with `#/` links, and Google ignores everything after the `#`. So `tools/build_seo_pages.py` saves
+each important page (services, service areas, HOA pages, FAQs, About) as its own real page, in English (`/services/lawn-care/`) and Spanish (`/es/services/lawn-care/`),
+with its own title, description, canonical link, language alternates, structured data, and writes `sitemap.xml`.
+After changing page text in `index.html`, `js/data.js` or `js/i18n.js`, run `python3 tools/build_seo_pages.py` and commit the generated folders
+(`services/`, `areas/`, `faqs/`, `about/`, `es/`, `sitemap.xml`). Titles and descriptions live at the top of that script.
