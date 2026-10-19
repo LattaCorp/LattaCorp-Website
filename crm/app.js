@@ -1135,6 +1135,12 @@ function ensureTaxSheets(){
     return makeSheet(x[1],["",TAX_COLS,x[3]],x[0]).then(function(){},function(m){return Promise.reject(m)})})},Promise.resolve()).then(function(){taxMaking=false;return true},function(m){taxMaking=false;taxErr=String(m||"Could not set up the equipment lists.");return true})}
 var taxErr="";
 function invDateYear(s){var d=parseDateLoose(s);if(d)return+d.slice(0,4);var m=String(s||"").match(/(?:^|\D)((?:19|20)\d{2})(?:\D|$)/);return m?+m[1]:null}
+/* Older equipment: purchase date in a different calendar year than now (or the tax year, on the Tax Report) = light red row. */
+var OLD_RED="#fbe0dd";
+function invRefYear(){return(view==="reports"&&rtab==="tax")?+taxYear:new Date().getFullYear()}
+function invIsOld(c,r){var dc=invAllCol(c,"purchase date",r);if(!dc)return false;var y=invDateYear(invVal(r,dc.k));return y!=null&&y!==invRefYear()}
+function invLegend(yr){var l=el("span","note");l.innerHTML='<span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:'+OLD_RED+';border:1px solid #e3b5b0;vertical-align:-2px"></span> Light red = purchased before '+yr+" (older equipment)";return l}
+function invTintRow(tr,old){Array.prototype.forEach.call(tr.children,function(td){if(td.classList.contains("rn")||td.dataset.cat)return;td.style.background=old?OLD_RED:(td.dataset.grey?"#f1f3f0":"")})}
 /* Every inventory category in one small box: how many items, what was bought in the tax year, what is older (older = light red so the accountant can tell). */
 function inventorySummaryBox(year){
   var y=+year,box=el("div","taxbox"),t=document.createElement("table"),hr=document.createElement("tr");
@@ -1928,6 +1934,7 @@ function renderInventory(){
   ensureInvColors();
   var bar=el("div","invbar"),si=document.createElement("input");si.type="search";si.placeholder="Search inventory: items, categories, notes...";si.value=invq;si.setAttribute("aria-label","Search inventory");bar.appendChild(si);
   if(invCat!=="all")bar.appendChild(btn("Sheet settings","btn alt sm",function(){var c=byId(invCats,invCat);if(c)openInvCat(c)}));
+  var yr=new Date().getFullYear();bar.appendChild(invLegend(yr));
   list.appendChild(bar);var body=el("div");list.appendChild(body);
   si.addEventListener("input",function(){invq=si.value;paintTabs();drawInvBody(body)});
   paintTabs();drawInvBody(body)}
@@ -1963,16 +1970,16 @@ function invAllGrid(cats,t){
   var th_=document.createElement("thead");th_.appendChild(hr);tbl.appendChild(th_);
   var tb=document.createElement("tbody");
   rows.forEach(function(x,ri){var c=x[0],r=x[1],tr=document.createElement("tr");tr.appendChild(el("td","rn",String(ri+1)));
-    var cd=document.createElement("td"),cb=btn(c.name,"hcol",function(){invCat=c.id;invq="";render()});cb.title="Open the "+c.name+" sheet";cb.className="hcol";cb.style.cssText="display:block;width:100%;height:100%;min-height:36px;padding:8px 10px;text-align:left;background:transparent;color:inherit;border:0;border-radius:0;cursor:pointer;font:inherit;font-weight:700";invPaint(cd,c);cd.style.padding="0";cd.appendChild(cb);tr.appendChild(cd);
-    names.forEach(function(k){var td=document.createElement("td"),col=cellOf(c,k,r);
-      if(!col){td.style.background="#f1f3f0";tr.appendChild(td);return}
+    var cd=document.createElement("td"),cb=btn(c.name,"hcol",function(){invCat=c.id;invq="";render()});cb.title="Open the "+c.name+" sheet";cb.className="hcol";cb.style.cssText="display:block;width:100%;height:100%;min-height:36px;padding:8px 10px;text-align:left;background:transparent;color:inherit;border:0;border-radius:0;cursor:pointer;font:inherit;font-weight:700";invPaint(cd,c);cd.style.padding="0";cd.dataset.cat="1";cd.appendChild(cb);tr.appendChild(cd);
+    var isOld=invIsOld(c,r);names.forEach(function(k){var td=document.createElement("td"),col=cellOf(c,k,r);
+      if(!col){td.style.background=isOld?OLD_RED:"#f1f3f0";td.dataset.grey="1";tr.appendChild(td);return}
       var inp=document.createElement("input");inp.type="text";inp.value=invVal(r,col.k);inp.dataset.v=inp.value;inp.dataset.r=r.id;inp.dataset.k=col.k;inp.dataset.n=k;inp.setAttribute("aria-label",info[k].n);inp.autocomplete="off";if(col.t==="number"){inp.inputMode="decimal";inp.className="num"}
       inp.addEventListener("change",function(){invCommit(inp)});inp.addEventListener("focus",function(){inp.select()});
       inp.addEventListener("keydown",function(e){if(e.key!=="Enter"&&e.key!=="ArrowUp"&&e.key!=="ArrowDown")return;e.preventDefault();
         var all=Array.prototype.slice.call(tbl.querySelectorAll('tbody input[data-n="'+k+'"]')),i=all.indexOf(inp),n=all[e.key==="ArrowUp"?i-1:i+1];if(n)n.focus()});
-      td.appendChild(inp);tr.appendChild(td)});
+      if(isOld)td.style.background=OLD_RED;td.appendChild(inp);tr.appendChild(td)});
     var xd=el("td","xc"),xb=btn("×","hgear",function(){var has=invCols(c).some(function(col){return invVal(r,col.k)});if(has&&!confirm("Delete this item?"))return;
-      sb.from("inventory_items").delete().eq("id",r.id).then(function(res){if(res.error){alert("Could not delete.");return}invItems=invItems.filter(function(z){return z.id!==r.id});render()})});xb.setAttribute("aria-label","Delete row");xb.style.color="var(--red)";xd.appendChild(xb);tr.appendChild(xd);tb.appendChild(tr)});
+      sb.from("inventory_items").delete().eq("id",r.id).then(function(res){if(res.error){alert("Could not delete.");return}invItems=invItems.filter(function(z){return z.id!==r.id});render()})});xb.setAttribute("aria-label","Delete row");xb.style.color="var(--red)";xd.appendChild(xb);if(isOld)xd.style.background=OLD_RED;tr.appendChild(xd);tb.appendChild(tr)});
   tbl.appendChild(tb);
   var tf=document.createElement("tfoot"),fr=document.createElement("tr");fr.appendChild(el("td","rn","Σ"));var ft=el("td","foot","Overall total · "+rows.length+" item"+(rows.length===1?"":"s"));fr.appendChild(ft);for(var i=0;i<names.length;i++)fr.appendChild(el("td","foot",""));fr.appendChild(el("td","xc",""));tf.appendChild(fr);tbl.appendChild(tf);
   wrap.appendChild(tbl);box.appendChild(wrap);
@@ -1987,7 +1994,7 @@ function invCommit(inp){
   var val=inp.value.trim(),d=Object.assign({},r.data),n=invNumber(val);d[col.k]=(col.t==="number"&&n!=null)?n:val;inp.dataset.v=inp.value;
   return sb.from("inventory_items").update({data:d,updated_at:new Date().toISOString()}).eq("id",r.id).then(function(res){
     if(res.error){inp.dataset.v="\u0000";alert("Could not save that cell. Check your connection and try again.");return}
-    r.data=d;var t=inp.closest("table");if(t&&t._foot)t._foot()})}
+    r.data=d;var t=inp.closest("table");if(t&&t._foot)t._foot();var trr=inp.closest("tr");if(trr)invTintRow(trr,invIsOld(c,r))})}
 function addInvRow(c,fk){
   var mx=invRows(c).reduce(function(m,r){return Math.max(m,r.sort||0)},0);
   return sb.from("inventory_items").insert({cat_id:c.id,data:{},sort:mx+1}).select().single().then(function(r){
@@ -2018,7 +2025,7 @@ function invGrid(c,rows,searching){
   var qtyCol=cols.filter(function(x){return/^(qty|quantity)$/i.test(x.n)})[0],minCol=cols.filter(function(x){return/^min/i.test(x.n)})[0];
   var tb=document.createElement("tbody");
   vr.forEach(function(r,ri){
-    var tr=document.createElement("tr");tr.appendChild(el("td","rn",String(ri+1)));
+    var tr=document.createElement("tr");tr.appendChild(el("td","rn",String(ri+1)));var oldRow=invIsOld(c,r);
     cols.forEach(function(col){
       var td=document.createElement("td"),inp=document.createElement("input");inp.type="text";inp.value=invVal(r,col.k);inp.dataset.v=inp.value;inp.dataset.r=r.id;inp.dataset.k=col.k;inp.setAttribute("aria-label",col.n);inp.autocomplete="off";
       if(col.t==="number"){inp.inputMode="decimal";inp.className="num"}
@@ -2031,11 +2038,11 @@ function invGrid(c,rows,searching){
         if(nr){var ni=nr.querySelector('input[data-k="'+col.k+'"]');if(ni)ni.focus();return}
         if(e.key==="Enter"&&!searching)Promise.resolve(invCommit(inp)).then(function(){addInvRow(c,col.k)})});
       inp.addEventListener("paste",function(e){var txt=(e.clipboardData||window.clipboardData).getData("text")||"";if(!/[\t\n]/.test(txt.replace(/\r?\n$/,"")))return;e.preventDefault();invPaste(c,vr,r,col,txt)});
-      td.appendChild(inp);tr.appendChild(td)});
+      if(oldRow)td.style.background=OLD_RED;td.appendChild(inp);tr.appendChild(td)});
     var xd=el("td","xc"),x=btn("×","hgear",function(){
       var has=cols.some(function(col){return invVal(r,col.k)});if(has&&!confirm("Delete this row?"))return;
       sb.from("inventory_items").delete().eq("id",r.id).then(function(res){if(res.error){alert("Could not delete the row.");return}invItems=invItems.filter(function(z){return z.id!==r.id});render()})});
-    x.setAttribute("aria-label","Delete row");x.title="Delete row";x.style.color="var(--red)";xd.appendChild(x);tr.appendChild(xd);tb.appendChild(tr)});
+    x.setAttribute("aria-label","Delete row");x.title="Delete row";x.style.color="var(--red)";xd.appendChild(x);if(oldRow)xd.style.background=OLD_RED;tr.appendChild(xd);tb.appendChild(tr)});
   t.appendChild(tb);
   var tf=document.createElement("tfoot"),fr=document.createElement("tr"),fc={};fr.appendChild(el("td","rn","Σ"));
   cols.forEach(function(col){var td=document.createElement("td");td.className="foot"+(col.t==="number"?" num":"");fc[col.k]=td;fr.appendChild(td)});fr.appendChild(el("td","xc",""));tf.appendChild(fr);t.appendChild(tf);
