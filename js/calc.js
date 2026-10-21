@@ -5,13 +5,13 @@
   var root = document.getElementById("pcalc");
   if (!root) return;
   var DEF_OPTS = [
-    { id: "fence", en: "Is the yard fenced?", es: "¿El patio tiene cerca?", amt: 10, on: 1 },
-    { id: "plants", en: "Lots of plants, trees or obstacles in the lawn?", es: "¿Muchas plantas, árboles u obstáculos en el césped?", amt: 5, on: 1 },
-    { id: "slope", en: "Steep slope or uneven ground?", es: "¿Pendiente pronunciada o terreno desigual?", amt: 5, on: 1 },
-    { id: "walks", en: "Long driveway or lots of sidewalks to edge and blow?", es: "¿Entrada larga o muchas aceras para bordear y soplar?", amt: 5, on: 1 },
-    { id: "water", en: "Pond or lake bank to trim around?", es: "¿Orilla de estanque o lago para recortar?", amt: 5, on: 1 }
+    { id: "fence", en: "Is the yard fenced?", es: "¿El patio tiene cerca?", pct: 25, on: 1 },
+    { id: "plants", en: "Lots of plants, trees or obstacles in the lawn?", es: "¿Muchas plantas, árboles u obstáculos en el césped?", pct: 12.5, on: 1 },
+    { id: "slope", en: "Steep slope or uneven ground?", es: "¿Pendiente pronunciada o terreno desigual?", pct: 12.5, on: 1 },
+    { id: "walks", en: "Long driveway or lots of sidewalks to edge and blow?", es: "¿Entrada larga o muchas aceras para bordear y soplar?", pct: 12.5, on: 1 },
+    { id: "water", en: "Pond or lake bank to trim around?", es: "¿Orilla de estanque o lago para recortar?", pct: 12.5, on: 1 }
   ];
-  var DEF = { base: 20, per1000: 4, bi: 1.2, minw: 35, minb: 40, step: 5, grass: 52, adder: 5, maxg: 25000, show: 1 };
+  var DEF = { base: 20, per1000: 4, bi: 1.2, minw: 35, minb: 40, step: 5, grass: 52, adderp: 8, maxg: 45000, show: 1, taperAt: 10000, taper: 75 };
   var P = Object.assign({ options: DEF_OPTS }, DEF);
   var L = {
     en: {
@@ -43,15 +43,19 @@
     Object.keys(DEF).forEach(function (k) { P[k] = num(p[k], DEF[k]); });
     if (Array.isArray(p.options)) {
       P.options = p.options.map(function (o, i) {
-        return { id: String(o.id || "o" + i), en: String(o.en || ""), es: String(o.es || o.en || ""), amt: num(o.amt, 0), on: (o.on === 0 || o.on === false) ? 0 : 1 };
+        return { id: String(o.id || "o" + i), en: String(o.en || ""), es: String(o.es || o.en || ""), pct: isNaN(parseFloat(o.pct)) ? num(o.amt, 0) / 40 * 100 : num(o.pct, 0), on: (o.on === 0 || o.on === false) ? 0 : 1 };
       }).filter(function (o) { return o.en; });
     }
   }
+  function ceilStep(x) { return P.step > 0 ? Math.ceil(x / P.step - 1e-9) * P.step : Math.ceil(x - 1e-9); }
   function base(g, freq) {
-    var w = P.base + P.per1000 * g / 1000, raw = freq === "biweekly" ? w * P.bi : w;
+    var eff = Math.min(g, P.taperAt) + (P.taper / 100) * Math.max(g - P.taperAt, 0);
+    var w = P.base + P.per1000 * eff / 1000, raw = freq === "biweekly" ? w * P.bi : w;
     var r = P.step > 0 ? Math.round(raw / P.step) * P.step : Math.round(raw), mn = freq === "biweekly" ? P.minb : P.minw;
     return { price: Math.max(r, mn), atMin: r <= mn };
   }
+  // Options add a percentage of the base price; the website adds a % cushion; both round UP to the next $5.
+  function web(g, freq, pct) { var b = base(g, freq); return { total: ceilStep(b.price * (1 + pct / 100) * (1 + P.adderp / 100)), atMin: b.atMin }; }
   function ce(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
 
   function draw() {
@@ -83,7 +87,7 @@
       opts.forEach(function (o) {
         var lb = ce("label", "pc-opt"), c = document.createElement("input"); c.type = "checkbox"; c.checked = !!S.pick[o.id];
         c.addEventListener("change", function () { S.pick[o.id] = c.checked; upd(); });
-        lb.appendChild(c); lb.appendChild(ce("span", null, (es ? o.es : o.en) + " (+$" + o.amt + ")")); ol.appendChild(lb);
+        lb.appendChild(c); lb.appendChild(ce("span", null, es ? o.es : o.en)); ol.appendChild(lb);
       });
       root.appendChild(ol);
     }
@@ -95,11 +99,11 @@
       if (!(n > 0)) { out.appendChild(ce("div", "pc-hint", X.enter)); return; }
       var g = S.basis === "lot" ? n * P.grass / 100 : n, gr = Math.round(g);
       if (g > P.maxg) { out.appendChild(ce("div", "pc-big", X.big)); out.appendChild(cta(null)); return; }
-      var chosen = P.options.filter(function (o) { return o.on && S.pick[o.id]; }), add = chosen.reduce(function (t, o) { return t + o.amt; }, 0);
-      var b = base(g, S.freq), total = b.price + add + P.adder;
+      var chosen = P.options.filter(function (o) { return o.on && S.pick[o.id]; }), pct = chosen.reduce(function (t, o) { return t + o.pct; }, 0);
+      var b = web(g, S.freq, pct), total = b.total;
       out.appendChild(ce("div", "pc-lbl", X.est));
       var price = ce("div", "pc-price", "$" + total); price.id = "pc-price"; out.appendChild(price);
-      var wk = base(g, "weekly").price + add + P.adder, bw = base(g, "biweekly").price + add + P.adder;
+      var wk = web(g, "weekly", pct).total, bw = web(g, "biweekly", pct).total;
       out.appendChild(ce("div", "pc-alt", X.weekly + ": $" + wk + "  ·  " + X.biweekly + ": $" + bw));
       if (S.basis === "lot") out.appendChild(ce("div", "pc-alt", X.about + " " + gr.toLocaleString(es ? "es-US" : "en-US") + " " + X.of));
       if (b.atMin) out.appendChild(ce("div", "pc-alt", X.min));

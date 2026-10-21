@@ -1830,27 +1830,30 @@ function clientEstimatesSection(c){
   if(mine.length>5)sec.appendChild(el("div","note","+ "+(mine.length-5)+" older estimates in Billing > Estimates."));
   return sec}
 /* ---- Lawn price calculator (rough per-visit price for lawn maintenance) ---- */
-var PRICE_DEF={base:20,per1000:4,bi:1.2,minw:35,minb:40,step:5,grass:52,adder:5,maxg:25000,show:1};
-var DEF_OPTS=[{id:"fence",en:"Is the yard fenced?",es:"¿El patio tiene cerca?",amt:10,on:1},{id:"plants",en:"Lots of plants, trees or obstacles in the lawn?",es:"¿Muchas plantas, árboles u obstáculos en el césped?",amt:5,on:1},
-  {id:"slope",en:"Steep slope or uneven ground?",es:"¿Pendiente pronunciada o terreno desigual?",amt:5,on:1},{id:"walks",en:"Long driveway or lots of sidewalks to edge and blow?",es:"¿Entrada larga o muchas aceras para bordear y soplar?",amt:5,on:1},
-  {id:"water",en:"Pond or lake bank to trim around?",es:"¿Orilla de estanque o lago para recortar?",amt:5,on:1}];
+var PRICE_DEF={base:20,per1000:4,bi:1.2,minw:35,minb:40,step:5,grass:52,adderp:8,maxg:45000,show:1,taperAt:10000,taper:75};
+var DEF_OPTS=[{id:"fence",en:"Is the yard fenced?",es:"¿El patio tiene cerca?",pct:25,on:1},{id:"plants",en:"Lots of plants, trees or obstacles in the lawn?",es:"¿Muchas plantas, árboles u obstáculos en el césped?",pct:12.5,on:1},
+  {id:"slope",en:"Steep slope or uneven ground?",es:"¿Pendiente pronunciada o terreno desigual?",pct:12.5,on:1},{id:"walks",en:"Long driveway or lots of sidewalks to edge and blow?",es:"¿Entrada larga o muchas aceras para bordear y soplar?",pct:12.5,on:1},
+  {id:"water",en:"Pond or lake bank to trim around?",es:"¿Orilla de estanque o lago para recortar?",pct:12.5,on:1}];
 function pricing(){var o=Object.assign({},PRICE_DEF),p=biz&&biz.pricing&&typeof biz.pricing==="object"?biz.pricing:{};Object.keys(PRICE_DEF).forEach(function(k){var v=parseFloat(p[k]);if(!isNaN(v)&&v>=0)o[k]=v});
-  o.options=Array.isArray(p.options)?p.options.map(function(x,i){return{id:String(x.id||"o"+i),en:String(x.en||""),es:String(x.es||x.en||""),amt:parseFloat(x.amt)||0,on:(x.on===0||x.on===false)?0:1}}).filter(function(x){return x.en}):DEF_OPTS.slice();return o}
-function priceFor(g,freq,P){P=P||pricing();var w=P.base+P.per1000*g/1000,raw=freq==="biweekly"?w*P.bi:w,st=P.step>0?Math.round(raw/P.step)*P.step:Math.round(raw),mn=freq==="biweekly"?P.minb:P.minw;return{price:Math.max(st,mn),atMin:st<=mn}}
+  o.options=Array.isArray(p.options)?p.options.map(function(x,i){return{id:String(x.id||"o"+i),en:String(x.en||""),es:String(x.es||x.en||""),pct:isNaN(parseFloat(x.pct))?(parseFloat(x.amt)||0)/40*100:parseFloat(x.pct),on:(x.on===0||x.on===false)?0:1}}).filter(function(x){return x.en}):DEF_OPTS.slice();return o}
+function ceilStep(x,st){return st>0?Math.ceil(x/st-1e-9)*st:Math.ceil(x-1e-9)}
+/* Base price for a lawn, then options add a percentage of it (rounded UP to the next $5); the website adds a % cushion on top (also rounded up). */
+function priceFor(g,freq,P){P=P||pricing();var T=P.taperAt,eff=Math.min(g,T)+(P.taper/100)*Math.max(g-T,0),w=P.base+P.per1000*eff/1000,raw=freq==="biweekly"?w*P.bi:w,st=P.step>0?Math.round(raw/P.step)*P.step:Math.round(raw),mn=freq==="biweekly"?P.minb:P.minw;return{price:Math.max(st,mn),atMin:st<=mn}}
+function quoteFor(g,freq,pct,P){P=P||pricing();var b=priceFor(g,freq,P),raw=b.price*(1+pct/100);return{base:b.price,atMin:b.atMin,quote:pct>0?ceilStep(raw,P.step):b.price,web:ceilStep(raw*(1+P.adderp/100),P.step)}}
 function calcWidget(use){
   var box=el("div","calcbox"),P=pricing();
   var basis=fld("Square feet of","select","grass",[["grass","Grass only (mowed area)"],["lot","Whole property (grass is about "+Math.round(P.grass)+"%)"]]),sq=fld("Square feet","number","");sq.input.inputMode="numeric";sq.input.min="0";
   box.appendChild(basis);box.appendChild(sq);
-  var opts=el("div"),checks=[];P.options.filter(function(o){return o.on}).forEach(function(o){var l=document.createElement("label");l.style.cssText="display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:400";var c=document.createElement("input");c.type="checkbox";c.style.cssText="width:auto;margin:0";c.addEventListener("change",draw);l.appendChild(c);l.appendChild(document.createTextNode(o.en+" (+$"+o.amt+")"));opts.appendChild(l);checks.push([c,o])});
-  if(checks.length){var oh=el("div","note","Options (each adds to the price per visit)");oh.style.marginTop="10px";box.appendChild(oh);box.appendChild(opts)}
+  var opts=el("div"),checks=[];P.options.filter(function(o){return o.on}).forEach(function(o){var l=document.createElement("label");l.style.cssText="display:flex;gap:8px;align-items:center;margin:6px 0;font-weight:400";var c=document.createElement("input");c.type="checkbox";c.style.cssText="width:auto;margin:0";c.addEventListener("change",draw);l.appendChild(c);l.appendChild(document.createTextNode(o.en+" (+"+o.pct+"%)"));opts.appendChild(l);checks.push([c,o])});
+  if(checks.length){var oh=el("div","note","Options (each adds a percentage of the base price)");oh.style.marginTop="10px";box.appendChild(oh);box.appendChild(opts)}
   var out=el("div","calcout");box.appendChild(out);
   function draw(){
     out.textContent="";P=pricing();var n=parseFloat(sq.input.value);if(!(n>0)){out.appendChild(el("div","note","Enter the square footage to see a rough price."));return}
-    var g=basis.input.value==="lot"?n*P.grass/100:n,gr=Math.round(g),sel=checks.filter(function(x){return x[0].checked}).map(function(x){return x[1]}),add=sel.reduce(function(t,o){return t+o.amt},0);
+    var g=basis.input.value==="lot"?n*P.grass/100:n,gr=Math.round(g),sel=checks.filter(function(x){return x[0].checked}).map(function(x){return x[1]}),pct=sel.reduce(function(t,o){return t+o.pct},0);
     if(basis.input.value==="lot")out.appendChild(el("div","note","About "+gr.toLocaleString("en-US")+" sq ft of grass."));
     var row=el("div","calcrow");
-    [["weekly","Weekly"],["biweekly","Bi-weekly"]].forEach(function(f){var r=priceFor(g,f[0],P),q=r.price+add,c=el("div","calccard"),b=el("div","calcbig","$"+q);c.appendChild(el("div","note",f[1]+" · quote price per visit"));c.appendChild(b);
-      c.appendChild(el("div","note","Website shows $"+(q+P.adder)+(r.atMin?" · minimum applies":"")));
+    [["weekly","Weekly"],["biweekly","Bi-weekly"]].forEach(function(f){var r=quoteFor(g,f[0],pct,P),q=r.quote,c=el("div","calccard"),b=el("div","calcbig","$"+q);c.appendChild(el("div","note",f[1]+" · quote price per visit"));c.appendChild(b);
+      c.appendChild(el("div","note","Website shows $"+r.web+(r.atMin?" · minimum applies":"")));
       if(use)c.appendChild(btn("Use this price","btn alt sm",function(){use("Lawn maintenance, "+f[1].toLowerCase()+" (about "+gr.toLocaleString("en-US")+" sq ft of grass"+(sel.length?"; "+sel.map(function(o){return o.en.replace(/\?$/,"")}).join("; "):"")+")",q)}));
       row.appendChild(c)});
     out.appendChild(row);out.appendChild(el("div","note","A rough guide, rounded to the nearest $"+P.step+". Adjust for hills, gates, heavy overgrowth or distance."))}
@@ -1859,22 +1862,22 @@ function calcWidget(use){
     var d=document.createElement("details");d.style.marginTop="14px";d.appendChild(el("summary",null,"Edit rates and options (owner)"));
     var F={base:fld("Starting price per visit ($)","number",P.base),per1000:fld("Added per 1,000 sq ft of grass ($)","number",P.per1000),bi:fld("Bi-weekly costs this many times the weekly price (1.2 = 20% more)","number",P.bi),
       minw:fld("Weekly minimum ($)","number",P.minw),minb:fld("Bi-weekly minimum ($)","number",P.minb),step:fld("Round to the nearest ($)","number",P.step),grass:fld("Grass is about this % of a whole property","number",P.grass),
-      adder:fld("Website estimate is this many $ higher than the quote price","number",P.adder),maxg:fld("Website asks for a custom quote above this many sq ft of grass","number",P.maxg),
+      adderp:fld("Website estimate is this many % higher than the quote price (rounded up)","number",P.adderp),taperAt:fld("Bigger lawns: the rate drops after this many sq ft of grass","number",P.taperAt),taper:fld("...each extra 1,000 sq ft after that costs this % of the normal rate (100 = no drop)","number",P.taper),maxg:fld("Website asks for a custom quote above this many sq ft of grass","number",P.maxg),
       show:fld("Show the calculator on the website","select",P.show?"1":"0",[["1","Yes"],["0","No"]])};
     Object.keys(F).forEach(function(k){F[k].input.step="any";d.appendChild(F[k])});
-    var oh2=el("h3",null,"Options");oh2.style.marginTop="14px";d.appendChild(oh2);d.appendChild(el("p","note","Each checked option adds a flat amount per visit. Spanish is what Spanish-speaking visitors see."));
+    var oh2=el("h3",null,"Options");oh2.style.marginTop="14px";d.appendChild(oh2);d.appendChild(el("p","note","Each checked option adds a percentage of the base price per visit, rounded up to the next $5, so it scales with bigger lawns. Spanish is what Spanish-speaking visitors see."));
     var orow=el("div");d.appendChild(orow);var rows=[];
-    function addOpt(o){var r=el("div","calcopt");r.style.cssText="border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0";var en=fld("Question (English)","text",o.en),es=fld("Question (Spanish)","text",o.es),am=fld("Adds ($ per visit)","number",o.amt),on=document.createElement("label");on.style.cssText="display:flex;gap:8px;align-items:center;margin:6px 0";var ck=document.createElement("input");ck.type="checkbox";ck.checked=!!o.on;ck.style.cssText="width:auto;margin:0";on.appendChild(ck);on.appendChild(document.createTextNode("Show this option"));
+    function addOpt(o){var r=el("div","calcopt");r.style.cssText="border:1px solid var(--line);border-radius:8px;padding:8px;margin:8px 0";var en=fld("Question (English)","text",o.en),es=fld("Question (Spanish)","text",o.es),am=fld("Adds (% of the base price)","number",o.pct),on=document.createElement("label");on.style.cssText="display:flex;gap:8px;align-items:center;margin:6px 0";var ck=document.createElement("input");ck.type="checkbox";ck.checked=!!o.on;ck.style.cssText="width:auto;margin:0";on.appendChild(ck);on.appendChild(document.createTextNode("Show this option"));
       var rm=btn("Remove","btn danger sm",function(){r.remove();rows=rows.filter(function(x){return x.r!==r})});r.appendChild(en);r.appendChild(es);r.appendChild(am);r.appendChild(on);r.appendChild(rm);orow.appendChild(r);rows.push({r:r,id:o.id,en:en,es:es,am:am,ck:ck})}
     P.options.forEach(addOpt);
-    d.appendChild(btn("+ Add option","btn alt sm",function(){addOpt({id:"o"+Date.now().toString(36),en:"",es:"",amt:5,on:1})}));
+    d.appendChild(btn("+ Add option","btn alt sm",function(){addOpt({id:"o"+Date.now().toString(36),en:"",es:"",pct:12.5,on:1})}));
     var sv=btn("Save rates and options","btn",function(){var o={};for(var k in F){var v=parseFloat(F[k].input.value);if(isNaN(v)||v<0){alert("Every rate needs a number, zero or more.");return}o[k]=v}
-      o.options=rows.map(function(x){return{id:x.id,en:x.en.input.value.trim(),es:x.es.input.value.trim(),amt:parseFloat(x.am.input.value)||0,on:x.ck.checked?1:0}}).filter(function(x){return x.en});
+      o.options=rows.map(function(x){return{id:x.id,en:x.en.input.value.trim(),es:x.es.input.value.trim(),pct:parseFloat(x.am.input.value)||0,on:x.ck.checked?1:0}}).filter(function(x){return x.en});
       var q=biz&&biz.id?sb.from("business").update({pricing:o}).eq("id",biz.id):sb.from("business").upsert({id:1,pricing:o});
       q.select().then(function(r){var row=r.data&&(Array.isArray(r.data)?r.data[0]:r.data);if(r.error||!row){alert("Could not save. Run the Stage 15 SQL in Supabase first.");return}biz=row;closeDetail();render();alert("Saved. The website uses these within a minute or two.")})});
     sv.style.marginTop="12px";d.appendChild(sv);box.appendChild(d)}
   return box}
-function openCalc(){var p=panel();p.appendChild(el("h2",null,"Lawn price calculator"));p.appendChild(el("p","note","Your quote price per visit for lawn maintenance, from the size of the lawn and any options. The website shows a slightly higher estimate, so a custom quote can come in a little lower. You can also use this inside a new estimate."));p.appendChild(calcWidget(null))}
+function openCalc(){var p=panel();p.appendChild(el("h2",null,"Lawn price calculator"));p.appendChild(el("p","note","Your quote price per visit for lawn maintenance, from the size of the lawn and any options. The website shows a slightly higher estimate (a % cushion), so a custom quote can come in a little lower. You can also use this inside a new estimate."));p.appendChild(calcWidget(null))}
 function openEstimateForm(cid){
   if(estErr){alert("Run the Stage 11 SQL in Supabase first, then press Refresh.");return}
   var p=panel();p.appendChild(el("h2",null,"New estimate"));
