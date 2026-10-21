@@ -970,13 +970,17 @@ function renderExpensesView(){
   si.addEventListener("input",function(){exq=si.value;exShown=300;draw()});draw()}
 
 function openExpense(e,pre,scanFile){
-  pre=pre||{};var src=e||pre;
+  pre=pre||{};var src=e||pre,splitIds=pre.splitIds||{};
   var p=panel();p.appendChild(el("h2",null,e?"Expense":"Add expense"));
   if(scanFile&&!e){var sn_=el("div","pcard","✓ Read from your receipt photo"+(pre.known?" and filled in from your last purchase at "+pre.vendor:"")+". Please check every field before saving.");sn_.style.cssText="background:var(--mint);font-weight:600";p.appendChild(sn_)}
   var codes={},vendors={};expenses.forEach(function(x){if(x.code)codes[x.code]=1;if(x.vendor)vendors[x.vendor]=1});
   function dl(id,obj){var d=document.createElement("datalist");d.id=id;Object.keys(obj).sort().forEach(function(k){var o=document.createElement("option");o.value=k;d.appendChild(o)});p.appendChild(d)}
   dl("exCodes",codes);dl("exVendors",vendors);
-  var code=fld("Code (up to 4 characters)","text",src.code||""),dt=fld("Date","date",e?e.spent_on:(pre.date||today()));code.input.setAttribute("list","exCodes");code.input.maxLength=4;
+  var code=fld("Code (up to 4 characters)","text",src.code||""),dt=fld("Date (type it like 10/21/2026, or tap the calendar)","text",mdy(e?e.spent_on:(pre.date||today())));dt.input.placeholder="MM/DD/YYYY";dt.input.inputMode="numeric";dt.input.autocomplete="off";
+  var dpk=document.createElement("input");dpk.type="date";dpk.tabIndex=-1;dpk.setAttribute("aria-hidden","true");dpk.style.cssText="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px";dpk.value=e?e.spent_on:(pre.date||today());
+  var dbtn=btn("📅","btn alt sm",function(){dpk.value=dtVal()||today();try{dpk.showPicker()}catch(x){dpk.focus();dpk.click()}});dbtn.style.cssText="margin-top:6px";dbtn.setAttribute("aria-label","Open calendar");dt.appendChild(dbtn);dt.appendChild(dpk);
+  function dtVal(){return parseDateLoose(dt.input.value)||""}
+  dpk.addEventListener("change",function(){if(dpk.value){dt.input.value=mdy(dpk.value);dt.input.dispatchEvent(new Event("input"))}});code.input.setAttribute("list","exCodes");code.input.maxLength=4;
   var g1=el("div","grid2");g1.appendChild(code);g1.appendChild(dt);p.appendChild(g1);
   var ve=fld("Vendor","text",src.vendor||"");ve.input.setAttribute("list","exVendors");p.appendChild(ve);
   var no=fld("Description","text",e?e.note:(pre.description||""));p.appendChild(no);
@@ -986,13 +990,19 @@ function openExpense(e,pre,scanFile){
   var pay=fld("Payment","select",src.payment||"Debit",pays.map(function(c){return[c,c]}));
   var g2=el("div","grid2");g2.appendChild(cat);g2.appendChild(pay);p.appendChild(g2);
   var rn=fld("Receipt #","text",src.receipt_no||"");p.appendChild(rn);
-  var am=fld("Amount ($, before tax)","number",e?expNet(e):(pre.amount!=null?pre.amount:"")),tx=fld("Tax ($)","number",e?(expTax(e)||""):(pre.tax||""));
-  [am,tx].forEach(function(f){f.input.step="0.01";f.input.inputMode="decimal"});
-  var g3=el("div","grid2");g3.appendChild(am);g3.appendChild(tx);p.appendChild(g3);
-  var tot=el("div","invtotal");function upd(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;tot.textContent="Total "+m2(r2(a+t))}upd();am.input.addEventListener("input",upd);tx.input.addEventListener("input",upd);p.appendChild(tot);
+  var am=fld("Amount ($, before tax)","number",e?expNet(e):(pre.amount!=null?pre.amount:"")),tx=fld("Tax ($)","number",e?(expTax(e)||""):(pre.tax||"")),tp=fld("Tax % (pick or type)","number","");
+  [am,tx].forEach(function(f){f.input.step="0.01";f.input.inputMode="decimal"});tp.input.step="0.01";tp.input.min="0";tp.input.inputMode="decimal";tp.input.placeholder="0";tp.input.setAttribute("list","exTaxP");
+  var tpl=document.createElement("datalist");tpl.id="exTaxP";[0,6,6.5,7,7.5].forEach(function(v){var o=document.createElement("option");o.value=v;o.label=v+"%";tpl.appendChild(o)});p.appendChild(tpl);
+  var tpq=el("div","note","Tax is figured on this item only. For a receipt with different tax rates, add each part as its own item (use Save and add another item).");
+  function pctFromTax(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;tp.input.value=(a>0&&t>0)?String(Math.round(t/a*10000)/100):(t>0?"":"0")}
+  function taxFromPct(){var a=parseFloat(am.input.value)||0,pc=parseFloat(tp.input.value);if(isNaN(pc))return;tx.input.value=pc>0?String(r2(a*pc/100)):""}
+  pctFromTax();
+  var g3=el("div","grid2");g3.appendChild(am);g3.appendChild(tp);p.appendChild(g3);p.appendChild(tx);p.appendChild(tpq);
+  var tot=el("div","invtotal");function upd(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;tot.textContent="Total "+m2(r2(a+t))}upd();
+  am.input.addEventListener("input",function(){if(tp.input.value!=="")taxFromPct();upd()});tp.input.addEventListener("input",function(){taxFromPct();upd()});tx.input.addEventListener("input",function(){pctFromTax();upd()});p.appendChild(tot);
   var dw=el("div","pcard");dw.style.cssText="background:#fff3c4;border-color:#e0c25a;color:#7a5b00;font-weight:600";dw.hidden=true;p.appendChild(dw);
-  function cur(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;return{spent_on:dt.input.value,amount:r2(a+t),vendor:ve.input.value,receipt_no:rn.input.value}}
-  function chk(){var d=findDup(cur(),e&&e.id);dw.hidden=!d;if(d)dw.textContent="⚠ Possible duplicate: "+dupText(d)+" is already saved."}
+  function cur(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;return{spent_on:dtVal(),amount:r2(a+t),vendor:ve.input.value,receipt_no:rn.input.value}}
+  function chk(){var d=findDup(cur(),e&&e.id);if(d&&splitIds[d.id])d=null;dw.hidden=!d;if(d)dw.textContent="⚠ Possible duplicate: "+dupText(d)+" is already saved."}
   [dt,ve,rn,am,tx].forEach(function(f){f.input.addEventListener("input",chk);f.input.addEventListener("change",chk)});setTimeout(chk,0);
   var cl=fld("For a client's job (optional)","select",e&&e.client_id?e.client_id:"",[["","None"]].concat(clients.filter(function(c){return!c.archived||(e&&e.client_id===c.id)}).map(function(c){return[c.id,c.name]})));p.appendChild(cl);
   /* remember the code and details you used last time for the same category or vendor */
@@ -1013,16 +1023,19 @@ function openExpense(e,pre,scanFile){
       var rb=el("div","pbar2");rb.appendChild(btn("Take photo","btn alt sm",function(){pickPhotos(true,function(fs){pend=pend.concat(fs);pnTxt()})}));rb.appendChild(btn("Choose photo","btn alt sm",function(){pickPhotos(false,function(fs){pend=pend.concat(fs);pnTxt()})}));rc.appendChild(rb);rc.appendChild(pn)}
     p.appendChild(rc)}
   var acts=el("div","acts");acts.style.marginTop="12px";
-  var sv=btn("Save","btn",function(){
+  var again=false;function doSave(){
     var a=parseFloat(am.input.value),t=parseFloat(tx.input.value);if(isNaN(t))t=0;
-    if(isNaN(a)||a<0||t<0){alert("Enter the amount (and tax if any).");return}if(!dt.input.value){alert("Pick the date.");return}if(!cat.input.value){alert("Pick a category.");return}
-    var row={spent_on:dt.input.value,amount:r2(a+t),tax:r2(t),category:cat.input.value,vendor:ve.input.value.trim(),note:no.input.value.trim(),code:code.input.value.trim(),payment:pay.input.value,receipt_no:rn.input.value.trim(),client_id:cl.input.value||null};
-    var dup=findDup(row,e&&e.id);if(dup&&!confirm("This looks like a duplicate of "+dupText(dup)+".\n\nSave it anyway?"))return;sv.disabled=true;
+    if(isNaN(a)||a<0||t<0){alert("Enter the amount (and tax if any).");return}if(!dtVal()){alert("Enter the date like 10/21/2026, or tap the calendar.");return}if(!cat.input.value){alert("Pick a category.");return}
+    var row={spent_on:dtVal(),amount:r2(a+t),tax:r2(t),category:cat.input.value,vendor:ve.input.value.trim(),note:no.input.value.trim(),code:code.input.value.trim(),payment:pay.input.value,receipt_no:rn.input.value.trim(),client_id:cl.input.value||null};
+    var dup=findDup(row,e&&e.id);if(dup&&splitIds[dup.id])dup=null;if(dup&&!confirm("This looks like a duplicate of "+dupText(dup)+".\n\nSave it anyway?"))return;sv.disabled=true;
     var q=e?sb.from("expenses").update(row).eq("id",e.id).select().single():sb.from("expenses").insert(Object.assign({created_by:myEmail||""},row)).select().single();
     q.then(function(r){sv.disabled=false;if(r.error||!r.data){alert("Could not save. Did you run the Stage 9 and Stage 13 SQL in Supabase?");return}if(e)Object.assign(e,r.data);else expenses.unshift(r.data);repData=null;
       var files=pend.slice();if(keep&&keep.checked&&scanFile)files.push(scanFile);
-      if(!files.length){closeDetail();render();return}
-      sv.disabled=true;sv.textContent="Uploading photo...";uploadMany(files,{expense_id:r.data.id,client_id:r.data.client_id,kind:"receipt"}).then(function(res){var msg=uploadMsg(res);if(msg)alert(msg);closeDetail();render()})})});acts.appendChild(sv);
+      function done(){if(again){var ids=Object.assign({},splitIds);ids[r.data.id]=1;closeDetail();render();openExpense(null,{date:r.data.spent_on,vendor:r.data.vendor,receipt_no:r.data.receipt_no,payment:r.data.payment,code:r.data.code,splitIds:ids})}else{closeDetail();render()}}
+      if(!files.length){done();return}
+      sv.disabled=true;sv.textContent="Uploading photo...";uploadMany(files,{expense_id:r.data.id,client_id:r.data.client_id,kind:"receipt"}).then(function(res){var msg=uploadMsg(res);if(msg)alert(msg);done()})})}
+  var sv=btn("Save","btn",function(){again=false;doSave()});acts.appendChild(sv);
+  if(!e)acts.appendChild(btn("Save and add another item","btn alt",function(){again=true;doSave()}));
   if(e)acts.appendChild(btn("Delete","btn danger",function(){if(!confirm("Delete this expense?"))return;sb.from("expenses").delete().eq("id",e.id).then(function(r){if(r.error){alert("Could not delete.");return}expenses=expenses.filter(function(z){return z.id!==e.id});repData=null;closeDetail();render()})}));
   p.appendChild(acts)}
 
