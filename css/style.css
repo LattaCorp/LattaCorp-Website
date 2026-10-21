@@ -567,3 +567,8 @@ header .lang a{color:inherit;text-decoration:none;padding:2px 3px}header .lang a
 #pcalc .pc-hint,#pcalc .pc-big{color:var(--muted);margin:0 0 10px}
 @media (max-width:560px){#pcalc .pc-row{grid-template-columns:1fr}}
 .qleft>.calc{margin:0 0 34px}.qleft>.calc h2{text-align:center;margin:0 0 12px}.qleft>h2.qh{margin-top:0}
+
+#pcalc .pc-link{display:block;margin:12px auto 0;background:none;border:0;color:var(--forest);text-decoration:underline;font:inherit;font-weight:600;cursor:pointer}
+#pcalc .pc-su{text-align:left;margin-top:16px;padding-top:14px;border-top:1px solid #dfe8dc;display:grid;gap:10px}#pcalc .pc-su h3{margin:0}
+#pcalc .pc-su input{width:100%}#pcalc .pc-err{color:#a12;margin:0;font-weight:600}
+#pcalc .pc-thanks{text-align:center;padding:18px 0}.qsub{margin:-6px 0 14px;color:var(--muted)}

@@ -21,8 +21,13 @@
       opts: "Anything that applies to your yard?", est: "Estimated price per visit", about: "About", of: "sq ft of grass",
       other: "Other option", rough: "A rough estimate. Final pricing depends on your property and is confirmed in your quote.",
       big: "That's a large property. Please request a custom quote and we'll price it for you.",
-      enter: "Enter your square footage to see a rough price.", cta: "Get an exact quote", min: "Minimum visit price applies.",
-      note: "Calculator estimate"
+      enter: "Enter your square footage to see a rough price.", cta: "Request an exact quote", min: "Minimum visit price applies.",
+      note: "Calculator estimate",
+      signup: "Sign up at this price", exact: "Or request an exact quote instead",
+      sh: "Sign up at your instant quote price", sd: "We'll lock in this price to start. If, after we review your property, we find something that changes the work, we'll let you know before anything changes. This is not a final contract.",
+      nm: "Full name", ph2: "Phone", em: "Email", ad: "Service address", send: "Sign up", sending: "Sending...", back: "Cancel",
+      ok: "You're signed up!", ok2: "We received your sign-up at the instant quote price. We'll review your property and confirm within 1 to 3 business days. Need us sooner? Call or text 407-470-5309.",
+      err: "Sorry, something went wrong. Please try again or call or text 407-470-5309."
     },
     es: {
       sub: "Elija el tamaño de su césped y las opciones para ver un precio aproximado por visita. Su cotización final se confirma después de revisar su propiedad.",
@@ -31,8 +36,13 @@
       opts: "¿Algo de esto aplica a su patio?", est: "Precio estimado por visita", about: "Aproximadamente", of: "pies cuadrados de césped",
       other: "Otra opción", rough: "Un estimado aproximado. El precio final depende de su propiedad y se confirma en su cotización.",
       big: "Es una propiedad grande. Solicite una cotización personalizada y le daremos un precio.",
-      enter: "Ingrese sus pies cuadrados para ver un precio aproximado.", cta: "Obtener una cotización exacta", min: "Se aplica el precio mínimo por visita.",
-      note: "Estimado de la calculadora"
+      enter: "Ingrese sus pies cuadrados para ver un precio aproximado.", cta: "Solicitar una cotización exacta", min: "Se aplica el precio mínimo por visita.",
+      note: "Estimado de la calculadora",
+      signup: "Inscribirme con este precio", exact: "O solicitar una cotización exacta",
+      sh: "Inscríbase con su precio de cotización instantánea", sd: "Reservamos este precio para comenzar. Si después de revisar su propiedad encontramos algo que cambie el trabajo, se lo informaremos antes de cualquier cambio. Esto no es un contrato final.",
+      nm: "Nombre completo", ph2: "Teléfono", em: "Correo electrónico", ad: "Dirección del servicio", send: "Inscribirme", sending: "Enviando...", back: "Cancelar",
+      ok: "¡Está inscrito!", ok2: "Recibimos su inscripción con el precio de cotización instantánea. Revisaremos su propiedad y confirmaremos en 1 a 3 días hábiles. ¿Nos necesita antes? Llame o envíe un mensaje al 407-470-5309.",
+      err: "Lo sentimos, algo salió mal. Inténtelo de nuevo o llame o envíe un mensaje al 407-470-5309."
     }
   };
   var S = { basis: "grass", sq: "", freq: "weekly", pick: {} };
@@ -108,8 +118,36 @@
       if (S.basis === "lot") out.appendChild(ce("div", "pc-alt", X.about + " " + gr.toLocaleString(es ? "es-US" : "en-US") + " " + X.of));
       if (b.atMin) out.appendChild(ce("div", "pc-alt", X.min));
       out.appendChild(ce("div", "pc-rough", X.rough));
-      out.appendChild(cta("Lawn maintenance, " + (S.freq === "weekly" ? "weekly" : "bi-weekly") + ", about " + gr.toLocaleString("en-US") + " sq ft of grass" +
-        (chosen.length ? " (" + chosen.map(function (o) { return o.en.replace(/\?$/, ""); }).join("; ") + ")" : "") + ", estimate $" + total + " per visit"));
+      var desc = "Lawn maintenance, " + (S.freq === "weekly" ? "weekly" : "bi-weekly") + ", about " + gr.toLocaleString("en-US") + " sq ft of grass" +
+        (chosen.length ? " (" + chosen.map(function (o) { return o.en.replace(/\?$/, ""); }).join("; ") + ")" : "");
+      var su = ce("button", "btn", X.signup); su.type = "button"; su.addEventListener("click", function () { su.style.display = "none"; out.appendChild(signupForm(desc, total)); });
+      out.appendChild(su);
+      var ex = cta(desc + ", estimate $" + total + " per visit"); ex.textContent = X.exact; ex.className = "pc-link"; out.appendChild(ex);
+    }
+    function signupForm(desc, total) {
+      var f = ce("form", "pc-su"); f.setAttribute("novalidate", "");
+      f.appendChild(ce("h3", null, X.sh)); f.appendChild(ce("p", "pc-rough", X.sd));
+      var ins = {};
+      [["nm", "text", "name", "name"], ["ph2", "tel", "tel", "phone"], ["em", "email", "email", "email"], ["ad", "text", "street-address", "addr"]].forEach(function (d) {
+        var l = ce("label", null, X[d[0]]), i = document.createElement("input"); i.type = d[1]; i.required = true; i.autocomplete = d[2]; l.appendChild(i); f.appendChild(l); ins[d[3]] = i;
+      });
+      var hp = document.createElement("input"); hp.type = "text"; hp.tabIndex = -1; hp.autocomplete = "off"; hp.setAttribute("aria-hidden", "true"); hp.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px"; f.appendChild(hp);
+      var err = ce("p", "pc-err"); err.setAttribute("role", "alert"); err.style.display = "none"; f.appendChild(err);
+      var b = ce("button", "btn", X.send); b.type = "submit"; f.appendChild(b);
+      f.addEventListener("submit", function (e) {
+        e.preventDefault();
+        for (var k in ins) if (!ins[k].value.trim() || !ins[k].checkValidity()) { ins[k].focus(); ins[k].reportValidity && ins[k].reportValidity(); return; }
+        b.disabled = true; b.textContent = X.sending; err.style.display = "none";
+        var fields = [{ label: "Full name", value: ins.name.value }, { label: "Phone", value: ins.phone.value }, { label: "Email", value: ins.email.value },
+          { label: "Service address", value: ins.addr.value }, { label: "Service", value: "Lawn maintenance" }, { label: "Signed up at instant quote price", value: "$" + total + " per visit" },
+          { label: "Calculator details", value: desc }, { label: "Note", value: "Customer signed up at the Instant Quote Calculator price. Price is subject to change after property review." }];
+        var done = function () { root.textContent = ""; var t = ce("div", "pc-thanks"); t.setAttribute("role", "status"); t.appendChild(ce("h3", null, X.ok)); t.appendChild(ce("p", null, X.ok2)); root.appendChild(t); t.scrollIntoView({ block: "center" }); };
+        if (window.FORM_LIVE === false) { done(); return; }
+        fetch("/api/submit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "Instant quote signup", lang: window.lang === "es" ? "es" : "en", lc_trap_7: hp.value, fields: fields, photos: [] }) })
+          .then(function (r) { if (!r.ok) throw 0; done(); })
+          .catch(function () { err.textContent = X.err; err.style.display = "block"; b.disabled = false; b.textContent = X.send; });
+      });
+      return f;
     }
     function cta(noteText) {
       var b = ce("button", "btn", X.cta); b.type = "button";

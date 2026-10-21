@@ -9,7 +9,7 @@ const DEFAULT_TO = "lattacorpofcentralfl@gmail.com";
 const DEFAULT_SUPABASE_URL = "https://lvaofwtfxwlqwvzesckt.supabase.co";
 // Public (browser-safe) key, the same one in crm/config.js. Used only to ask Supabase who a signed-in person is.
 const PUBLISHABLE_KEY = "sb_publishable_1N8kZ8Zk5YvMA0W8Fzpsnw_jWvkrVlK";
-const KINDS = ["Quote request", "Service request", "Contact message", "Proposal request"];
+const KINDS = ["Quote request", "Service request", "Contact message", "Proposal request", "Instant quote signup"];
 const MAX_FIELDS = 60, MAX_VALUE = 5000, MAX_PHOTOS = 8, MAX_PHOTO_BYTES = 4 * 1024 * 1024, MAX_TOTAL_BYTES = 24 * 1024 * 1024;
 
 const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
