@@ -990,20 +990,23 @@ function openExpense(e,pre,scanFile){
   var pay=fld("Payment","select",src.payment||"Debit",pays.map(function(c){return[c,c]}));
   var g2=el("div","grid2");g2.appendChild(cat);g2.appendChild(pay);p.appendChild(g2);
   var rn=fld("Receipt #","text",src.receipt_no||"");p.appendChild(rn);
-  var am=fld("Amount ($, before tax)","number",e?expNet(e):(pre.amount!=null?pre.amount:"")),tx=fld("Tax ($)","number",e?(expTax(e)||""):(pre.tax||"")),tp=fld("Tax % (pick or type)","number","");
-  [am,tx].forEach(function(f){f.input.step="0.01";f.input.inputMode="decimal"});tp.input.step="0.01";tp.input.min="0";tp.input.inputMode="decimal";tp.input.placeholder="0";tp.input.setAttribute("list","exTaxP");
+  var DEF_TAXP=7.5,haveTax=!!(e||pre.amount!=null||pre.tax);
+  var am=fld("Amount ($, before tax)","number",e?expNet(e):(pre.amount!=null?pre.amount:"")),tx=fld("Tax ($)","number",e?(expTax(e)||""):(pre.tax||"")),tp=fld("Tax rate (%)","number","");
+  am.input.step="0.01";am.input.inputMode="decimal";tp.input.step="0.01";tp.input.min="0";tp.input.inputMode="decimal";tp.input.placeholder="7.5";tp.input.setAttribute("list","exTaxP");
   var tpl=document.createElement("datalist");tpl.id="exTaxP";[0,6,6.5,7,7.5].forEach(function(v){var o=document.createElement("option");o.value=v;o.label=v+"%";tpl.appendChild(o)});p.appendChild(tpl);
-  var tpq=el("div","note","Tax is figured on this item only. For a receipt with different tax rates, add each part as its own item (use Save and add another item).");
-  function pctFromTax(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;tp.input.value=(a>0&&t>0)?String(Math.round(t/a*10000)/100):(t>0?"":"0")}
-  function taxFromPct(){var a=parseFloat(am.input.value)||0,pc=parseFloat(tp.input.value);if(isNaN(pc))return;tx.input.value=pc>0?String(r2(a*pc/100)):""}
-  pctFromTax();
-  var g3=el("div","grid2");g3.appendChild(am);g3.appendChild(tp);p.appendChild(g3);p.appendChild(tx);p.appendChild(tpq);
-  var tot=el("div","invtotal");function upd(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;tot.textContent="Total "+m2(r2(a+t))}upd();
-  am.input.addEventListener("input",function(){if(tp.input.value!=="")taxFromPct();upd()});tp.input.addEventListener("input",function(){taxFromPct();upd()});tx.input.addEventListener("input",function(){pctFromTax();upd()});p.appendChild(tot);
+  /* tx.input holds the tax in dollars (not shown). It is kept exactly as scanned or saved until you change the amount or the rate. */
+  var fixedTax=haveTax&&(parseFloat(tx.input.value)||0)>0;
+  (function(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;tp.input.value=haveTax?((a>0&&t>0)?String(Math.round(t/a*10000)/100):"0"):String(DEF_TAXP)})();
+  function calcTax(){var a=parseFloat(am.input.value)||0,pc=parseFloat(tp.input.value)||0;tx.input.value=pc>0?String(r2(a*pc/100)):""}
+  if(!haveTax)calcTax();
+  var g3=el("div","grid2");g3.appendChild(am);g3.appendChild(tp);p.appendChild(g3);
+  p.appendChild(el("div","note","Tax is added to the amount to make the total. For a receipt with different tax rates, add each part as its own item (Save and add another item)."));
+  var tot=el("div","invtotal");function upd(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;tot.textContent="Amount "+m2(a)+" + Tax "+m2(t)+" = Total "+m2(r2(a+t))}upd();
+  am.input.addEventListener("input",function(){fixedTax=false;calcTax();upd()});tp.input.addEventListener("input",function(){fixedTax=false;calcTax();upd()});p.appendChild(tot);
   var dw=el("div","pcard");dw.style.cssText="background:#fff3c4;border-color:#e0c25a;color:#7a5b00;font-weight:600";dw.hidden=true;p.appendChild(dw);
   function cur(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;return{spent_on:dtVal(),amount:r2(a+t),vendor:ve.input.value,receipt_no:rn.input.value}}
   function chk(){var d=findDup(cur(),e&&e.id);if(d&&splitIds[d.id])d=null;dw.hidden=!d;if(d)dw.textContent="⚠ Possible duplicate: "+dupText(d)+" is already saved."}
-  [dt,ve,rn,am,tx].forEach(function(f){f.input.addEventListener("input",chk);f.input.addEventListener("change",chk)});setTimeout(chk,0);
+  [dt,ve,rn,am,tp].forEach(function(f){f.input.addEventListener("input",chk);f.input.addEventListener("change",chk)});setTimeout(chk,0);
   var cl=fld("For a client's job (optional)","select",e&&e.client_id?e.client_id:"",[["","None"]].concat(clients.filter(function(c){return!c.archived||(e&&e.client_id===c.id)}).map(function(c){return[c.id,c.name]})));p.appendChild(cl);
   /* remember the code and details you used last time for the same category or vendor */
   var touched={code:!!(e||pre.code),cat:!!(e||pre.category)};
