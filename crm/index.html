@@ -61,6 +61,7 @@ textarea{min-height:110px;resize:vertical}
 .row:hover{box-shadow:0 4px 14px rgba(27,85,43,.12)}
 .row.new{border-left-color:var(--gold)}
 .row b{font-size:1.02rem}.row .sub{color:var(--muted);font-size:.9rem}
+.calcrow{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0}.calccard{flex:1;min-width:140px;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;text-align:center}.calcbig{font-size:2rem;font-weight:800;color:var(--forest);margin:2px 0 6px}.calcbox details summary{cursor:pointer;font-weight:700;color:var(--forest)}
 .invbar{display:flex;gap:10px;align-items:center;margin:4px 0 10px;flex-wrap:wrap}.invbar input{flex:1;min-width:200px;border:1px solid #bcc9b9;border-radius:999px;padding:9px 16px;font:inherit}
 .invwrap{overflow:auto;border:1px solid #cfd9cc;border-radius:8px;background:#fff;max-height:68vh}
 .invgrid{border-collapse:separate;border-spacing:0;width:100%;min-width:520px;font-size:.95rem}
@@ -275,7 +276,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=37"></script>
+<script src="app.js?v=38"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

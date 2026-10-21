@@ -353,7 +353,7 @@ function openImport(){
     ["Schedule","schedule calendar route today tomorrow visit visits crew day week",function(){view="schedule"}],["Weather delay","weather rain delay storm reschedule",function(){view="schedule";openWeather(today())}],["To-Do","todo to-do task tasks reminder",function(){view="todo"}],
     ["Invoices (Billing)","invoices invoice bill billing payment paid unpaid overdue owed zelle",function(){view="billing";bfilter="open"}],["Ready to bill","bill billing unbilled ready to-bill create invoices",function(){view="billing";bfilter="tobill"}],["Estimates (Billing)","estimates estimate quote proposal",function(){view="billing";bfilter="estimates"}],
     ["Reports","reports report revenue profit earnings income money",function(){view="reports";rtab="overview"}],["Tax report","tax taxes report year-end equipment",function(){view="reports";rtab="tax"}],["Expenses","expenses expense receipt spending cost costs vendor scan",function(){view="expenses"}],["Photos","photos photo pictures picture images gallery before after receipt",function(){view="photos"}],
-    ["Inventory","inventory stock supplies equipment parts tools chemicals fuel",function(){view="inventory";invq=""}],["Team","team staff users user login access owner office permissions",function(){if(isOwner())view="team";else view="leads"}],["Billing settings","settings business zelle terms footer",function(){view="billing";openBizSettings()}]];
+    ["Price calculator","price prices pricing calculator estimate quote rate rates mow mowing lawn sqft square feet",function(){view="billing";bfilter="estimates";setTimeout(openCalc,0)}],["Inventory","inventory stock supplies equipment parts tools chemicals fuel",function(){view="inventory";invq=""}],["Team","team staff users user login access owner office permissions",function(){if(isOwner())view="team";else view="leads"}],["Billing settings","settings business zelle terms footer",function(){view="billing";openBizSettings()}]];
   function topicHit(tp,t){var w=(tp[0]+" "+tp[1]).toLowerCase().split(/\s+/);return t.every(function(x){return w.some(function(y){return y.indexOf(x)===0})})}
   function close(){res.classList.remove("on");res.textContent=""}
   function run(){
@@ -1673,7 +1673,7 @@ function renderBilling(){
   var bg=billGroups();
   [["tobill","To bill",bg.order.length],["open","Open",op.length],["paid","Paid",pd_.length],["estimates","Estimates",estimates.filter(function(e){return(e.status==="draft"||e.status==="sent")&&!estExpired(e)}).length]].forEach(function(s){
     var b=el("button","tab"+(bfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){bfilter=s[0];render()});tabs.appendChild(b)});
-  $("topbtns").appendChild(btn("Billing settings","btn alt",openBizSettings));
+  $("topbtns").appendChild(btn("Price calculator","btn alt",openCalc));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Billing settings","btn alt",openBizSettings));
   var list=$("list");list.textContent="";
   if(bfilter==="estimates")return renderEstimates(list);
   if(billErr){list.appendChild(el("div","empty","Billing isn't set up yet. Run the Stage 5 SQL in Supabase (SQL Editor), then press Refresh."));return}
@@ -1829,6 +1829,37 @@ function clientEstimatesSection(c){
     var l=el("div");l.appendChild(el("b",null,estNum(e.number)+" · "+money(e.total)));l.appendChild(el("div","note",e.title||"Estimate"));r.appendChild(l);r.appendChild(estChip(e));r.addEventListener("click",function(){openEstimate(e.id)});sec.appendChild(r)});
   if(mine.length>5)sec.appendChild(el("div","note","+ "+(mine.length-5)+" older estimates in Billing > Estimates."));
   return sec}
+/* ---- Lawn price calculator (rough per-visit price for lawn maintenance) ---- */
+var PRICE_DEF={base:20,per1000:4,bi:1.2,minw:35,minb:40,step:5,grass:52};
+function pricing(){var o=Object.assign({},PRICE_DEF),p=biz&&biz.pricing&&typeof biz.pricing==="object"?biz.pricing:{};Object.keys(PRICE_DEF).forEach(function(k){var v=parseFloat(p[k]);if(!isNaN(v)&&v>=0)o[k]=v});return o}
+function priceFor(g,freq,P){P=P||pricing();var w=P.base+P.per1000*g/1000,raw=freq==="biweekly"?w*P.bi:w,st=P.step>0?Math.round(raw/P.step)*P.step:Math.round(raw),mn=freq==="biweekly"?P.minb:P.minw;return{price:Math.max(st,mn),atMin:st<=mn}}
+function calcWidget(use){
+  var box=el("div","calcbox"),P=pricing();
+  var basis=fld("Square feet of","select","grass",[["grass","Grass only (mowed area)"],["lot","Whole property (grass is about "+Math.round(P.grass)+"%)"]]),sq=fld("Square feet","number","");sq.input.inputMode="numeric";sq.input.min="0";
+  box.appendChild(basis);box.appendChild(sq);
+  var out=el("div","calcout");box.appendChild(out);
+  function draw(){
+    out.textContent="";P=pricing();var n=parseFloat(sq.input.value);if(!(n>0)){out.appendChild(el("div","note","Enter the square footage to see a rough price."));return}
+    var g=basis.input.value==="lot"?n*P.grass/100:n,gr=Math.round(g);
+    if(basis.input.value==="lot")out.appendChild(el("div","note","About "+gr.toLocaleString("en-US")+" sq ft of grass."));
+    var row=el("div","calcrow");
+    [["weekly","Weekly"],["biweekly","Bi-weekly"]].forEach(function(f){var r=priceFor(g,f[0],P),c=el("div","calccard"),b=el("div","calcbig","$"+r.price);c.appendChild(el("div","note",f[1]+" · per visit"));c.appendChild(b);
+      if(r.atMin)c.appendChild(el("div","note","Minimum price"));
+      if(use)c.appendChild(btn("Use this price","btn alt sm",function(){use("Lawn maintenance, "+f[1].toLowerCase()+" (about "+gr.toLocaleString("en-US")+" sq ft of grass)",r.price)}));
+      row.appendChild(c)});
+    out.appendChild(row);out.appendChild(el("div","note","A rough guide, rounded to the nearest $"+P.step+". Adjust for hills, fences, gates, heavy overgrowth or distance."))}
+  sq.input.addEventListener("input",draw);basis.input.addEventListener("change",draw);draw();
+  if(isOwner()){
+    var d=document.createElement("details");d.style.marginTop="14px";d.appendChild(el("summary",null,"Edit rates (owner)"));
+    var F={base:fld("Starting price per visit ($)","number",P.base),per1000:fld("Added per 1,000 sq ft of grass ($)","number",P.per1000),bi:fld("Bi-weekly costs this many times the weekly price (1.2 = 20% more)","number",P.bi),
+      minw:fld("Weekly minimum ($)","number",P.minw),minb:fld("Bi-weekly minimum ($)","number",P.minb),step:fld("Round to the nearest ($)","number",P.step),grass:fld("Grass is about this % of a whole property","number",P.grass)};
+    Object.keys(F).forEach(function(k){F[k].input.step="any";d.appendChild(F[k])});
+    d.appendChild(btn("Save rates","btn sm",function(){var o={};for(var k in F){var v=parseFloat(F[k].input.value);if(isNaN(v)||v<0){alert("Every rate needs a number, zero or more.");return}o[k]=v}
+      var q=biz&&biz.id?sb.from("business").update({pricing:o}).eq("id",biz.id):sb.from("business").upsert({id:1,pricing:o});
+      q.select().then(function(r){var row=r.data&&(Array.isArray(r.data)?r.data[0]:r.data);if(r.error||!row){alert("Could not save. Run the Stage 15 SQL in Supabase first.");return}biz=row;draw();alert("Rates saved.")})}));
+    box.appendChild(d)}
+  return box}
+function openCalc(){var p=panel();p.appendChild(el("h2",null,"Lawn price calculator"));p.appendChild(el("p","note","A rough per-visit price for lawn maintenance, from the size of the lawn. You can also use it inside a new estimate."));p.appendChild(calcWidget(null))}
 function openEstimateForm(cid){
   if(estErr){alert("Run the Stage 11 SQL in Supabase first, then press Refresh.");return}
   var p=panel();p.appendChild(el("h2",null,"New estimate"));
@@ -1836,8 +1867,10 @@ function openEstimateForm(cid){
   var cs=fld("Client","select",cid||"",[["","Choose a client..."]].concat(list.map(function(c){return[c.id,c.name+(c.company?" · "+c.company:"")]})));
   var ttl=fld("Title (for example: Spring cleanup and mulch)","text",""),scp=fld("Details the client will see (optional)","textarea",""),vd=fld("Valid for (days)","number","30");
   p.appendChild(cs);p.appendChild(ttl);p.appendChild(scp);p.appendChild(vd);
-  p.appendChild(el("h3",null,"Lines"));var box=el("div"),rows=[];p.appendChild(box);
+  p.appendChild(el("h3",null,"Lines"));var box=el("div"),rows=[];
   function addRow(){var r=el("div","grid2"),d=fld("Description","text",""),a=fld("Amount ($)","number","");a.input.step="0.01";a.input.inputMode="decimal";r.appendChild(d);r.appendChild(a);box.appendChild(r);rows.push({d:d,a:a})}
+  var cd=document.createElement("details");cd.style.margin="0 0 10px";cd.appendChild(el("summary",null,"Price calculator (lawn maintenance)"));
+  cd.appendChild(calcWidget(function(desc,amt){var t=rows.filter(function(x){return!x.d.input.value.trim()&&x.a.input.value===""})[0];if(!t){addRow();t=rows[rows.length-1]}t.d.input.value=desc;t.a.input.value=String(amt);cd.open=false}));p.appendChild(cd);p.appendChild(box);
   addRow();var more=btn("+ Add another line","btn alt sm",addRow);p.appendChild(more);
   var go=btn("Save estimate","btn",function(){
     if(!cs.input.value){alert("Choose a client.");return}
