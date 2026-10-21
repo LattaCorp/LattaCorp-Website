@@ -56,10 +56,10 @@ footer .btn:hover{background:var(--leaf);border-color:var(--leaf);color:#fff}
 .chk.oth{position:relative}.tipi{position:static;display:none;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--leaf);color:#fff;font:600 .72rem Lora,serif;cursor:help;margin-left:2px}
 .tipi::after{content:attr(data-tip);display:none;position:absolute;left:0;top:calc(100% + 6px);width:min(280px,80vw);background:var(--forest);color:#fff;padding:10px 12px;border-radius:4px;font-size:.85rem;line-height:1.4;font-weight:400;text-align:left;z-index:10}
 .tipi.on{display:inline-grid}.tipi:hover::after,.tipi:focus::after{display:block}
-form input[type=checkbox]{-webkit-appearance:none;appearance:none;width:22px;height:22px;margin:0;flex:none;border:2px solid #9bb5a0;border-radius:5px;background:#fff;position:relative;cursor:pointer;padding:0}
-form input[type=checkbox]:hover{border-color:var(--forest)}
-form input[type=checkbox]:checked{border-color:#1f9d3a}
-form input[type=checkbox]:checked::after{content:"";position:absolute;left:-7%;top:-38%;width:145%;height:145%;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 17 C7 18.5 10 21.5 12 26.5 C14.5 17 21 8 30 3' fill='none' stroke='%231f9d3a' stroke-width='3.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center/contain;pointer-events:none}
+form input[type=checkbox],#pcalc input[type=checkbox]{-webkit-appearance:none;appearance:none;width:22px;height:22px;margin:0;flex:none;border:2px solid #9bb5a0;border-radius:5px;background:#fff;position:relative;cursor:pointer;padding:0}
+form input[type=checkbox]:hover,#pcalc input[type=checkbox]:hover{border-color:var(--forest)}
+form input[type=checkbox]:checked,#pcalc input[type=checkbox]:checked{border-color:#1f9d3a}
+form input[type=checkbox]:checked::after,#pcalc input[type=checkbox]:checked::after{content:"";position:absolute;left:-7%;top:-38%;width:145%;height:145%;background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 17 C7 18.5 10 21.5 12 26.5 C14.5 17 21 8 30 3' fill='none' stroke='%231f9d3a' stroke-width='3.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") no-repeat center/contain;pointer-events:none}
 form .ack input[type=checkbox]{margin-top:4px}
 #ackrow{font-weight:600;font-size:1.1rem;line-height:1.4}#ackrow{align-items:flex-start;border-top:1px solid #c5d3c1;padding-top:18px;margin-top:6px}#ackrow input{width:26px;height:26px;flex:none;margin-top:2px}
 .box{display:none}.box.on{display:block}.hero p.sm{font-size:1rem;margin-top:18px}.hero p.sm a{color:var(--forest);font-weight:600}
@@ -572,3 +572,7 @@ header .lang a{color:inherit;text-decoration:none;padding:2px 3px}header .lang a
 #pcalc .pc-su{text-align:left;margin-top:16px;padding-top:14px;border-top:1px solid #dfe8dc;display:grid;gap:10px}#pcalc .pc-su h3{margin:0}
 #pcalc .pc-su input{width:100%}#pcalc .pc-err{color:#a12;margin:0;font-weight:600}
 #pcalc .pc-thanks{text-align:center;padding:18px 0}.qsub{margin:-6px 0 14px;color:var(--muted)}
+
+#pcalc{border:2px solid var(--leaf)}
+#pcalc .pc-opt{align-items:center}#pcalc .pc-opt input{margin:0;width:22px;height:22px}
+form#cf{border:2px solid var(--leaf)}
