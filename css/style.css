@@ -551,3 +551,19 @@ html.rvon .rv.in{opacity:1;transform:none}
 .sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;border:0}
 .flinks.fseo{flex-wrap:wrap;white-space:normal;font-size:.88rem;margin-bottom:12px}.flinks.fseo a{font-weight:500;opacity:.9}
 header .lang a{color:inherit;text-decoration:none;padding:2px 3px}header .lang a:hover{text-decoration:underline}
+
+/* Instant Price Calculator (Services page) */
+#pcalc{background:#fff;border:1px solid #cfdccb;border-radius:10px;padding:18px;box-shadow:0 2px 10px rgba(27,85,43,.07)}
+#pcalc .pc-sub{margin:0 0 12px;color:var(--muted)}
+#pcalc .pc-row{display:grid;grid-template-columns:1fr 1fr;gap:12px}#pcalc label{display:block;font-weight:600;font-size:.92rem}
+#pcalc select,#pcalc input[type=number]{display:block;width:100%;margin-top:4px;padding:10px;border:1px solid #bcc9b9;border-radius:6px;font:inherit;background:#fff}
+#pcalc .pc-freq{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin:14px 0 4px;font-weight:600}
+#pcalc .freq{display:inline-flex;border:1px solid var(--forest);border-radius:999px;overflow:hidden}#pcalc .freq button{border:0;background:#fff;color:var(--forest);padding:8px 16px;font:inherit;font-weight:600;cursor:pointer}#pcalc .freq button.on{background:var(--forest);color:#fff}
+#pcalc .pc-oh{margin:14px 0 4px;font-weight:700;color:var(--forest)}#pcalc .pc-opts{display:grid;gap:6px}
+#pcalc .pc-opt{display:flex;gap:10px;align-items:flex-start;font-weight:400;cursor:pointer}#pcalc .pc-opt input{width:auto;margin-top:4px;flex:none}
+#pcalc .pc-out{margin-top:16px;padding-top:14px;border-top:1px solid #dfe8dc;text-align:center}
+#pcalc .pc-lbl{font-weight:600;color:var(--muted)}#pcalc .pc-price{font-size:2.6rem;font-weight:800;color:var(--forest);line-height:1.1;margin:2px 0}
+#pcalc .pc-alt{font-size:.92rem;color:var(--muted);margin:2px 0}#pcalc .pc-rough{font-size:.85rem;color:var(--muted);margin:8px auto 12px;max-width:44ch}
+#pcalc .pc-hint,#pcalc .pc-big{color:var(--muted);margin:0 0 10px}
+@media (max-width:560px){#pcalc .pc-row{grid-template-columns:1fr}}
+.qleft>.calc{margin:0 0 34px}.qleft>.calc h2{text-align:center;margin:0 0 12px}.qleft>h2.qh{margin-top:0}

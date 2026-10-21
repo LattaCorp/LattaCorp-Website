@@ -175,17 +175,17 @@
 </main>
 
 <main id="services" class="page">
-<section id="quote" class="mint"><div class="wrap qgrid"><div class="qleft"><h2>Request a quote</h2>
+<section id="quote" class="mint"><div class="wrap qgrid"><div class="qleft"><div class="calc"><h2>Instant Price Calculator</h2><div id="pcalc"></div></div><h2 class="qh">Request a quote</h2>
 <form id="qf"><label>Full name<input required autocomplete="name" placeholder="Your full name"></label><label>Phone<input required type="tel" autocomplete="tel" placeholder="(407) 555-0123"></label>
 <label>Email<input required type="email" autocomplete="email" placeholder="you@example.com"></label><label>Service address<input required autocomplete="street-address" placeholder="Street address, city"></label>
 <label class="full">Service<select id="svc" required><option value="">Choose a service</option><option value="Lawn maintenance">Lawn maintenance</option><option value="Tree and hedge trimming">Tree and hedge trimming</option><option value="Mulching">Mulching</option><option value="other">Something else</option></select></label>
 <label id="planw" style="display:none">Maintenance plan<select id="plansel"><option value="">Choose a plan</option><option value="Basic">Basic</option><option value="Plus">Plus</option><option value="Premier">Premier</option></select><a href="#plans" id="seeplans" class="seeplans">Click here to see our maintenance plans</a></label>
 <label id="freqw" style="display:none">How often?<select id="freqsel"><option value="">Choose how often</option><option value="Weekly">Weekly</option><option value="Bi-weekly">Bi-weekly</option></select></label>
-<label class="full">Special requests<textarea rows="3" placeholder="Gate codes, pets, lawn size, anything we should know"></textarea></label>
+<label class="full">Special requests<textarea id="qnotes" rows="3" placeholder="Gate codes, pets, lawn size, anything we should know"></textarea></label>
 <div class="full photos"><div class="phl">Photos (optional)</div><p class="pht">Add a few photos of your lawn, beds, or trees and we can often give you an estimate remotely.</p>
 <input type="file" id="phin" accept="image/*" multiple hidden><button type="button" class="btn alt" id="phb">Add photos</button><span id="phn" class="phn" style="display:none">You can add up to 8 photos, 10 MB each.</span><div id="pthumbs" class="pthumbs"></div></div>
 <div id="disc" class="note full" aria-live="polite"></div>
-<div class="full"><button class="btn" type="submit">Send quote request</button><p class="rnote">Responses can take 1 to 3 business days.</p></div></form><div class="thanks" id="t-qf" role="status" tabindex="-1"><div class="tick">&#10003;</div><h2>Thank you!</h2><p>We received your quote request.</p><p class="tsub">Responses can take 1 to 3 business days.</p><p>Need us sooner? Call or text <a href="tel:4074705309">407-470-5309</a>.</p><button type="button" class="btn alt" data-again="t-qf">Send another request</button><p class="draftn">Draft preview only: this form is not connected yet.</p></div><div class="calc"><h2>Instant Price Calculator</h2><p>Coming soon: pick your services and lawn size and get an instant estimate.</p><div class="calcbox">Calculator area</div></div></div><div class="qimgs"><img src="images/photo-wide.jpg" data-img="wide" width="1400" height="1050" alt="Freshly mowed backyard lawn with a trimmed hedge line and a tree"><img src="images/photo-fence.jpg" data-img="fence" width="1400" height="1050" alt="Mowed lawn along an iron fence and a row of homes"></div></div></section>
+<div class="full"><button class="btn" type="submit">Send quote request</button><p class="rnote">Responses can take 1 to 3 business days.</p></div></form><div class="thanks" id="t-qf" role="status" tabindex="-1"><div class="tick">&#10003;</div><h2>Thank you!</h2><p>We received your quote request.</p><p class="tsub">Responses can take 1 to 3 business days.</p><p>Need us sooner? Call or text <a href="tel:4074705309">407-470-5309</a>.</p><button type="button" class="btn alt" data-again="t-qf">Send another request</button><p class="draftn">Draft preview only: this form is not connected yet.</p></div></div><div class="qimgs"><img src="images/photo-wide.jpg" data-img="wide" width="1400" height="1050" alt="Freshly mowed backyard lawn with a trimmed hedge line and a tree"><img src="images/photo-fence.jpg" data-img="fence" width="1400" height="1050" alt="Mowed lawn along an iron fence and a row of homes"></div></div></section>
 <section id="plans"><div class="wrap"><h2>Lawn maintenance plans</h2>
 <p style="color:var(--muted);max-width:62ch">Choose how often we visit and how much you want covered. Then request your quote.</p>
 <div class="freqrow"><span>How often?</span><div class="freq" role="radiogroup" aria-label="How often?"><button type="button" role="radio" aria-checked="true" data-f="Weekly" class="on">Weekly</button><button type="button" role="radio" aria-checked="false" data-f="Bi-weekly">Bi-weekly</button></div></div>
@@ -330,4 +330,6 @@
 <script src="js/i18n.js"></script>
 <script src="js/data.js"></script>
 <script src="js/forms.js"></script>
-<script src="js/app.js"></script></body></html>
+<script src="crm/config.js"></script>
+<script src="js/app.js"></script>
+<script src="js/calc.js"></script></body></html>
