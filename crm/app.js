@@ -911,6 +911,7 @@ function renderReports(){
 /* ======= Expenses tab: the tax ledger (Code, Date, Vendor, Description, Category, Payment, Receipt #, Amount, Tax, Total) ======= */
 /* The "amount" column in the database holds the TOTAL paid (amount + tax), so Reports keep working. The Amount shown here is total minus tax. */
 var LCOLS=["Code","Date","Vendor","Description","Category","Payment","Receipt #","Amount","Tax","Total"];
+var LCSV=LCOLS.concat(["Tax description"]);
 function m2(n){return"$"+(Number(n)||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
 function mdy(s){var m=String(s||"").slice(0,10).split("-");return m.length===3?(+m[1])+"/"+(+m[2])+"/"+m[0]:""}
 function expTax(e){return r2(Number(e.tax)||0)}
@@ -928,7 +929,7 @@ function findDup(r,ignoreId){
   return null}
 function dupText(x){return(x.vendor||"(no vendor)")+" on "+mdy(x.spent_on)+" for "+m2(expTotal(x))+(x.receipt_no?" (receipt # "+x.receipt_no+")":"")}
 function expCells(e){return[e.code||"",mdy(e.spent_on),e.vendor||"",e.note||"",e.category||"",e.payment||"",e.receipt_no||"",m2(expNet(e)),expTax(e)?m2(expTax(e)):"",m2(expTotal(e))]}
-function expCsv(rows){return[LCOLS].concat(rows.slice().sort(function(a,b){return a.spent_on<b.spent_on?-1:a.spent_on>b.spent_on?1:0}).map(function(e){return[e.code||"",mdy(e.spent_on),e.vendor||"",e.note||"",e.category||"",e.payment||"",e.receipt_no||"",expNet(e).toFixed(2),expTax(e).toFixed(2),expTotal(e).toFixed(2)]}))}
+function expCsv(rows){return[LCSV].concat(rows.slice().sort(function(a,b){return a.spent_on<b.spent_on?-1:a.spent_on>b.spent_on?1:0}).map(function(e){return[e.code||"",mdy(e.spent_on),e.vendor||"",e.note||"",e.category||"",e.payment||"",e.receipt_no||"",expNet(e).toFixed(2),expTax(e).toFixed(2),expTotal(e).toFixed(2),e.tax_note||""]}))}
 /* the small "Expenses" box: every category with its total for the year */
 function expenseBox(year){
   var rows=expInYear(year),by={},box=el("div","taxbox"),t=document.createElement("table");
@@ -952,7 +953,7 @@ function renderExpensesView(){
   var lay=el("div","exlayout"),body=el("div","exmain");det.classList.add("exside");lay.appendChild(body);lay.appendChild(det);list.appendChild(lay);
   function draw(){
     body.textContent="";var t=invToks(exq);
-    var rows=expInYear(exYear).filter(function(e){return(exCat==="all"||e.category===exCat)&&(!t.length||t.every(function(x){return expCells(e).join(" ").toLowerCase().indexOf(x)>-1}))});
+    var rows=expInYear(exYear).filter(function(e){return(exCat==="all"||e.category===exCat)&&(!t.length||t.every(function(x){return (expCells(e).join(" ")+" "+(e.tax_note||"")).toLowerCase().indexOf(x)>-1}))});
     rows.sort(function(a,b){return a.spent_on===b.spent_on?0:(a.spent_on<b.spent_on?exSort*-1:exSort)});
     var sn=0,st=0,sT=0;rows.forEach(function(e){sn+=expNet(e);st+=expTax(e);sT+=expTotal(e)});
     var hd=el("div","note",rows.length+" expense"+(rows.length===1?"":"s")+" · Amount "+m2(r2(sn))+" · Tax "+m2(r2(st))+" · Total "+m2(r2(sT)));hd.style.cssText="font-weight:700;margin:12px 0 6px";body.appendChild(hd);
@@ -1007,6 +1008,7 @@ function openExpense(e,pre,scanFile){
   p.appendChild(el("div","note","Tax is added to the amount to make the total. For a receipt with different tax rates, add each part as its own item (Save and add another item)."));
   var tot=el("div","invtotal");function upd(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;tot.textContent="Amount "+m2(a)+" + Tax "+m2(t)+" = Total "+m2(r2(a+t))}upd();
   am.input.addEventListener("input",function(){fixedTax=false;calcTax();upd()});tp.input.addEventListener("input",function(){fixedTax=false;calcTax();upd()});p.appendChild(tot);
+  var tn=fld("Tax description (notes for your accountant)","textarea",e?(e.tax_note||""):"");tn.input.placeholder="Why this was bought, what it was used for, how it should be treated for taxes...";p.appendChild(tn);
   var dw=el("div","pcard");dw.style.cssText="background:#fff3c4;border-color:#e0c25a;color:#7a5b00;font-weight:600";dw.hidden=true;p.appendChild(dw);
   function cur(){var a=parseFloat(am.input.value)||0,t=parseFloat(tx.input.value)||0;return{spent_on:dtVal(),amount:r2(a+t),vendor:ve.input.value,receipt_no:rn.input.value}}
   function chk(){var d=findDup(cur(),e&&e.id);if(d&&splitIds[d.id])d=null;dw.hidden=!d;if(d)dw.textContent="⚠ Possible duplicate: "+dupText(d)+" is already saved."}
@@ -1036,9 +1038,10 @@ function openExpense(e,pre,scanFile){
     var a=parseFloat(am.input.value),t=parseFloat(tx.input.value);if(isNaN(t))t=0;
     if(isNaN(a)||a<0||t<0){alert("Enter the amount (and tax if any).");return}if(!dtVal()){alert("Enter the date like 10/21/2026, or tap the calendar.");return}if(!cat.input.value){alert("Pick a category.");return}
     var row={spent_on:dtVal(),amount:r2(a+t),tax:r2(t),category:cat.input.value,vendor:ve.input.value.trim(),note:no.input.value.trim(),code:code.input.value.trim(),payment:pay.input.value,receipt_no:rn.input.value.trim(),client_id:cl.input.value||null};
+    var tnv=tn.input.value.trim();if(tnv||(expenses.length&&("tax_note" in expenses[0])))row.tax_note=tnv;
     var dup=findDup(row,e&&e.id);if(dup&&splitIds[dup.id])dup=null;if(dup&&!confirm("This looks like a duplicate of "+dupText(dup)+".\n\nSave it anyway?"))return;sv.disabled=true;
     var q=e?sb.from("expenses").update(row).eq("id",e.id).select().single():sb.from("expenses").insert(Object.assign({created_by:myEmail||""},row)).select().single();
-    q.then(function(r){sv.disabled=false;if(r.error||!r.data){alert("Could not save. Did you run the Stage 9 and Stage 13 SQL in Supabase?");return}if(e)Object.assign(e,r.data);else expenses.unshift(r.data);repData=null;
+    q.then(function(r){sv.disabled=false;if(r.error||!r.data){alert("Could not save. Did you run the Stage 9, Stage 13 and Stage 16 SQL in Supabase?");return}if(e)Object.assign(e,r.data);else expenses.unshift(r.data);repData=null;
       var files=pend.slice();if(keep&&keep.checked&&scanFile)files.push(scanFile);
       function done(){if(again){var ids=Object.assign({},splitIds);ids[r.data.id]=1;closeDetail();render();openExpense(null,{date:r.data.spent_on,vendor:r.data.vendor,receipt_no:r.data.receipt_no,payment:r.data.payment,code:r.data.code,splitIds:ids})}else{closeDetail();render()}}
       if(!files.length){done();return}
