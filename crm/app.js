@@ -976,9 +976,9 @@ function openExpense(e,pre,scanFile){
   var codes={},vendors={};expenses.forEach(function(x){if(x.code)codes[x.code]=1;if(x.vendor)vendors[x.vendor]=1});
   function dl(id,obj){var d=document.createElement("datalist");d.id=id;Object.keys(obj).sort().forEach(function(k){var o=document.createElement("option");o.value=k;d.appendChild(o)});p.appendChild(d)}
   dl("exCodes",codes);dl("exVendors",vendors);
-  var code=fld("Code (up to 4 characters)","text",src.code||""),dt=fld("Date (type it like 10/21/2026, or tap the calendar)","text",mdy(e?e.spent_on:(pre.date||today())));dt.input.placeholder="MM/DD/YYYY";dt.input.inputMode="numeric";dt.input.autocomplete="off";
+  var code=fld("Code (up to 4 characters)","text",src.code||""),dt=fld("Date","text",mdy(e?e.spent_on:(pre.date||today())));dt.input.placeholder="MM/DD/YYYY";dt.input.inputMode="numeric";dt.input.autocomplete="off";
   var dpk=document.createElement("input");dpk.type="date";dpk.tabIndex=-1;dpk.setAttribute("aria-hidden","true");dpk.style.cssText="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px";dpk.value=e?e.spent_on:(pre.date||today());
-  var dbtn=btn("📅","btn alt sm",function(){dpk.value=dtVal()||today();try{dpk.showPicker()}catch(x){dpk.focus();dpk.click()}});dbtn.style.cssText="margin-top:6px";dbtn.setAttribute("aria-label","Open calendar");dt.appendChild(dbtn);dt.appendChild(dpk);
+  var dbtn=btn("📅","btn alt sm",function(){dpk.value=dtVal()||today();try{dpk.showPicker()}catch(x){dpk.focus();dpk.click()}});dbtn.style.cssText="margin:0;flex:none;padding:0 12px;min-height:42px";dbtn.setAttribute("aria-label","Open calendar");dbtn.type="button";var drow=el("div");drow.style.cssText="display:flex;gap:8px;align-items:stretch;position:relative";dt.input.style.cssText="flex:1;min-width:0";dt.appendChild(drow);drow.appendChild(dt.input);drow.appendChild(dbtn);drow.appendChild(dpk);
   function dtVal(){return parseDateLoose(dt.input.value)||""}
   dpk.addEventListener("change",function(){if(dpk.value){dt.input.value=mdy(dpk.value);dt.input.dispatchEvent(new Event("input"))}});code.input.setAttribute("list","exCodes");code.input.maxLength=4;
   var g1=el("div","grid2");g1.appendChild(code);g1.appendChild(dt);p.appendChild(g1);
