@@ -164,7 +164,9 @@ function renderClients(){
 /* ---- panel helpers ---- */
 function panel(){var p=$("panel");p.textContent="";p.appendChild(btn("×","close",closeDetail)).setAttribute("aria-label","Close");$("detail").classList.add("on");return p}
 function closeDetail(){$("detail").classList.remove("on")}
-$("detail").addEventListener("click",function(e){if(e.target===$("detail"))closeDetail()});
+/* Clicking the dim area outside a panel closes it, but not while a form is open (so a stray click or a drag that ends outside never loses what you typed). Use the X or Esc to close a form. */
+var dnDown=null;$("detail").addEventListener("mousedown",function(e){dnDown=e.target});
+$("detail").addEventListener("click",function(e){if(e.target!==$("detail")||dnDown!==$("detail"))return;if($("panel").querySelector("input:not([type=hidden]),textarea,select"))return;closeDetail()});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"){if(!$("invview").hidden)hideInvoice();else closeDetail()}});
 $("invclose").addEventListener("click",function(){hideInvoice()});$("invprint").addEventListener("click",function(){window.print()});
 
