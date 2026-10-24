@@ -162,7 +162,7 @@ function renderClients(){
 }
 
 /* ---- panel helpers ---- */
-function panel(){var p=$("panel");p.textContent="";p.appendChild(btn("×","close",closeDetail)).setAttribute("aria-label","Close");$("detail").classList.add("on");return p}
+function panel(){var p=$("panel");p.textContent="";p.appendChild(btn("×","close",closeDetail)).setAttribute("aria-label","Close");$("detail").classList.add("on");p.scrollTop=0;$("detail").scrollTop=0;return p}
 function closeDetail(){$("detail").classList.remove("on")}
 /* Clicking the dim area outside a panel closes it, but not while a form is open (so a stray click or a drag that ends outside never loses what you typed). Use the X or Esc to close a form. */
 var dnDown=null;$("detail").addEventListener("mousedown",function(e){dnDown=e.target});
@@ -1071,7 +1071,7 @@ function openExpense(e,pre,scanFile){
     var q=e?sb.from("expenses").update(row).eq("id",e.id).select().single():sb.from("expenses").insert(Object.assign({created_by:myEmail||""},row)).select().single();
     q.then(function(r){sv.disabled=false;if(r.error||!r.data){alert("Could not save. Did you run the Stage 9, Stage 13 and Stage 16 SQL in Supabase?");return}if(e)Object.assign(e,r.data);else expenses.unshift(r.data);repData=null;
       var files=pend.slice();if(keep&&keep.checked&&scanFile)files.push(scanFile);
-      function done(){if(again){var ids=Object.assign({},splitIds);ids[r.data.id]=1;closeDetail();render();openExpense(null,{date:r.data.spent_on,vendor:r.data.vendor,receipt_no:r.data.receipt_no,payment:r.data.payment,code:r.data.code,splitIds:ids})}else{closeDetail();render()}}
+      function done(){if(again){var ids=Object.assign({},splitIds);ids[r.data.id]=1;closeDetail();render();openExpense(null,{date:r.data.spent_on,vendor:r.data.vendor,receipt_no:r.data.receipt_no,payment:r.data.payment,code:r.data.code,splitIds:ids});setTimeout(function(){$("panel").scrollTop=0;$("detail").scrollTop=0;var f=$("panel").querySelector("input[type=number]");if(f)f.focus({preventScroll:true})},0)}else{closeDetail();render()}}
       if(!files.length){done();return}
       sv.disabled=true;sv.textContent="Uploading photo...";uploadMany(files,{expense_id:r.data.id,client_id:r.data.client_id,kind:"receipt"}).then(function(res){var msg=uploadMsg(res);if(msg)alert(msg);done()})})}
   var sv=btn("Save","btn",function(){again=false;doSave()});acts.appendChild(sv);
