@@ -5,7 +5,7 @@ var STATUSES=[["new","New"],["contacted","Contacted"],["quoted","Quoted"],["won"
 var TYPES=[["residential","Residential"],["hoa","HOA"],["commercial","Commercial"]];
 var leads=[],clients=[],props=[],clientsErr=false,services=[],jobs=[],visits=[],jobsErr=false;
 var photos=[],photoErr=false,pf={client:"all",kind:"all",when:"all"},psel=null,pshown=60;
-var expenses=[],expErr=false,rtab="overview",rper="month",rfrom="",rto="",exCat="all",exYear=String(new Date().getFullYear()),exq="",exShown=300,exSort=-1,taxYear=String(new Date().getFullYear()),taxMaking=false;
+var expenses=[],expErr=false,rtab="overview",rper="month",rfrom="",rto="",exCat="all",exYear=String(new Date().getFullYear()),exq="",exShown=300,exCol=1,exDir=-1,exF={},taxYear=String(new Date().getFullYear()),taxMaking=false;
 var todos=[],todoErr=false,tfilter="open",team=[];
 var role="owner",myEmail="";function isOwner(){return role==="owner"}
 var view="leads",lfilter="all",cfilter="active",jfilter="active",smode="day",selDate=today(),crewF="all",query="";
@@ -941,7 +941,29 @@ function expenseBox(year){
   expCats().forEach(function(c){var tr=document.createElement("tr"),a=document.createElement("td"),b=document.createElement("td");a.textContent=c;b.className="r";b.textContent=by[c]?m2(by[c]):"";total+=by[c]||0;tr.appendChild(a);tr.appendChild(b);t.appendChild(tr)});
   var ft=document.createElement("tr");ft.className="tot";var a2=document.createElement("td");a2.textContent="Overall Total";var b2=document.createElement("td");b2.className="r";b2.textContent=m2(r2(total));ft.appendChild(a2);ft.appendChild(b2);t.appendChild(ft);
   box.appendChild(t);return box}
-function renderExpensesView(){
+/* column drop-downs on the expense table: sort and filter by any column */
+function exKey(e,i){switch(i){case 0:return String(e.code||"").toLowerCase();case 1:return e.spent_on||"";case 2:return String(e.vendor||"").toLowerCase();case 3:return String(e.note||"").toLowerCase();case 4:return String(e.category||"").toLowerCase();case 5:return String(e.payment||"").toLowerCase();case 6:return String(e.receipt_no||"").toLowerCase();case 7:return expNet(e);case 8:return expTax(e);default:return expTotal(e)}}
+function exVal(e,i){return i===1?String(e.spent_on||"").slice(5,7):String(i===0?e.code:i===2?e.vendor:i===3?e.note:i===4?e.category:i===5?e.payment:i===6?e.receipt_no:"")||""}
+function exColOk(e){for(var k in exF){if(exF[k]!=null&&exF[k]!==""&&exVal(e,+k)!==exF[k])return false}return true}
+var EXMONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+var exOpen=null;
+function exClose(){if(exOpen){exOpen.remove();exOpen=null}}
+document.addEventListener("click",function(e){if(exOpen&&!exOpen.contains(e.target))exClose()});document.addEventListener("keydown",function(e){if(e.key==="Escape")exClose()});
+function exMenu(anchor,i,yr,redraw){
+  exClose();var m=el("div"),r=anchor.getBoundingClientRect(),num=i>=7,date=i===1;
+  m.setAttribute("role","menu");m.style.cssText="position:fixed;z-index:60;background:#fff;color:#1c2a20;border:2px solid var(--forest);border-radius:8px;box-shadow:0 6px 20px rgba(0,0,0,.2);padding:8px;min-width:210px;max-width:300px;display:grid;gap:6px;left:"+Math.max(8,Math.min(r.left,window.innerWidth-310))+"px;top:"+(r.bottom+4)+"px";
+  function item(label,fn,on){var b=btn(label,"btn alt sm",function(){fn();exClose();redraw()});b.style.cssText="text-align:left;"+(on?"background:var(--mint);font-weight:800":"");m.appendChild(b)}
+  item(date?"Oldest first":(num?"Low to high":"A to Z"),function(){exCol=i;exDir=1},exCol===i&&exDir===1);
+  item(date?"Newest first":(num?"High to low":"Z to A"),function(){exCol=i;exDir=-1},exCol===i&&exDir===-1);
+  if(!num){
+    var opts=[];if(date){EXMONTHS.forEach(function(n,k){opts.push([("0"+(k+1)).slice(-2),n])})}
+    else{var seen={};yr.forEach(function(e){var v=exVal(e,i);if(v&&!seen[v]){seen[v]=1;opts.push([v,v])}});opts.sort(function(a,b){return a[1].toLowerCase()<b[1].toLowerCase()?-1:1})}
+    var sel=fld(date?"Show only month":"Show only","select",exF[i]||"",[["",date?"All months":"All"]].concat(opts));sel.style.cssText="margin:4px 0 0";
+    sel.input.addEventListener("change",function(){exF[i]=sel.input.value;exShown=300;exClose();redraw()});m.appendChild(sel)}
+  var any=Object.keys(exF).some(function(k){return exF[k]});
+  if(any||exCol!==1||exDir!==-1)item("Clear all sorting and filters",function(){exF={};exCol=1;exDir=-1;exShown=300},false);
+  document.body.appendChild(m);exOpen=m;m.querySelector("button,select").focus()}
+function renderExpensesView(){exClose();
   var tabs=$("tabs");tabs.textContent="";var list=$("list");list.textContent="";
   if(expErr){list.appendChild(el("div","empty","Expenses aren't set up yet. Run the Stage 9 SQL in Supabase (SQL Editor), then press Refresh."));return}
   var tb=$("topbtns");tb.appendChild(btn("+ Add expense","btn",function(){openExpense(null)}));tb.appendChild(document.createTextNode(" "));tb.appendChild(btn("Scan receipt","btn alt",openScan));tb.appendChild(document.createTextNode(" "));tb.appendChild(btn("Paste from Excel","btn alt",openExpPaste));
@@ -955,15 +977,16 @@ function renderExpensesView(){
   var lay=el("div","exlayout"),body=el("div","exmain");det.classList.add("exside");lay.appendChild(body);lay.appendChild(det);list.appendChild(lay);
   function draw(){
     body.textContent="";var t=invToks(exq);
-    var rows=expInYear(exYear).filter(function(e){return(exCat==="all"||e.category===exCat)&&(!t.length||t.every(function(x){return (expCells(e).join(" ")+" "+(e.tax_note||"")).toLowerCase().indexOf(x)>-1}))});
-    rows.sort(function(a,b){return a.spent_on===b.spent_on?0:(a.spent_on<b.spent_on?exSort*-1:exSort)});
+    var yr=expInYear(exYear);
+    var rows=yr.filter(function(e){return(exCat==="all"||e.category===exCat)&&exColOk(e)&&(!t.length||t.every(function(x){return (expCells(e).join(" ")+" "+(e.tax_note||"")).toLowerCase().indexOf(x)>-1}))});
+    rows.sort(function(a,b){var ka=exKey(a,exCol),kb=exKey(b,exCol),c=ka<kb?-1:(ka>kb?1:0);if(c)return c*exDir;return a.spent_on===b.spent_on?0:(a.spent_on<b.spent_on?1:-1)});
     var sn=0,st=0,sT=0;rows.forEach(function(e){sn+=expNet(e);st+=expTax(e);sT+=expTotal(e)});
     var hd=el("div","note",rows.length+" expense"+(rows.length===1?"":"s")+" · Amount "+m2(r2(sn))+" · Tax "+m2(r2(st))+" · Total "+m2(r2(sT)));hd.style.cssText="font-weight:700;margin:12px 0 6px";body.appendChild(hd);
     if(!rows.length){body.appendChild(el("div","empty",expenses.length?"Nothing matches. Try another year or category.":"No expenses yet. Tap + Add expense, Scan receipt, or Paste from Excel."));return}
     var wrap=el("div","invwrap"),t2=document.createElement("table");t2.className="exgrid";
-    var cg=document.createElement("colgroup");[4.5,8.5,9,20.5,14.5,7.5,11,8.5,7,8.5].forEach(function(w){var c=document.createElement("col");c.style.width=w+"%";cg.appendChild(c)});t2.appendChild(cg);
+    var cg=document.createElement("colgroup");[5.5,9.5,9,18,13.5,9,10.5,8.5,7.5,9].forEach(function(w){var c=document.createElement("col");c.style.width=w+"%";cg.appendChild(c)});t2.appendChild(cg);
     var hr=document.createElement("tr");LCOLS.forEach(function(c,i){var th=document.createElement("th");if(i>=7)th.className="num";
-      if(c==="Date"){var b=btn("Date "+(exSort<0?"▼":"▲"),"hcol",function(){exSort=-exSort;draw()});th.appendChild(b)}else th.textContent=c;hr.appendChild(th)});
+      var on=exCol===i,fl=exF[i]!=null&&exF[i]!=="";var b=btn(c+(on?(exDir<0?" ▼":" ▲"):"")+(fl?" ●":"")+" ▾","hcol",function(ev){ev.stopPropagation();exMenu(b,i,yr,draw)});b.setAttribute("aria-haspopup","menu");b.title="Sort or filter by "+c;th.appendChild(b);hr.appendChild(th)});
     var th_=document.createElement("thead");th_.appendChild(hr);t2.appendChild(th_);
     var tbd=document.createElement("tbody");
     rows.slice(0,exShown).forEach(function(e){var tr=document.createElement("tr");tr.tabIndex=0;expCells(e).forEach(function(v,i){var td=document.createElement("td");td.textContent=v;if(i>=7)td.className="num";tr.appendChild(td)});
@@ -987,6 +1010,8 @@ function openExpense(e,pre,scanFile){
   var dpk=document.createElement("input");dpk.type="date";dpk.tabIndex=-1;dpk.setAttribute("aria-hidden","true");dpk.style.cssText="position:absolute;opacity:0;pointer-events:none;width:1px;height:1px";dpk.value=e?e.spent_on:(pre.date||today());
   var dbtn=btn("📅","btn alt sm",function(){dpk.value=dtVal()||today();try{dpk.showPicker()}catch(x){dpk.focus();dpk.click()}});dbtn.style.cssText="margin:0;flex:none;padding:0 12px;min-height:42px";dbtn.setAttribute("aria-label","Open calendar");dbtn.type="button";var drow=el("div");drow.style.cssText="display:flex;gap:8px;align-items:stretch;position:relative";dt.input.style.cssText="flex:1;min-width:0";dt.appendChild(drow);drow.appendChild(dt.input);drow.appendChild(dbtn);drow.appendChild(dpk);
   function dtVal(){return parseDateLoose(dt.input.value)||""}
+  /* typing only digits (like 10232026) adds the slashes for you; if you type your own slashes they are left alone */
+  dt.input.addEventListener("input",function(){var v=dt.input.value;if(!/^(\d+|\d{2}\/\d{1,2}|\d{2}\/\d{2}\/?\d*)$/.test(v))return;var d=v.replace(/\D/g,""),o=d.slice(0,2);if(d.length>2)o+="/"+d.slice(2,4);if(d.length>4)o+="/"+d.slice(4,8);if(o!==v)dt.input.value=o});
   dpk.addEventListener("change",function(){if(dpk.value){dt.input.value=mdy(dpk.value);dt.input.dispatchEvent(new Event("input"))}});code.input.setAttribute("list","exCodes");code.input.maxLength=4;
   var g1=el("div","grid2");g1.appendChild(code);g1.appendChild(dt);p.appendChild(g1);
   var ve=fld("Vendor","text",src.vendor||"");ve.input.setAttribute("list","exVendors");p.appendChild(ve);
