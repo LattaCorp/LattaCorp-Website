@@ -577,3 +577,12 @@ header .lang a{color:inherit;text-decoration:none;padding:2px 3px}header .lang a
 #pcalc .pc-opt{align-items:center}#pcalc .pc-opt input{margin:0;width:22px;height:22px}
 form#cf{border:5px solid var(--forest);box-shadow:inset 0 0 0 3px #fff,inset 0 0 0 4px var(--forest)}
 #pcalc .pc-su .pc-rough{margin:0;max-width:none;text-align:left}
+
+/* footer: keep the two-line logo inside its own column so it never runs into the link tabs */
+@media (min-width:901px){
+footer .fwrap{grid-template-columns:minmax(370px,1fr) minmax(0,2fr) 200px!important;column-gap:24px}footer .fleft{position:relative}footer .brand.fbrand img.wtree{left:0!important}footer .flinks{flex-wrap:wrap}
+footer .fleft{min-width:0;width:100%;justify-self:stretch;padding-left:84px;align-items:stretch}
+footer .brand.fbrand{grid-template-columns:minmax(0,1fr);width:100%;justify-items:center}
+footer .brand.fbrand img.wword{width:100%;max-width:280px;min-width:170px}
+}
+@media (min-width:901px) and (max-width:1300px){footer .fwrap{grid-template-columns:minmax(330px,1fr) minmax(0,2fr) 190px!important}footer .fleft{padding-left:78px}footer .brand.fbrand img.wword{max-width:230px}}
