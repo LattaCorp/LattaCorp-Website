@@ -838,8 +838,11 @@ function personBio(host,p){
   /* ID photo */
   var ph=el("div","pcard");ph.style.cssText+=";display:flex;gap:12px;align-items:center;flex-wrap:wrap";
   var pic=el("div");ph.appendChild(pic);
-  function drawPic(){pic.textContent="";var a=avatar(p||{full_name:"?"},96);a.style.borderRadius="10px";a.style.width="80px";a.style.height="100px";
-    if(pend){a.textContent="";var i=document.createElement("img");i.alt="ID photo";i.src=URL.createObjectURL(pend);i.style.cssText="width:100%;height:100%;object-fit:cover";a.appendChild(i)}pic.appendChild(a)}
+  function drawPic(){pic.textContent="";
+    if(!pend&&!(p&&p.photo_path)){var a=avatar(p||{full_name:"?"},96);a.style.borderRadius="10px";a.style.width="80px";a.style.height="100px";pic.appendChild(a);return}
+    var im=document.createElement("img");im.alt="ID photo";im.style.cssText="display:block;max-width:100%;width:auto;height:auto;max-height:340px;border:1px solid var(--line);border-radius:8px;background:#f1f5f0;cursor:zoom-in";pic.style.cssText="flex:1 1 260px;max-width:100%";
+    if(pend)im.src=URL.createObjectURL(pend);else signP(p.photo_path).then(function(u){if(u)im.src=u});
+    im.addEventListener("click",function(){if(im.src)window.open(im.src,"_blank")});pic.appendChild(im)}
   drawPic();var pa=el("div","acts");pa.style.marginTop="0";
   pa.appendChild(btn(p&&p.photo_path?"Replace ID photo":"Add ID photo","btn alt sm",function(){
     pickPhotos(false,function(fs){var f=fs[0];
