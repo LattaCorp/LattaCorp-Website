@@ -10,7 +10,8 @@ var todos=[],todoErr=false,tfilter="open",team=[];
 var role="owner",myEmail="";function isOwner(){return role==="owner"}
 var view="leads",lfilter="all",cfilter="active",jfilter="active",smode="day",selDate=today(),crewF="all",query="";
 var estimates=[],estErr=false;
-var people=[],payRows=[],benRows=[],docRows=[],persErr=false,pfilter="active";
+var teamSyncAt=0,teamSyncing=false;
+var people=[],payRows=[],benRows=[],docRows=[],persErr=false,pfilter="all";
 var invCats=[],invItems=[],invErr=false,invCat=null,invq="",invSort=null,invFocus=null;
 var invoices=[],biz=null,billErr=false,unbilled=[],bfilter="tobill",billThrough=lastMonthEnd();
 var crew=[],s3=false,histFrom=addDays(today(),-45),crewMe=null,cwDate=today();
@@ -744,7 +745,7 @@ function renderTeam(){
   var holder=el("div");list.appendChild(holder);holder.appendChild(el("div","empty","Loading the team..."));
   var ROLES=[["office","Office (clients, jobs, schedule, billing)"],["owner","Owner / co-owner (everything)"]];
   function draw(members){
-    holder.textContent="";
+    teamSyncAt=0;holder.textContent="";
     members.forEach(function(m){
       var card=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
       var l=el("div");l.appendChild(el("b",null,(m.name||m.email)+(m.email===myEmail?" (you)":"")));l.appendChild(el("div","note",m.email));top.appendChild(l);
@@ -789,9 +790,25 @@ function avatar(p,size){
   d.textContent=String(p.full_name||"?").trim().charAt(0).toUpperCase();
   if(p.photo_path)signP(p.photo_path).then(function(u){if(u){d.textContent="";var i=document.createElement("img");i.alt="";i.src=u;i.style.cssText="width:100%;height:100%;object-fit:cover";d.appendChild(i)}});
   return d}
+/* Everyone on the Team tab gets a Personnel record automatically (linked by their login email; an existing record with the same name is linked instead of duplicated). */
+function syncTeam(){
+  if(teamSyncing||persErr||!isOwner()||Date.now()-teamSyncAt<60000)return;teamSyncing=true;
+  callApi("/api/team","list",{}).then(function(res){
+    teamSyncAt=Date.now();
+    if(!res.ok||!res.data||!res.data.members){teamSyncing=false;return}
+    var jobs=[];
+    res.data.members.forEach(function(m){
+      var em=String(m.email||"").trim().toLowerCase();if(!em)return;
+      if(people.some(function(x){return String(x.login_email||"").toLowerCase()===em}))return;
+      var nm=String(m.name||"").trim(),match=nm?people.filter(function(x){return!x.login_email&&String(x.full_name).trim().toLowerCase()===nm.toLowerCase()})[0]:null;
+      if(match)jobs.push(sb.from("personnel").update({login_email:em,status:"team"}).eq("id",match.id).select().single());
+      else jobs.push(sb.from("personnel").insert({full_name:nm||em.split("@")[0],email:em,status:"team",login_email:em}).select().single())});
+    if(!jobs.length){teamSyncing=false;return}
+    Promise.all(jobs).then(function(rs){var ch=false;rs.forEach(function(r){if(r&&!r.error&&r.data){pRow(r.data);ch=true}});teamSyncing=false;if(ch&&view==="personnel")render()},function(){teamSyncing=false})},function(){teamSyncing=false})}
 function renderPersonnel(){
   var tabs=$("tabs");tabs.textContent="";var list=$("list");list.textContent="";
   $("topbtns").appendChild(btn("+ Add person","btn",function(){openPerson(null)}));
+  syncTeam();
   if(persErr){list.appendChild(el("div","empty","Personnel isn't set up yet. Run the Stage 17 SQL in Supabase (it's in the supabase folder of the website files)."));return}
   var counts={all:people.length,active:0,team:0,inactive:0};people.forEach(function(p){counts[p.status]=(counts[p.status]||0)+1});
   [["all","All"]].concat(PSTAT).forEach(function(s){var b=el("button","tab"+(pfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+(counts[s[0]]||0)+")"));b.addEventListener("click",function(){pfilter=s[0];render()});tabs.appendChild(b)});
