@@ -1958,6 +1958,7 @@ function openInvoiceForm(cid){
 var PAYMETH=[["Zelle","Zelle"],["Cash","Cash"],["Check","Check"],["Other","Other"]];
 function invPaidSum(inv){var t=0;invPays.forEach(function(x){if(x.invoice_id===inv.id)t+=Number(x.amount)||0});return r2(t)}
 function balOf(inv){if(inv.status!=="open")return 0;return Math.max(0,r2(Number(inv.total||0)-invPaidSum(inv)))}
+function creditOf(cid){var t=0;invPays.forEach(function(x){if(!x.invoice_id&&x.client_id===cid)t+=Number(x.amount)||0});return r2(t)}
 function clientBal(cid){var t=0;invoices.forEach(function(i){if(i.client_id===cid)t+=balOf(i)});return r2(t)}
 function openInvsFor(cid){return invoices.filter(function(i){return i.client_id===cid&&i.status==="open"}).sort(function(a,b){return String(a.issue_date)<String(b.issue_date)?-1:String(a.issue_date)>String(b.issue_date)?1:a.number-b.number})}
 function delPayment(pr,done){
@@ -1989,7 +1990,7 @@ function openPayment(cid,pre){
   am.input.addEventListener("input",function(){amtTouched=true;distribute();draw()});
   function draw(){
     host.textContent="";var cid2=cs.input.value;balBox.textContent="";
-    balBox.appendChild(el("span",null,"Customer Balance"));balBox.appendChild(el("b",null,cid2?money(clientBal(cid2)):"$0"));
+    balBox.appendChild(el("span",null,"Customer Balance"));balBox.appendChild(el("b",null,cid2?money(clientBal(cid2)):"$0"));var cr=cid2?creditOf(cid2):0;if(cr>0){var crb=el("span",null,"Payments on account: "+money(cr));crb.style.cssText="width:100%;font-weight:400;font-size:.88rem;color:var(--muted,#555)";balBox.style.flexWrap="wrap";balBox.appendChild(crb)}
     if(!cid2)return;
     rows=openInvsFor(cid2);
     var wrap=el("div","invwrap"),t=document.createElement("table");t.className="ptable";
@@ -2007,13 +2008,16 @@ function openPayment(cid,pre){
       var tt2=totals(),amt=Number(am.input.value)||0;
       if(!dt.input.value){alert("Pick the date.");return}
       var picks=rows.filter(function(i){return sel[i.id]&&(Number(app[i.id])||0)>0});
-      if(!picks.length){alert("Tick the invoice(s) this payment is for and enter an amount.");return}
+      if(!picks.length&&!(amt>0)){alert("Enter the amount, and tick an invoice if it's for one. (An invoice is optional.)");return}
       for(var k=0;k<picks.length;k++)if(app[picks[k].id]>balOf(picks[k])+0.005){alert("The amount applied to "+invNum(picks[k].number)+" is more than its balance.");return}
-      if(amt>0&&Math.abs(amt-tt2.a)>0.005&&!confirm("The amount is "+money(amt)+" but "+money(tt2.a)+" is applied to invoices. Save the "+money(tt2.a)+"?"))return;
+      var extra=amt>0?r2(amt-tt2.a):0;
+      if(extra<-0.005){alert("More is applied to invoices ("+money(tt2.a)+") than the amount received ("+money(amt)+").");return}
+      if(extra>0.005&&!confirm(picks.length?money(extra)+" of the "+money(amt)+" isn't applied to an invoice. Save it as a payment on account?":"No invoice is ticked. Save "+money(amt)+" as a payment on account (not applied to an invoice)?"))return;
       save.disabled=true;
       var recs=picks.map(function(i){return{invoice_id:i.id,client_id:i.client_id,paid_on:dt.input.value,amount:r2(app[i.id]),method:me.input.value,reference:rf.input.value.trim(),note:nt.input.value.trim()}});
+      if(extra>0.005)recs.push({invoice_id:null,client_id:cid2,paid_on:dt.input.value,amount:extra,method:me.input.value,reference:rf.input.value.trim(),note:nt.input.value.trim()});
       sb.from("invoice_payments").insert(recs).select().then(function(r){
-        if(r.error||!r.data){save.disabled=false;alert("Could not save the payment.");return}
+        if(r.error||!r.data){save.disabled=false;alert("Could not save the payment. If it was not for an invoice, run the Stage 18b SQL in Supabase first.");return}
         r.data.forEach(function(x){invPays.unshift(x)});
         var ups=[];picks.forEach(function(i){if(invPaidSum(i)>=Number(i.total)-0.005){var when=dt.input.value+"T12:00:00";ups.push(sb.from("invoices").update({status:"paid",paid_at:when,paid_method:me.input.value}).eq("id",i.id).then(function(r2_){if(!r2_.error){i.status="paid";i.paid_at=when;i.paid_method=me.input.value}}))}});
         Promise.all(ups).then(function(){render();openPayment(cid2,{saved:true})})})});
@@ -2023,7 +2027,7 @@ function openPayment(cid,pre){
     var ent=invPays.filter(function(x){return x.client_id===cid2||(byId(invoices,x.invoice_id)||{}).client_id===cid2}).sort(function(a,b){return String(b.paid_on).localeCompare(String(a.paid_on))});
     if(!ent.length)host.appendChild(el("div","empty","No payments recorded for this customer."));
     else{var w2=el("div","invwrap"),t2=document.createElement("table");t2.className="ptable";var h2=document.createElement("tr");["Date","Invoice","Method","Reference","Amount",""].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i===4)th.className="r";h2.appendChild(th)});t2.appendChild(h2);
-      ent.forEach(function(x){var iv=byId(invoices,x.invoice_id),tr=document.createElement("tr");[mdy(x.paid_on),iv?invNum(iv.number):"",x.method,x.reference,money(x.amount)].forEach(function(v,k){var td=document.createElement("td");td.textContent=v;if(k===4)td.className="r";tr.appendChild(td)});
+      ent.forEach(function(x){var iv=byId(invoices,x.invoice_id),tr=document.createElement("tr");[mdy(x.paid_on),iv?invNum(iv.number):"On account",x.method,x.reference,money(x.amount)].forEach(function(v,k){var td=document.createElement("td");td.textContent=v;if(k===4)td.className="r";tr.appendChild(td)});
         var dx=document.createElement("td"),db=btn("Delete","btn danger sm",function(){delPayment(x,function(){openPayment(cid2)})});dx.appendChild(db);tr.appendChild(dx);t2.appendChild(tr)});w2.appendChild(t2);host.appendChild(w2)}
     /* invoice history */
     var h3=el("h3",null,"Invoice history");h3.style.margin="18px 0 6px";host.appendChild(h3);
@@ -2045,7 +2049,7 @@ function renderPayments(list){
   if(!set.length){list.appendChild(el("div","empty","No customer payments yet. Press Customer payment to record one."));return}
   var tot=r2(set.reduce(function(s,x){return s+Number(x.amount)},0));list.appendChild(el("div","note","Showing "+set.length+" payment"+(set.length>1?"s":"")+" · "+money(tot)));
   set.forEach(function(x){var iv=byId(invoices,x.invoice_id),c=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
-    var l=el("div");l.appendChild(el("b",null,cname(x.client_id||(iv&&iv.client_id))+" · "+money(x.amount)));l.appendChild(el("div","note",[mdy(x.paid_on),iv?"Invoice "+invNum(iv.number):"",x.method,x.reference?"Ref "+x.reference:"",x.note].filter(Boolean).join(" · ")));top.appendChild(l);
+    var l=el("div");l.appendChild(el("b",null,cname(x.client_id||(iv&&iv.client_id))+" · "+money(x.amount)));l.appendChild(el("div","note",[mdy(x.paid_on),iv?"Invoice "+invNum(iv.number):"On account",x.method,x.reference?"Ref "+x.reference:"",x.note].filter(Boolean).join(" · ")));top.appendChild(l);
     var a=el("div","acts");a.style.marginTop="0";a.appendChild(btn("Open","btn alt sm",function(){openPayment(x.client_id||(iv&&iv.client_id))}));a.appendChild(btn("Delete","btn danger sm",function(){delPayment(x)}));top.appendChild(a);c.appendChild(top);list.appendChild(c)})}
 
 /* ---- Billing screen ---- */

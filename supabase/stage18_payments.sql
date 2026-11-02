@@ -18,3 +18,6 @@ create index if not exists invoice_payments_client_idx  on public.invoice_paymen
 alter table public.invoice_payments enable row level security;
 drop policy if exists "staff all invoice_payments" on public.invoice_payments;
 create policy "staff all invoice_payments" on public.invoice_payments for all to authenticated using (public.is_staff()) with check (public.is_staff());
+
+-- Stage 18b: a payment does not have to be applied to an invoice (payment on account).
+alter table public.invoice_payments alter column invoice_id drop not null;
