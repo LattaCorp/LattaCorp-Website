@@ -1372,7 +1372,8 @@ function invDateYear(s){var d=parseDateLoose(s);if(d)return+d.slice(0,4);var m=S
 /* Older equipment: purchase date in a different calendar year than now (or the tax year, on the Tax Report) = light red row. */
 var OLD_RED="#fbe0dd";
 function invRefYear(){return(view==="reports"&&rtab==="tax")?+taxYear:new Date().getFullYear()}
-function invIsOld(c,r){var dc=invAllCol(c,"purchase date",r);if(!dc)return false;var y=invDateYear(invVal(r,dc.k));return y!=null&&y!==invRefYear()}
+function invMarkedOld(r){var d=r&&r.data;if(!d)return false;for(var k in d){if(/^\s*old( equipment)?\s*$/i.test(String(d[k]==null?"":d[k])))return true}return false}
+function invIsOld(c,r){if(invMarkedOld(r))return true;var dc=invAllCol(c,"purchase date",r);if(!dc)return false;var y=invDateYear(invVal(r,dc.k));return y!=null&&y!==invRefYear()}
 function invLegend(yr){var l=el("span","note");l.innerHTML='<span style="display:inline-block;width:14px;height:14px;border-radius:3px;background:'+OLD_RED+';border:1px solid #e3b5b0;vertical-align:-2px"></span> Light red = purchased before '+yr+" (older equipment)";return l}
 function invTintRow(tr,old){Array.prototype.forEach.call(tr.children,function(td){if(td.classList.contains("rn")||td.dataset.cat)return;td.style.background=old?OLD_RED:(td.dataset.grey?"#f1f3f0":"")})}
 /* Every inventory category in one small box: how many items, what was bought in the tax year, what is older (older = light red so the accountant can tell). */
@@ -1381,8 +1382,8 @@ function inventorySummaryBox(year){
   ["Category","Items","Bought "+year,"Older"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i)th.className="r";hr.appendChild(th)});t.appendChild(hr);
   var tn=0,tNew=0,tOld=0,tUn=0,later=0;
   invVisible().forEach(function(c){var n=0,nw=0,od=0,un=0;
-    invRows(c).forEach(function(r){var dc=invAllCol(c,"purchase date",r),pc=invAllCol(c,"price",r),yr=dc?invDateYear(invVal(r,dc.k)):null,pr=pc?(invNumber(invVal(r,pc.k))||0):0;
-      if(yr!=null&&yr>y){later++;return}n++;if(yr==null)un+=pr;else if(yr===y)nw+=pr;else od+=pr});
+    invRows(c).forEach(function(r){var dc=invAllCol(c,"purchase date",r),pc=invAllCol(c,"price",r),yr=dc?invDateYear(invVal(r,dc.k)):null,pr=pc?(invNumber(invVal(r,pc.k))||0):0,mk=invMarkedOld(r);
+      if(mk){n++;od+=pr;return}if(yr!=null&&yr>y){later++;return}n++;if(yr==null)un+=pr;else if(yr===y)nw+=pr;else od+=pr});
     if(!n)return;tn+=n;tNew+=nw;tOld+=od;tUn+=un;
     var tr=document.createElement("tr");[[c.name,""],[String(n),"r"],[nw?m2(nw):"","r"],[od?m2(od):"","r old"]].forEach(function(x,i){var td=document.createElement("td");td.textContent=x[0];if(x[1])td.className=x[1];if(i===0)invPaint(td,c);tr.appendChild(td)});t.appendChild(tr)});
   if(!tn){var e=document.createElement("tr"),ed=document.createElement("td");ed.colSpan=4;ed.textContent="No inventory items yet.";e.appendChild(ed);t.appendChild(e)}
