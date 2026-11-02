@@ -165,6 +165,7 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 .billbar{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap;margin:6px 0}
 .chip.od{background:#fde2e0;color:#b3261e}.row.overdue{border-left-color:var(--red)}
 details summary{cursor:pointer;color:var(--forest);font-weight:600;margin-top:6px}
+.ptable{width:100%;border-collapse:collapse;background:#fff}.ptable th{background:var(--forest);color:#fff;text-align:left;padding:7px 8px;font-size:.82rem}.ptable td{padding:6px 8px;border-bottom:1px solid #e3eae0;font-size:.88rem;font-weight:400;color:var(--ink)}.ptable th.r,.ptable td.r{text-align:right}.ptable tr:hover td{background:#f4f9f2}.ptable td,.ptable th{white-space:nowrap}.ptable th:first-child,.ptable td:first-child{width:34px}
 .itable td{padding:6px 8px 6px 0}.itable td:first-child{width:auto;color:var(--ink);font-weight:400;white-space:nowrap}.itable td.amt{text-align:right;white-space:nowrap;font-weight:600}
 .wxbar{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:#e8f1fb;border:1px solid #b9d3ee;color:#1f4f7d;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-weight:600}
 .qadd{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:6px}.qadd input[type=text]{flex:1 1 220px;width:auto}.qadd input[type=date]{width:auto}
@@ -276,7 +277,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=56"></script>
+<script src="app.js?v=58"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

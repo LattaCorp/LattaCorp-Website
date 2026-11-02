@@ -10,7 +10,7 @@ var todos=[],todoErr=false,tfilter="open",team=[];
 var role="owner",myEmail="";function isOwner(){return role==="owner"}
 var view="leads",lfilter="all",cfilter="active",jfilter="active",smode="day",selDate=today(),crewF="all",query="";
 var estimates=[],estErr=false;
-var teamSyncAt=0,teamSyncing=false;
+var teamSyncAt=0,teamSyncing=false,invPays=[],payErr=false;
 var people=[],payRows=[],benRows=[],docRows=[],persErr=false,pfilter="all";
 var invCats=[],invItems=[],invErr=false,invCat=null,invq="",invSort=null,invFocus=null;
 var invoices=[],biz=null,billErr=false,unbilled=[],bfilter="tobill",billThrough=lastMonthEnd();
@@ -84,8 +84,10 @@ function load(){
     sb.from("personnel").select("*").order("emp_no",{ascending:true}).limit(2000),
     sb.from("personnel_pay").select("*").order("paid_on",{ascending:false}).limit(20000),
     sb.from("personnel_benefits").select("*").order("created_at",{ascending:false}).limit(5000),
-    sb.from("personnel_docs").select("*").order("created_at",{ascending:false}).limit(5000)
+    sb.from("personnel_docs").select("*").order("created_at",{ascending:false}).limit(5000),
+    sb.from("invoice_payments").select("*").order("paid_on",{ascending:false}).limit(20000)
   ]).then(function(rs){
+    payErr=!!rs[20].error;invPays=rs[20].error?[]:(rs[20].data||[]);
     persErr=!!(rs[16].error||rs[17].error||rs[18].error||rs[19].error);people=rs[16].error?[]:(rs[16].data||[]);payRows=rs[17].error?[]:(rs[17].data||[]);benRows=rs[18].error?[]:(rs[18].data||[]);docRows=rs[19].error?[]:(rs[19].data||[]);
     if(rs[0].error){$("msg").textContent="Could not load leads. If you just signed in, make sure this email is on the staff list.";return}
     leads=rs[0].data||[];
@@ -1902,7 +1904,7 @@ function loadUnbilled(){
   return sb.from("visits").select("*").eq("status","done").is("invoice_id",null).is("paid_at",null).limit(5000).then(function(r){if(r.error){billErr=true;unbilled=[]}else unbilled=r.data||[]})}
 function reloadInvoices(){return sb.from("invoices").select("*").order("number",{ascending:false}).limit(3000).then(function(r){if(!r.error)invoices=r.data||[]})}
 function isOverdue(i){return i.status==="open"&&i.due_date&&i.due_date<today()}
-function openTotal(arr){return r2(arr.filter(function(i){return i.status==="open"}).reduce(function(s,i){return s+Number(i.total||0)},0))}
+function openTotal(arr){return r2(arr.filter(function(i){return i.status==="open"}).reduce(function(s,i){return s+balOf(i)},0))}
 function eligible(){return unbilled.filter(function(v){return v.scheduled_date<=billThrough&&Number(v.price)>0})}
 function billGroups(){
   var g={},order=[];eligible().forEach(function(v){if(!g[v.client_id]){g[v.client_id]=[];order.push(v.client_id)}g[v.client_id].push(v)});
@@ -1952,17 +1954,112 @@ function openInvoiceForm(cid){
         if(r2_.error){sb.from("invoices").delete().eq("id",inv.id).then(function(){go.disabled=false;alert("Could not save the lines.")});return}
         invoices.unshift(inv);bfilter="open";render();openInvoice(inv.id)})})});
   go.style.marginTop="14px";p.appendChild(go)}
+/* ---- Customer payments: apply a payment to one or more open invoices (partial or full), with entry and invoice history ---- */
+var PAYMETH=[["Zelle","Zelle"],["Cash","Cash"],["Check","Check"],["Other","Other"]];
+function invPaidSum(inv){var t=0;invPays.forEach(function(x){if(x.invoice_id===inv.id)t+=Number(x.amount)||0});return r2(t)}
+function balOf(inv){if(inv.status!=="open")return 0;return Math.max(0,r2(Number(inv.total||0)-invPaidSum(inv)))}
+function clientBal(cid){var t=0;invoices.forEach(function(i){if(i.client_id===cid)t+=balOf(i)});return r2(t)}
+function openInvsFor(cid){return invoices.filter(function(i){return i.client_id===cid&&i.status==="open"}).sort(function(a,b){return String(a.issue_date)<String(b.issue_date)?-1:String(a.issue_date)>String(b.issue_date)?1:a.number-b.number})}
+function delPayment(pr,done){
+  var inv=byId(invoices,pr.invoice_id);
+  if(!confirm("Delete this "+money(pr.amount)+" payment"+(inv?" on invoice "+invNum(inv.number):"")+"? The invoice balance goes back up."))return;
+  sb.from("invoice_payments").delete().eq("id",pr.id).then(function(r){
+    if(r.error){alert("Could not delete the payment.");return}
+    invPays=invPays.filter(function(x){return x.id!==pr.id});
+    if(inv&&inv.status==="paid"&&invPaidSum(inv)<Number(inv.total)-0.005){
+      sb.from("invoices").update({status:"open",paid_at:null,paid_method:""}).eq("id",inv.id).then(function(r2_){if(!r2_.error){inv.status="open";inv.paid_at=null;inv.paid_method=""}render();if(done)done()})}
+    else{render();if(done)done()}})}
+function openPayment(cid,pre){
+  pre=pre||{};
+  if(billErr){alert("Billing isn't set up yet. Run the Stage 5 SQL in Supabase first.");return}
+  if(payErr){alert("Customer payments need the Stage 18 SQL. Run it in Supabase (SQL Editor), then press Refresh.");return}
+  var p=panel();p.appendChild(el("h2",null,"Customer payment"));
+  if(pre.saved){var ok=el("div","pcard","✓ Payment saved.");ok.style.cssText="background:var(--mint);font-weight:700";p.appendChild(ok)}
+  var cl=clients.filter(function(c){return!c.archived||c.id===cid});
+  var cs=fld("Customer Name","select",cid||"",[["","Choose a customer..."]].concat(cl.map(function(c){return[c.id,c.name+(c.company?" · "+c.company:"")]})));p.appendChild(cs);
+  var balBox=el("div");balBox.style.cssText="display:flex;justify-content:space-between;margin:0 0 10px;font-weight:600";p.appendChild(balBox);
+  var g=el("div","grid2"),dt=fld("Date","date",today()),am=fld("Amount ($)","number",""),me=fld("Pmt. Method","select","Zelle",PAYMETH),rf=fld("Reference","text","");
+  am.input.step="0.01";am.input.min="0";am.input.inputMode="decimal";[dt,am,me,rf].forEach(function(x){g.appendChild(x)});p.appendChild(g);
+  var nt=fld("Note","text","");p.appendChild(nt);
+  var host=el("div");p.appendChild(host);
+  var sel={},app={},amtTouched=false,rows=[];
+  function sumSel(){var t=0;rows.forEach(function(i){if(sel[i.id])t+=balOf(i)});return r2(t)}
+  function distribute(){var left=Number(am.input.value)||0;rows.forEach(function(i){if(sel[i.id]){var a=Math.min(balOf(i),Math.max(0,left));app[i.id]=r2(a);left=r2(left-a)}else app[i.id]=0})}
+  function totals(){var b=0,a=0;rows.forEach(function(i){if(sel[i.id]){b+=balOf(i);a+=Number(app[i.id])||0}});return{b:r2(b),a:r2(a)}}
+  am.input.addEventListener("input",function(){amtTouched=true;distribute();draw()});
+  function draw(){
+    host.textContent="";var cid2=cs.input.value;balBox.textContent="";
+    balBox.appendChild(el("span",null,"Customer Balance"));balBox.appendChild(el("b",null,cid2?money(clientBal(cid2)):"$0"));
+    if(!cid2)return;
+    rows=openInvsFor(cid2);
+    var wrap=el("div","invwrap"),t=document.createElement("table");t.className="ptable";
+    var hr=document.createElement("tr");["✓","Date","Number","Amount","Balance","Applied"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i>2)th.className="r";hr.appendChild(th)});t.appendChild(hr);
+    if(!rows.length){var e=document.createElement("tr"),ed=document.createElement("td");ed.colSpan=6;ed.textContent="No open invoices for this customer.";e.appendChild(ed);t.appendChild(e)}
+    rows.forEach(function(i){
+      var tr=document.createElement("tr"),c0=document.createElement("td"),ck=document.createElement("input");ck.type="checkbox";ck.checked=!!sel[i.id];ck.style.width="auto";ck.setAttribute("aria-label","Apply to "+invNum(i.number));
+      ck.addEventListener("change",function(){sel[i.id]=ck.checked;if(!amtTouched||!(Number(am.input.value)>0)){am.input.value=sumSel()>0?String(sumSel()):"";}distribute();draw()});c0.appendChild(ck);tr.appendChild(c0);
+      [mdy(i.issue_date),invNum(i.number),money(i.total),money(balOf(i))].forEach(function(x,k){var td=document.createElement("td");td.textContent=x;if(k>1)td.className="r";tr.appendChild(td)});
+      var ap=document.createElement("td");ap.className="r";var inp=document.createElement("input");inp.type="number";inp.step="0.01";inp.min="0";inp.inputMode="decimal";inp.value=app[i.id]?String(app[i.id]):"";inp.placeholder="0";inp.disabled=!sel[i.id];inp.style.cssText="width:90px;text-align:right";
+      inp.addEventListener("change",function(){app[i.id]=Math.max(0,r2(Number(inp.value)||0));if(!amtTouched){var s2=0;rows.forEach(function(x){if(sel[x.id])s2+=Number(app[x.id])||0});am.input.value=s2>0?String(r2(s2)):""}draw()});ap.appendChild(inp);tr.appendChild(ap);t.appendChild(tr)});
+    wrap.appendChild(t);host.appendChild(wrap);
+    var tt=totals(),sm=el("div");sm.style.cssText="margin:10px 0;text-align:right";sm.appendChild(el("div",null,"Amounts for Selected Invoices"));sm.appendChild(el("div","note","Balance "+money(tt.b)));sm.appendChild(el("div","note","Applied "+money(tt.a)));host.appendChild(sm);
+    var save=btn("Save payment","btn",function(){
+      var tt2=totals(),amt=Number(am.input.value)||0;
+      if(!dt.input.value){alert("Pick the date.");return}
+      var picks=rows.filter(function(i){return sel[i.id]&&(Number(app[i.id])||0)>0});
+      if(!picks.length){alert("Tick the invoice(s) this payment is for and enter an amount.");return}
+      for(var k=0;k<picks.length;k++)if(app[picks[k].id]>balOf(picks[k])+0.005){alert("The amount applied to "+invNum(picks[k].number)+" is more than its balance.");return}
+      if(amt>0&&Math.abs(amt-tt2.a)>0.005&&!confirm("The amount is "+money(amt)+" but "+money(tt2.a)+" is applied to invoices. Save the "+money(tt2.a)+"?"))return;
+      save.disabled=true;
+      var recs=picks.map(function(i){return{invoice_id:i.id,client_id:i.client_id,paid_on:dt.input.value,amount:r2(app[i.id]),method:me.input.value,reference:rf.input.value.trim(),note:nt.input.value.trim()}});
+      sb.from("invoice_payments").insert(recs).select().then(function(r){
+        if(r.error||!r.data){save.disabled=false;alert("Could not save the payment.");return}
+        r.data.forEach(function(x){invPays.unshift(x)});
+        var ups=[];picks.forEach(function(i){if(invPaidSum(i)>=Number(i.total)-0.005){var when=dt.input.value+"T12:00:00";ups.push(sb.from("invoices").update({status:"paid",paid_at:when,paid_method:me.input.value}).eq("id",i.id).then(function(r2_){if(!r2_.error){i.status="paid";i.paid_at=when;i.paid_method=me.input.value}}))}});
+        Promise.all(ups).then(function(){render();openPayment(cid2,{saved:true})})})});
+    save.style.marginTop="6px";host.appendChild(save);
+    /* payment entries (spreadsheet) */
+    var h1=el("h3",null,"Payment entries");h1.style.margin="18px 0 6px";host.appendChild(h1);
+    var ent=invPays.filter(function(x){return x.client_id===cid2||(byId(invoices,x.invoice_id)||{}).client_id===cid2}).sort(function(a,b){return String(b.paid_on).localeCompare(String(a.paid_on))});
+    if(!ent.length)host.appendChild(el("div","empty","No payments recorded for this customer."));
+    else{var w2=el("div","invwrap"),t2=document.createElement("table");t2.className="ptable";var h2=document.createElement("tr");["Date","Invoice","Method","Reference","Amount",""].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i===4)th.className="r";h2.appendChild(th)});t2.appendChild(h2);
+      ent.forEach(function(x){var iv=byId(invoices,x.invoice_id),tr=document.createElement("tr");[mdy(x.paid_on),iv?invNum(iv.number):"",x.method,x.reference,money(x.amount)].forEach(function(v,k){var td=document.createElement("td");td.textContent=v;if(k===4)td.className="r";tr.appendChild(td)});
+        var dx=document.createElement("td"),db=btn("Delete","btn danger sm",function(){delPayment(x,function(){openPayment(cid2)})});dx.appendChild(db);tr.appendChild(dx);t2.appendChild(tr)});w2.appendChild(t2);host.appendChild(w2)}
+    /* invoice history */
+    var h3=el("h3",null,"Invoice history");h3.style.margin="18px 0 6px";host.appendChild(h3);
+    var hist=invoices.filter(function(i){return i.client_id===cid2}).sort(function(a,b){return b.number-a.number});
+    if(!hist.length)host.appendChild(el("div","empty","No invoices for this customer yet."));
+    else{var w3=el("div","invwrap"),t3=document.createElement("table");t3.className="ptable";var h4=document.createElement("tr");["Number","Date","Due","Amount","Balance","Status"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i===3||i===4)th.className="r";h4.appendChild(th)});t3.appendChild(h4);
+      hist.forEach(function(i){var tr=document.createElement("tr");tr.style.cursor="pointer";tr.title="Open invoice";
+        var stt=i.status==="paid"?"Paid"+(i.paid_at?" "+dshort(String(i.paid_at).slice(0,10)):"")+(i.paid_method?" ("+i.paid_method+")":""):i.status==="void"?"Void":(isOverdue(i)?"Overdue":(invPaidSum(i)>0?"Partly paid":"Open"));
+        [invNum(i.number),mdy(i.issue_date),mdy(i.due_date),money(i.total),money(balOf(i)),stt].forEach(function(v,k){var td=document.createElement("td");td.textContent=v;if(k===3||k===4)td.className="r";tr.appendChild(td)});
+        tr.addEventListener("click",function(){openInvoice(i.id)});t3.appendChild(tr)});w3.appendChild(t3);host.appendChild(w3)}
+  }
+  cs.input.addEventListener("change",function(){sel={};app={};amtTouched=false;am.input.value="";draw()});
+  if(pre.inv){var iv0=byId(invoices,pre.inv);if(iv0&&iv0.status==="open"){sel[iv0.id]=true;am.input.value=String(balOf(iv0));distribute()}}
+  draw()}
+function renderPayments(list){
+  $("topbtns").appendChild(btn("Customer payment","btn",function(){openPayment(null)}));
+  if(payErr){list.appendChild(el("div","empty","Customer payments aren't set up yet. Run the Stage 18 SQL in Supabase (SQL Editor), then press Refresh."));return}
+  var set=invPays.filter(function(x){if(!query)return true;var iv=byId(invoices,x.invoice_id);return[cname(x.client_id),iv?invNum(iv.number):"",x.method,x.reference].join(" ").toLowerCase().indexOf(query)>-1}).sort(function(a,b){return String(b.paid_on).localeCompare(String(a.paid_on))});
+  if(!set.length){list.appendChild(el("div","empty","No customer payments yet. Press Customer payment to record one."));return}
+  var tot=r2(set.reduce(function(s,x){return s+Number(x.amount)},0));list.appendChild(el("div","note","Showing "+set.length+" payment"+(set.length>1?"s":"")+" · "+money(tot)));
+  set.forEach(function(x){var iv=byId(invoices,x.invoice_id),c=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
+    var l=el("div");l.appendChild(el("b",null,cname(x.client_id||(iv&&iv.client_id))+" · "+money(x.amount)));l.appendChild(el("div","note",[mdy(x.paid_on),iv?"Invoice "+invNum(iv.number):"",x.method,x.reference?"Ref "+x.reference:"",x.note].filter(Boolean).join(" · ")));top.appendChild(l);
+    var a=el("div","acts");a.style.marginTop="0";a.appendChild(btn("Open","btn alt sm",function(){openPayment(x.client_id||(iv&&iv.client_id))}));a.appendChild(btn("Delete","btn danger sm",function(){delPayment(x)}));top.appendChild(a);c.appendChild(top);list.appendChild(c)})}
+
 /* ---- Billing screen ---- */
 function renderBilling(){
   var tabs=$("tabs");tabs.textContent="";
   var op=invoices.filter(function(i){return i.status==="open"}),pd_=invoices.filter(function(i){return i.status==="paid"}),od=op.filter(isOverdue);
   var bg=billGroups();
-  [["tobill","To bill",bg.order.length],["open","Open",op.length],["paid","Paid",pd_.length],["estimates","Estimates",estimates.filter(function(e){return(e.status==="draft"||e.status==="sent")&&!estExpired(e)}).length]].forEach(function(s){
+  [["tobill","To bill",bg.order.length],["open","Open",op.length],["paid","Paid",pd_.length],["payments","Payments",invPays.length],["estimates","Estimates",estimates.filter(function(e){return(e.status==="draft"||e.status==="sent")&&!estExpired(e)}).length]].forEach(function(s){
     var b=el("button","tab"+(bfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){bfilter=s[0];render()});tabs.appendChild(b)});
-  if(bfilter!=="estimates"){$("topbtns").appendChild(btn("New invoice","btn",function(){openInvoiceForm(null)}));$("topbtns").appendChild(document.createTextNode(" "))}
+  if(bfilter!=="estimates"&&bfilter!=="payments"){$("topbtns").appendChild(btn("New invoice","btn",function(){openInvoiceForm(null)}));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Customer payment","btn alt",function(){openPayment(null)}));$("topbtns").appendChild(document.createTextNode(" "))}
   $("topbtns").appendChild(btn("Price calculator","btn alt",openCalc));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Billing settings","btn alt",openBizSettings));
   var list=$("list");list.textContent="";
   if(bfilter==="estimates")return renderEstimates(list);
+  if(bfilter==="payments")return renderPayments(list);
   if(billErr){list.appendChild(el("div","empty","Billing isn't set up yet. Run the Stage 5 SQL in Supabase (SQL Editor), then press Refresh."));return}
   var mon=today().slice(0,7),paidMonth=r2(pd_.filter(function(i){return i.paid_at&&String(i.paid_at).slice(0,7)===mon}).reduce(function(s,i){return s+Number(i.total||0)},0));
   var stats=el("div","stats");
@@ -1978,7 +2075,7 @@ function renderBilling(){
 function invoiceRow(i){
   var b=el("button","row client"+(isOverdue(i)?" overdue":""));b.type="button";var l=el("div");
   l.appendChild(el("b",null,invNum(i.number)+" · "+cname(i.client_id)));
-  l.appendChild(el("div","sub",[i.period_end?monthName(i.period_end):"",i.status==="paid"?"Paid "+(i.paid_at?dshort(String(i.paid_at).slice(0,10)):"")+(i.paid_method?" ("+i.paid_method+")":""):"Due "+dshort(i.due_date),i.reference?"Ref "+i.reference:"",i.status==="open"&&i.reminded_at?"Reminded "+dshort(String(i.reminded_at).slice(0,10)):""].filter(Boolean).join(" · ")));
+  l.appendChild(el("div","sub",[i.period_end?monthName(i.period_end):"",i.status==="paid"?"Paid "+(i.paid_at?dshort(String(i.paid_at).slice(0,10)):"")+(i.paid_method?" ("+i.paid_method+")":""):"Due "+dshort(i.due_date),i.reference?"Ref "+i.reference:"",i.status==="open"&&invPaidSum(i)>0?"Balance "+money(balOf(i)):"",i.status==="open"&&i.reminded_at?"Reminded "+dshort(String(i.reminded_at).slice(0,10)):""].filter(Boolean).join(" · ")));
   var r=el("div");r.style.textAlign="right";r.appendChild(el("b",null,money(i.total)));
   var chip=i.status==="void"?el("span","chip lost","Void"):i.status==="paid"?el("span","chip won","Paid"):isOverdue(i)?el("span","chip od","Overdue"):el("span","chip",i.sent_at?"Sent":"Not sent");r.appendChild(el("div"));r.appendChild(chip);
   b.appendChild(l);b.appendChild(r);b.addEventListener("click",function(){openInvoice(i.id)});return b}
