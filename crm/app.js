@@ -1924,6 +1924,34 @@ function createInvoice(cid,vs,through){
         if(r3.error)return undo("Could not link the visits to the invoice.");
         invoices.unshift(inv);return inv})})})}
 
+/* Manual invoice: pick a client, add the lines, and it is created ready to send (no completed visits needed). */
+function openInvoiceForm(cid){
+  if(billErr){alert("Billing isn't set up yet. Run the Stage 5 SQL in Supabase first.");return}
+  var p=panel();p.appendChild(el("h2",null,"New invoice"));
+  var list=clients.filter(function(c){return!c.archived||c.id===cid});
+  var cs=fld("Client","select",cid||"",[["","Choose a client..."]].concat(list.map(function(c){return[c.id,c.name+(c.company?" · "+c.company:"")]})));p.appendChild(cs);
+  var terms=Number(bizv("terms_days",10));terms=isNaN(terms)?10:terms;
+  var g=el("div","grid2"),isd=fld("Invoice date","date",today()),dd=fld("Due date","date",addDays(today(),terms)),dueTouched=false;
+  dd.input.addEventListener("change",function(){dueTouched=true});isd.input.addEventListener("change",function(){if(!dueTouched&&isd.input.value)dd.input.value=addDays(isd.input.value,terms)});
+  g.appendChild(isd);g.appendChild(dd);p.appendChild(g);
+  var ref=fld("Reference / PO number (optional, shows on the invoice)","text","");p.appendChild(ref);
+  p.appendChild(el("h3",null,"Lines"));var box=el("div"),rows=[];
+  function addRow(){var r=el("div","grid2"),d=fld("Description","text",""),a=fld("Amount ($, negative = discount)","number","");a.input.step="0.01";a.input.inputMode="decimal";r.appendChild(d);r.appendChild(a);box.appendChild(r);rows.push({d:d,a:a})}
+  p.appendChild(box);addRow();p.appendChild(btn("+ Add another line","btn alt sm",addRow));
+  var nt=fld("Notes (optional)","textarea","");nt.style.marginTop="10px";p.appendChild(nt);
+  var go=btn("Create invoice","btn",function(){
+    if(!cs.input.value){alert("Choose a client.");return}if(!isd.input.value||!dd.input.value){alert("Pick the invoice date and due date.");return}
+    var items=[];for(var i=0;i<rows.length;i++){var d=rows[i].d.input.value.trim(),a=parseFloat(rows[i].a.input.value);if(!d&&isNaN(a))continue;if(!d||isNaN(a)){alert("Each line needs a description and an amount.");return}items.push({description:d,amount:a})}
+    if(!items.length){alert("Add at least one line.");return}
+    var total=r2(items.reduce(function(s2,x){return s2+x.amount},0));if(total<0){alert("The total can't be negative.");return}
+    go.disabled=true;
+    sb.from("invoices").insert({client_id:cs.input.value,issue_date:isd.input.value,due_date:dd.input.value,total:total,reference:ref.input.value.trim(),notes:nt.input.value.trim()}).select().single().then(function(r){
+      if(r.error||!r.data){go.disabled=false;alert("Could not create the invoice. Did you run the Stage 5 SQL?");return}
+      var inv=r.data;items.forEach(function(x){x.invoice_id=inv.id;x.service_date=isd.input.value});
+      sb.from("invoice_items").insert(items).then(function(r2_){
+        if(r2_.error){sb.from("invoices").delete().eq("id",inv.id).then(function(){go.disabled=false;alert("Could not save the lines.")});return}
+        invoices.unshift(inv);bfilter="open";render();openInvoice(inv.id)})})});
+  go.style.marginTop="14px";p.appendChild(go)}
 /* ---- Billing screen ---- */
 function renderBilling(){
   var tabs=$("tabs");tabs.textContent="";
@@ -1931,6 +1959,7 @@ function renderBilling(){
   var bg=billGroups();
   [["tobill","To bill",bg.order.length],["open","Open",op.length],["paid","Paid",pd_.length],["estimates","Estimates",estimates.filter(function(e){return(e.status==="draft"||e.status==="sent")&&!estExpired(e)}).length]].forEach(function(s){
     var b=el("button","tab"+(bfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){bfilter=s[0];render()});tabs.appendChild(b)});
+  if(bfilter!=="estimates"){$("topbtns").appendChild(btn("New invoice","btn",function(){openInvoiceForm(null)}));$("topbtns").appendChild(document.createTextNode(" "))}
   $("topbtns").appendChild(btn("Price calculator","btn alt",openCalc));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Billing settings","btn alt",openBizSettings));
   var list=$("list");list.textContent="";
   if(bfilter==="estimates")return renderEstimates(list);
