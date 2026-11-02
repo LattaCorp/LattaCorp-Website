@@ -1051,7 +1051,11 @@ function computeReport(from,to){
   return Promise.all([a,b]).then(function(rs){
     if(rs[0].error||rs[1].error)return{error:true};
     var done=rs[0].data||[],pays=[];
-    invoices.forEach(function(i){var d=i.paid_at?String(i.paid_at).slice(0,10):"";if(i.status==="paid"&&d&&inRange(d,from,to)&&Number(i.total)>0)pays.push({date:d,type:"Invoice",client_id:i.client_id,ref:invNum(i.number),method:i.paid_method||"",amount:Number(i.total)})});
+    var hasRows={};invPays.forEach(function(x){if(x.invoice_id)hasRows[x.invoice_id]=1});
+    invoices.forEach(function(i){var d=i.paid_at?String(i.paid_at).slice(0,10):"";if(i.status==="paid"&&d&&inRange(d,from,to)&&Number(i.total)>0&&!hasRows[i.id])pays.push({date:d,type:"Invoice",client_id:i.client_id,ref:invNum(i.number),method:i.paid_method||"",amount:Number(i.total)});
+      if(i.status!=="void"&&!i.period_start&&i.issue_date&&inRange(i.issue_date,from,to)&&Number(i.total)>0)done.push({client_id:i.client_id,scheduled_date:i.issue_date,price:Number(i.total),manual:true})});
+    /* payments entered on the Customer payment screen (partial, full, or on account) count the day they were received */
+    invPays.forEach(function(x){var d=String(x.paid_on||"").slice(0,10),iv=x.invoice_id?byId(invoices,x.invoice_id):null;if(d&&inRange(d,from,to)&&Number(x.amount)>0)pays.push({date:d,type:iv?"Invoice payment":"On account",client_id:x.client_id||(iv&&iv.client_id),ref:iv?invNum(iv.number):"",method:x.method||"",amount:Number(x.amount)})});
     (rs[1].data||[]).forEach(function(v){if(Number(v.price)>0&&v.paid_at)pays.push({date:String(v.paid_at).slice(0,10),type:"Paid at visit",client_id:v.client_id,ref:"",method:v.paid_method||"",amount:Number(v.price)})});
     pays.sort(function(x,y){return x.date<y.date?-1:1});
     var exs=expenses.filter(function(e){return inRange(e.spent_on,from,to)}).sort(function(x,y){return x.spent_on<y.spent_on?1:-1});
@@ -1064,7 +1068,7 @@ function computeReport(from,to){
     var cl={};done.forEach(function(v){cl[v.client_id]=(cl[v.client_id]||0)+Number(v.price||0)});
     var top=Object.keys(cl).map(function(k){return{k:k,v:r2(cl[k])}}).filter(function(x){return x.v>0}).sort(function(x,y){return y.v-x.v}).slice(0,8);
     var meth={};pays.forEach(function(p){var k=p.method||"Other";meth[k]=(meth[k]||0)+p.amount});
-    return{from:from,to:to,earned:earned,collected:collected,spent:spent,net:r2(collected-spent),months:months,cats:cats,top:top,meth:meth,pays:pays,exs:exs,visitsDone:done.length}})}
+    return{from:from,to:to,earned:earned,collected:collected,spent:spent,net:r2(collected-spent),months:months,cats:cats,top:top,meth:meth,pays:pays,exs:exs,visitsDone:done.filter(function(v){return!v.manual}).length}})}
 function sm(n){n=r2(n);return n<0?"-"+money(-n):money(n)}
 function bars(list,rows,fmt,labelFn){
   var max=rows.reduce(function(m,x){return Math.max(m,x.v)},0)||1;
@@ -1952,7 +1956,7 @@ function openInvoiceForm(cid){
       var inv=r.data;items.forEach(function(x){x.invoice_id=inv.id;x.service_date=isd.input.value});
       sb.from("invoice_items").insert(items).then(function(r2_){
         if(r2_.error){sb.from("invoices").delete().eq("id",inv.id).then(function(){go.disabled=false;alert("Could not save the lines.")});return}
-        invoices.unshift(inv);bfilter="open";render();openInvoice(inv.id)})})});
+        invoices.unshift(inv);repData=null;bfilter="open";render();openInvoice(inv.id)})})});
   go.style.marginTop="14px";p.appendChild(go)}
 /* ---- Customer payments: apply a payment to one or more open invoices (partial or full), with entry and invoice history ---- */
 var PAYMETH=[["Zelle","Zelle"],["Cash","Cash"],["Check","Check"],["Other","Other"]];
@@ -1966,7 +1970,7 @@ function delPayment(pr,done){
   if(!confirm("Delete this "+money(pr.amount)+" payment"+(inv?" on invoice "+invNum(inv.number):"")+"? The invoice balance goes back up."))return;
   sb.from("invoice_payments").delete().eq("id",pr.id).then(function(r){
     if(r.error){alert("Could not delete the payment.");return}
-    invPays=invPays.filter(function(x){return x.id!==pr.id});
+    invPays=invPays.filter(function(x){return x.id!==pr.id});repData=null;
     if(inv&&inv.status==="paid"&&invPaidSum(inv)<Number(inv.total)-0.005){
       sb.from("invoices").update({status:"open",paid_at:null,paid_method:""}).eq("id",inv.id).then(function(r2_){if(!r2_.error){inv.status="open";inv.paid_at=null;inv.paid_method=""}render();if(done)done()})}
     else{render();if(done)done()}})}
@@ -2018,7 +2022,7 @@ function openPayment(cid,pre){
       if(extra>0.005)recs.push({invoice_id:null,client_id:cid2,paid_on:dt.input.value,amount:extra,method:me.input.value,reference:rf.input.value.trim(),note:nt.input.value.trim()});
       sb.from("invoice_payments").insert(recs).select().then(function(r){
         if(r.error||!r.data){save.disabled=false;alert("Could not save the payment. If it was not for an invoice, run the Stage 18b SQL in Supabase first.");return}
-        r.data.forEach(function(x){invPays.unshift(x)});
+        r.data.forEach(function(x){invPays.unshift(x)});repData=null;
         var ups=[];picks.forEach(function(i){if(invPaidSum(i)>=Number(i.total)-0.005){var when=dt.input.value+"T12:00:00";ups.push(sb.from("invoices").update({status:"paid",paid_at:when,paid_method:me.input.value}).eq("id",i.id).then(function(r2_){if(!r2_.error){i.status="paid";i.paid_at=when;i.paid_method=me.input.value}}))}});
         Promise.all(ups).then(function(){render();openPayment(cid2,{saved:true})})})});
     save.style.marginTop="6px";host.appendChild(save);
