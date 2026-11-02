@@ -173,6 +173,22 @@ function renderClients(){
 
 /* ---- panel helpers ---- */
 function panel(){var p=$("panel");p.textContent="";p.appendChild(btn("×","close",closeDetail)).setAttribute("aria-label","Close");$("detail").classList.add("on");p.scrollTop=0;$("detail").scrollTop=0;return p}
+/* Forms in the side panel: Enter (or finishing a drop-down or a full MM/DD/YYYY date) jumps to the next field. */
+(function(){
+  var pn=document.getElementById("panel");if(!pn)return;var arrow=false;
+  function fields(){return Array.prototype.filter.call(pn.querySelectorAll("input,select,textarea"),function(f){
+    if(f.disabled||f.readOnly||f.tabIndex<0||f.type==="hidden"||f.type==="checkbox"||f.type==="radio"||f.type==="file"||f.type==="button"||f.type==="submit")return false;
+    if(f.closest(".invgrid"))return false;return f.offsetParent!==null})}
+  function next(cur){var l=fields(),i=l.indexOf(cur);if(i<0||i>=l.length-1)return;var n=l[i+1];n.focus();if(n.select&&n.tagName==="INPUT"&&n.type!=="date"&&n.type!=="number")try{n.select()}catch(e){}}
+  pn.addEventListener("keydown",function(e){
+    arrow=(e.key==="ArrowUp"||e.key==="ArrowDown");
+    if(e.key!=="Enter"||e.defaultPrevented||e.shiftKey||e.ctrlKey||e.metaKey||e.altKey)return;
+    var t=e.target;if(!t||t.tagName==="TEXTAREA"||t.tagName==="BUTTON"||(t.tagName==="INPUT"&&(t.type==="checkbox"||t.type==="button"||t.type==="submit")))return;
+    if(t.tagName!=="INPUT"&&t.tagName!=="SELECT")return;
+    if(fields().indexOf(t)<0)return;e.preventDefault();next(t)});
+  pn.addEventListener("change",function(e){var t=e.target;if(t&&t.tagName==="SELECT"&&!arrow&&fields().indexOf(t)>-1)next(t)});
+  pn.addEventListener("input",function(e){var t=e.target;if(t&&t.tagName==="INPUT"&&t.placeholder==="MM/DD/YYYY"&&/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(t.value)&&fields().indexOf(t)>-1)next(t)});
+})();
 function closeDetail(){$("detail").classList.remove("on")}
 /* Clicking the dim area outside a panel closes it, but not while a form is open (so a stray click or a drag that ends outside never loses what you typed). Use the X or Esc to close a form. */
 var dnDown=null;$("detail").addEventListener("mousedown",function(e){dnDown=e.target});
