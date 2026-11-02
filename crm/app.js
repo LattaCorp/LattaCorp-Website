@@ -878,7 +878,7 @@ function personBio(host,p){
     var gg=el("div","grid2");tlEmail=fld("Login email","email",em.input.value);tlRole=fld("Access level","select","office",[["office","Office (clients, jobs, schedule, billing)"],["owner","Owner / co-owner (everything)"]]);tlPass=fld("Starting password (8+ characters, you tell them)","text","");tlPass.input.autocomplete="off";
     gg.appendChild(tlEmail);gg.appendChild(tlRole);tbox.appendChild(gg);tbox.appendChild(tlPass)}
   sts.input.addEventListener("change",drawTeam);drawTeam();
-  var acts=el("div","acts");acts.style.marginTop="12px";
+  var acts=el("div","acts");acts.style.cssText="display:flex;gap:8px;align-items:center;margin-top:16px";
   var save=btn(p?"Save changes":"Save person","btn",function(){
     if(!nm.input.value.trim()){alert("Enter the person's full name.");return}
     var sd9=ss.input.value.replace(/\D/g,"");if(sd9&&sd9.length!==9&&!confirm("That Social Security number has "+sd9.length+" digits instead of 9. Save it anyway?"))return;
@@ -896,12 +896,12 @@ function personBio(host,p){
         return sb.from("personnel").update({login_email:tlEmail.input.value.trim().toLowerCase()}).eq("id",saved.id).select().single().then(function(r2){if(!r2.error&&r2.data){p=r2.data;pRow(p)}alert("Team login created. Give them "+tlEmail.input.value.trim()+" and the password you set; they sign in at this same address.")})})});
       steps.then(function(){render();openPerson(p,wasNew?"pay":"bio")})})});
   acts.appendChild(save);
-  if(p)acts.appendChild(btn("Delete person","btn danger sm",function(){
+  if(p){var delP=btn("Delete person","btn danger sm",function(){
     if(paidBy(p.id).length){alert("This person has payments on record, which feed your Tax Report, so they can't be deleted. Set the status to Inactive instead.");return}
     if(!confirm("Delete "+p.full_name+" and everything saved for them? This can't be undone."))return;
     var paths=docRows.filter(function(d){return d.person_id===p.id}).map(function(d){return d.path});if(p.photo_path)paths.push(p.photo_path);
     (paths.length?sb.storage.from("personnel").remove(paths):Promise.resolve({})).then(function(){return sb.from("personnel").delete().eq("id",p.id)}).then(function(r){
-      if(r.error){alert("Could not delete.");return}people=people.filter(function(x){return x.id!==p.id});docRows=docRows.filter(function(d){return d.person_id!==p.id});benRows=benRows.filter(function(d){return d.person_id!==p.id});closeDetail();render()})}));
+      if(r.error){alert("Could not delete.");return}people=people.filter(function(x){return x.id!==p.id});docRows=docRows.filter(function(d){return d.person_id!==p.id});benRows=benRows.filter(function(d){return d.person_id!==p.id});closeDetail();render()})});delP.style.marginLeft="auto";acts.appendChild(delP)}
   host.appendChild(acts)}
 function uploadPersonPhoto(file,p){
   return loadImg(file).then(function(img){return toJpeg(img,700,.85)}).then(function(j){
