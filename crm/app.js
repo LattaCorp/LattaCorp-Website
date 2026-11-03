@@ -145,13 +145,26 @@ function renderLeads(){
     right.appendChild(el("div","sub",ago(l.created_at)));
     b.appendChild(left);b.appendChild(right);b.addEventListener("click",function(){openLead(l.id)});list.appendChild(b)});
 }
-/* Clients sort by last name (people) or by full name (HOAs and businesses). "Smith, Anna" is read as last name first; Jr/Sr/II/III are ignored. */
+/* Names: each client has a formal Name (as on the account), an optional Last name for sorting, and an optional Preferred name / nickname.
+   If Last name is blank it is guessed: the last word of the name, ignoring Jr/Sr/II/III/Family and anything in quotes or parentheses
+   ("Mr & Mrs Smith" -> Smith, "Alejandro Torres Jr" -> Torres). HOAs and businesses sort by their full name. */
+var NAME_SKIP=/^(jr|sr|ii|iii|iv|v|family|household|residence|esq|md|dds)\.?$/i;
+function nameTokens(n){return String(n||"").replace(/["\u201c\u201d][^"\u201c\u201d]*["\u201c\u201d]/g," ").replace(/\([^)]*\)/g," ").replace(/,/g," ").trim().split(/\s+/).filter(Boolean)}
+function guessLast(n){var w=nameTokens(n);while(w.length>1&&NAME_SKIP.test(w[w.length-1]))w.pop();return w.length?w[w.length-1]:""}
+function lastOf(c){return String(c.last_name||"").trim()||(String(c.name||"").indexOf(",")>-1?String(c.name).split(",")[0].trim():guessLast(c.name))}
 function lastKey(c){
   var n=String(c.name||"").trim().toLowerCase();if(!n)return"";
   if(c.type==="hoa"||c.type==="commercial")return n+"|";
-  var f,l;if(n.indexOf(",")>-1){l=n.split(",")[0].trim();f=n.split(",").slice(1).join(" ").trim()}
-  else{var w=n.split(/\s+/);while(w.length>1&&/^(jr|sr|ii|iii|iv|v)\.?$/.test(w[w.length-1]))w.pop();l=w.length>1?w[w.length-1]:w[0];f=w.slice(0,-1).join(" ")}
-  return l+"|"+f}
+  return lastOf(c).toLowerCase()+"|"+n}
+/* "Torres, Alejandro Jr "AL"" : last name first, formal rest of the name, then the nickname in quotes */
+function dispName(c){
+  var n=String(c.name||"").trim();if(!n)return"";var nick=String(c.nickname||"").trim(),tail=nick?' "'+nick+'"':"";
+  if(c.type==="hoa"||c.type==="commercial")return n+tail;
+  if(n.indexOf(",")>-1)return n+tail;
+  var last=lastOf(c),w=nameTokens(n),lw=nameTokens(last),i=-1;
+  for(var k=w.length-lw.length;k>=0;k--){var ok=true;for(var j=0;j<lw.length;j++)if(w[k+j].toLowerCase()!==lw[j].toLowerCase()){ok=false;break}if(ok){i=k;break}}
+  if(i<0)return last+", "+w.join(" ")+tail;
+  var rest=w.slice(0,i).concat(w.slice(i+lw.length)).join(" ");return last+(rest?", "+rest:"")+tail}
 function sortClients(){clients.sort(function(a,b){var x=lastKey(a),y=lastKey(b);return x<y?-1:x>y?1:0})}
 function clientProps(id){return props.filter(function(p){return p.client_id===id})}
 function renderClients(){
@@ -167,12 +180,12 @@ function renderClients(){
     if(cfilter==="archived"){if(!c.archived)return false}else{if(c.archived)return false;if(cfilter!=="active"&&c.type!==cfilter)return false}
     if(!query)return true;
     var addr=clientProps(c.id).map(function(p){return p.address}).join(" ");
-    return[c.name,c.company,c.email,c.phone,c.phone2,c.notes,addr].join(" ").toLowerCase().indexOf(query)>-1});
+    return[c.name,c.nickname,c.last_name,c.company,c.email,c.phone,c.phone2,c.notes,addr].join(" ").toLowerCase().indexOf(query)>-1});
   if(!shown.length){list.appendChild(el("div","empty",clients.length?"Nothing matches that.":"No clients yet. Add one, import a CSV, or convert a lead."));return}
   shown.forEach(function(c){
     var b=el("button","row client"+(c.archived?" archived":""));b.type="button";
     var ps=clientProps(c.id),left=el("div");
-    left.appendChild(el("b",null,c.name+(c.company?" · "+c.company:"")));
+    left.appendChild(el("b",null,dispName(c)+(c.company?" · "+c.company:"")));
     left.appendChild(el("div","sub",[c.phone,c.email].filter(Boolean).join(" · ")));
     if(ps[0])left.appendChild(el("div","sub",ps[0].address+(ps.length>1?"  (+"+(ps.length-1)+" more)":"")));
     var right=el("div");right.style.textAlign="right";right.appendChild(el("span","chip "+c.type,tlabel(c.type)));
@@ -254,7 +267,7 @@ function linkLead(l,c,addr){
 function openClient(id){
   var c=byId(clients,id);if(!c)return;var p=panel();
   p.appendChild(el("h2",null,c.name+(c.company?" · "+c.company:"")));
-  p.appendChild(el("div","note",tlabel(c.type)+" · added "+new Date(c.created_at).toLocaleDateString()+(c.source?" · from "+c.source:"")+(c.archived?" · ARCHIVED":"")));
+  p.appendChild(el("div","note",(c.nickname?"Goes by \""+c.nickname+"\" · ":"")+tlabel(c.type)+" · added "+new Date(c.created_at).toLocaleDateString()+(c.source?" · from "+c.source:"")+(c.archived?" · ARCHIVED":"")));
   p.appendChild(contactRow(c.phone||c.phone2,c.email));
   var t=document.createElement("table");
   [["Phone",c.phone],["Phone 2",c.phone2],["Email",c.email],["Notes",c.notes]].forEach(function(r){if(!r[1])return;var tr=document.createElement("tr");tr.appendChild(el("td",null,r[0]));tr.appendChild(el("td",null,r[1]));t.appendChild(tr)});
@@ -307,21 +320,23 @@ function propForm(c,pr,holder){
 }
 function openClientForm(c){
   var p=panel();p.appendChild(el("h2",null,c?"Edit client":"New client"));
-  var n=fld("Name","text",c&&c.name),co=fld("Company / HOA name (optional)","text",c&&c.company);
+  var n=fld("Name (as on the account, e.g. Mr & Mrs Smith, or Alejandro Torres Jr)","text",c&&c.name),ln=fld("Last name (for sorting)","text",c&&c.last_name),nk=fld("Preferred name / nickname (optional)","text",c&&c.nickname),co=fld("Company / HOA name (optional)","text",c&&c.company);
   var ph=fld("Phone","tel",c&&c.phone),ph2=fld("Phone 2 (optional)","tel",c&&c.phone2);
   var em=fld("Email","email",c&&c.email),ty=fld("Type","select",c?c.type:"residential",TYPES);
   var nt=fld("Notes","textarea",c&&c.notes);
-  var g=el("div","grid2");g.appendChild(n);g.appendChild(co);g.appendChild(ph);g.appendChild(ph2);g.appendChild(em);g.appendChild(ty);p.appendChild(g);p.appendChild(nt);
+  var g=el("div","grid2");g.appendChild(n);g.appendChild(ln);g.appendChild(nk);g.appendChild(co);g.appendChild(ph);g.appendChild(ph2);g.appendChild(em);g.appendChild(ty);p.appendChild(g);p.appendChild(nt);
+  function hint(){ln.input.placeholder=guessLast(n.input.value)||"Left blank = guessed from the name"}n.input.addEventListener("input",hint);hint();
   var addr=null;if(!c){addr=fld("Service address (required, you can add more later)","text","");addr.input.placeholder="123 Example Ln, Kissimmee, FL 34758";p.appendChild(addr)}
   var a=el("div","actions");
   var save=btn("Save","btn",function(){
     if(!n.input.value.trim()){alert("Enter a name.");return}
     if(!c&&!addr.input.value.trim()){alert("Enter the service address.");addr.input.focus();return}
     var row={name:n.input.value.trim(),company:co.input.value.trim(),phone:ph.input.value.trim(),phone2:ph2.input.value.trim(),email:em.input.value.trim(),type:ty.input.value,notes:nt.input.value.trim()};
+    var colsOk=clients.some(function(x){return"last_name"in x}),wantNames=ln.input.value.trim()||nk.input.value.trim();if(colsOk||wantNames){row.last_name=ln.input.value.trim();row.nickname=nk.input.value.trim()}
     save.disabled=true;
-    if(c){sb.from("clients").update(row).eq("id",c.id).select().single().then(function(r){save.disabled=false;if(r.error||!r.data){alert("Could not save.");return}Object.assign(c,r.data);render();openClient(c.id)})}
+    if(c){sb.from("clients").update(row).eq("id",c.id).select().single().then(function(r){save.disabled=false;if(r.error||!r.data){alert(wantNames&&!colsOk?"Could not save. Last name and nickname need the Stage 19 SQL: run it in Supabase (SQL Editor), then press Refresh.":"Could not save.");return}Object.assign(c,r.data);render();openClient(c.id)})}
     else{row.source="Added by hand";sb.from("clients").insert(row).select().single().then(function(r){
-      if(r.error||!r.data){save.disabled=false;alert("Could not save. Did you run the Stage 1 SQL?");return}
+      if(r.error||!r.data){save.disabled=false;alert(wantNames&&!colsOk?"Could not save. Last name and nickname need the Stage 19 SQL: run it in Supabase (SQL Editor), then press Refresh.":"Could not save. Did you run the Stage 1 SQL?");return}
       clients.push(r.data);clients.sort(function(x,y){return x.name.localeCompare(y.name)});
       var ad=addr.input.value.trim();
       sb.from("properties").insert({client_id:r.data.id,label:"Main",address:ad}).select().single().then(function(q){if(q.data)props.push(q.data);else alert("Client saved, but the address did not save. Add it from the client page.");render();openClient(r.data.id)})})}});
@@ -1698,7 +1713,7 @@ function openJobForm(client,job){
   var active=clients.filter(function(c){return!c.archived||(client&&c.id===client.id)});
   if(!active.length){p.appendChild(el("p",null,"Add a client first."));return}
   var cid=job?job.client_id:client?client.id:active[0].id;
-  var cs=fld("Client","select",cid,active.map(function(c){return[c.id,c.name]}));if(job||client)cs.input.disabled=true;
+  var cs=fld("Client","select",cid,active.map(function(c){return[c.id,dispName(c)]}));if(job||client)cs.input.disabled=true;
   var ps=fld("Property","select","",[]);
   function fillProps(){ps.input.textContent="";clientProps(cs.input.value).forEach(function(x){var o=document.createElement("option");o.value=x.id;o.textContent=(x.label?x.label+": ":"")+x.address;ps.input.appendChild(o)});if(job&&job.client_id===cs.input.value)ps.input.value=job.property_id}
   cs.input.addEventListener("change",fillProps);fillProps();
@@ -1959,7 +1974,7 @@ function openInvoiceForm(cid){
   if(billErr){alert("Billing isn't set up yet. Run the Stage 5 SQL in Supabase first.");return}
   var p=panel();p.appendChild(el("h2",null,"New invoice"));
   var list=clients.filter(function(c){return!c.archived||c.id===cid});
-  var cs=fld("Client","select",cid||"",[["","Choose a client..."]].concat(list.map(function(c){return[c.id,c.name+(c.company?" · "+c.company:"")]})));p.appendChild(cs);
+  var cs=fld("Client","select",cid||"",[["","Choose a client..."]].concat(list.map(function(c){return[c.id,dispName(c)+(c.company?" · "+c.company:"")]})));p.appendChild(cs);
   var terms=Number(bizv("terms_days",10));terms=isNaN(terms)?10:terms;
   var g=el("div","grid2"),isd=fld("Invoice date","date",today()),dd=fld("Due date","date",addDays(today(),terms)),dueTouched=false;
   dd.input.addEventListener("change",function(){dueTouched=true});isd.input.addEventListener("change",function(){if(!dueTouched&&isd.input.value)dd.input.value=addDays(isd.input.value,terms)});
@@ -2032,7 +2047,7 @@ function openPayment(cid,pre){
   var p=panel();p.appendChild(el("h2",null,"Customer payment"));
   if(pre.saved){var ok=el("div","pcard","✓ Payment saved.");ok.style.cssText="background:var(--mint);font-weight:700";p.appendChild(ok)}
   var cl=clients.filter(function(c){return!c.archived||c.id===cid});
-  var cs=fld("Customer Name","select",cid||"",[["","Choose a customer..."]].concat(cl.map(function(c){return[c.id,c.name+(c.company?" · "+c.company:"")]})));p.appendChild(cs);
+  var cs=fld("Customer Name","select",cid||"",[["","Choose a customer..."]].concat(cl.map(function(c){return[c.id,dispName(c)+(c.company?" · "+c.company:"")]})));p.appendChild(cs);
   var balBox=el("div");balBox.style.cssText="display:flex;justify-content:space-between;margin:0 0 10px;font-weight:600";p.appendChild(balBox);
   var g=el("div","grid2"),dt=fld("Date","date",today()),am=fld("Amount ($)","number",""),me=fld("Pmt. Method","select","Zelle",PAYMETH),rf=fld("Reference","text","");
   am.input.step="0.01";am.input.min="0";am.input.inputMode="decimal";[dt,am,me,rf].forEach(function(x){g.appendChild(x)});p.appendChild(g);
@@ -2325,7 +2340,7 @@ function openEstimateForm(cid){
   if(estErr){alert("Run the Stage 11 SQL in Supabase first, then press Refresh.");return}
   var p=panel();p.appendChild(el("h2",null,"New estimate"));
   var list=clients.filter(function(c){return!c.archived||c.id===cid});
-  var cs=fld("Client","select",cid||"",[["","Choose a client..."]].concat(list.map(function(c){return[c.id,c.name+(c.company?" · "+c.company:"")]})));
+  var cs=fld("Client","select",cid||"",[["","Choose a client..."]].concat(list.map(function(c){return[c.id,dispName(c)+(c.company?" · "+c.company:"")]})));
   var ttl=fld("Title (for example: Spring cleanup and mulch)","text",""),scp=fld("Details the client will see (optional)","textarea",""),vd=fld("Valid for (days)","number","30");
   p.appendChild(cs);p.appendChild(ttl);p.appendChild(scp);p.appendChild(vd);
   p.appendChild(el("h3",null,"Lines"));var box=el("div"),rows=[];
