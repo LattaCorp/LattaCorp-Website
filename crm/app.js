@@ -500,6 +500,16 @@ function renderJobs(){
     b.appendChild(left);b.appendChild(right);b.addEventListener("click",function(){openJob(j.id)});list.appendChild(b)})}
 
 /* ---- visit card (used in Schedule and in job detail) ---- */
+/* A completed visit with no price can't be billed. These controls fix it on the spot: set a price, or mark it "No charge" (kept in the history, never billed). */
+function noPrice(v){return v.status==="done"&&!v.invoice_id&&!v.paid_at&&!(Number(v.price)>0)}
+function priceFix(v,after){
+  var w=el("div");w.style.cssText="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px";
+  var inp=document.createElement("input");inp.type="number";inp.step="0.01";inp.min="0";inp.inputMode="decimal";inp.placeholder="Price $";inp.style.cssText="width:96px";inp.setAttribute("aria-label","Price for this visit");w.appendChild(inp);
+  w.appendChild(btn("Set price","btn sm",function(){var n=parseFloat(inp.value);if(!(n>0)){alert("Enter the price for this visit.");return}
+    sb.from("visits").update({price:n}).eq("id",v.id).then(function(r){if(r.error){alert("Could not save the price.");return}v.price=n;loadUnbilled().then(after)})}));
+  w.appendChild(btn("No charge","btn alt sm",function(){if(!confirm("Mark this visit as no charge? It will be kept in the history and never billed."))return;
+    var when=new Date().toISOString();sb.from("visits").update({paid_at:when,paid_method:"No charge"}).eq("id",v.id).then(function(r){if(r.error){alert("Could not save that.");return}v.paid_at=when;v.paid_method="No charge";loadUnbilled().then(after)})}));
+  return w}
 function visitCard(v,after,showJob,opts){
   opts=opts||{};
   var j=byId(jobs,v.job_id),card=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px";
@@ -510,6 +520,7 @@ function visitCard(v,after,showJob,opts){
   if(v.status==="scheduled"&&v.weather_from){var wn=el("div","note","Moved by weather from "+dshort(v.weather_from));wn.style.color="#1f5f9a";l.appendChild(wn)}
   top.appendChild(l);
   if(v.status!=="scheduled")top.appendChild(el("span","chip "+(v.status==="done"?"won":"lost"),v.status==="done"?"Done":"Skipped"));
+  if(!billErr&&noPrice(v)){var npc=el("span","chip od","\u26a0 No price");npc.title="This visit can't be billed until it has a price";npc.style.marginLeft="6px";top.appendChild(npc)}
   card.appendChild(top);
   var a=el("div","acts");
   function patch(p,cb){
@@ -523,13 +534,14 @@ function visitCard(v,after,showJob,opts){
   function btns(){
     a.textContent="";
     if(v.status==="scheduled"){
-      a.appendChild(btn("Done","btn sm",function(){patch({status:"done",completed_at:new Date().toISOString()})}));
+      a.appendChild(btn("Done","btn sm",function(){var pp={status:"done",completed_at:new Date().toISOString()};if(!billErr&&!(Number(v.price)>0)){var ans=prompt("This visit has no price yet, so it can't be billed. Enter the price for this visit, or leave it blank to set it later:","");var n=ans==null?NaN:parseFloat(ans);if(n>0)pp.price=n}patch(pp)}));
       a.appendChild(btn("Skip","btn alt sm",function(){patch(wxOn()?{status:"skipped",weather_from:null,weather_batch:null}:{status:"skipped"})}));
       a.appendChild(btn("Move","btn alt sm",function(){
         a.textContent="";var di=document.createElement("input");di.type="date";di.value=v.scheduled_date;di.style.width="auto";a.appendChild(di);
         a.appendChild(btn("Save date","btn sm",function(){if(!di.value)return;var nd=di.value,od=v.scheduled_date,pp={scheduled_date:nd};if(wxOn()){pp.weather_from=null;pp.weather_batch=null}if(remOn())pp.reminded_at=null;patch(pp,nd>od?function(){catchup([v],"m|"+Date.now(),after)}:null)}));a.appendChild(btn("Cancel","btn alt sm",btns))}));
     }else{
       if(!v.invoice_id&&!v.paid_at)a.appendChild(btn("Undo","btn alt sm",function(){patch({status:"scheduled",completed_at:null})}));
+      if(!billErr&&noPrice(v))card.appendChild(priceFix(v,after));
       if(!billErr&&v.status==="done"){
         if(v.invoice_id){var oi=el("span","note","On an invoice");oi.style.alignSelf="center";a.appendChild(oi)}
         else if(v.paid_at){var pn=el("span","chip won","Paid"+(v.paid_method?" · "+v.paid_method:""));pn.style.alignSelf="center";a.appendChild(pn);a.appendChild(btn("Undo paid","btn alt sm",function(){patch({paid_at:null,paid_method:""})}))}
@@ -2159,7 +2171,10 @@ function renderToBill(list,bg){
   var q=el("span");q.appendChild(btn("End of last month","btn alt sm",function(){billThrough=lastMonthEnd();render()}));q.appendChild(document.createTextNode(" "));q.appendChild(btn("Today","btn alt sm",function(){billThrough=today();render()}));bar.appendChild(q);
   list.appendChild(bar);
   var zero=unbilled.filter(function(v){return v.scheduled_date<=billThrough&&!(Number(v.price)>0)});
-  if(zero.length){var zn=el("div","note","⚠ "+zero.length+" completed visit"+(zero.length>1?"s have":" has")+" no price set, so "+(zero.length>1?"they are":"it is")+" left out. Set the job's price, then they can be billed.");zn.style.cssText="color:#7a5b00;margin:6px 0";list.appendChild(zn)}
+  if(zero.length){var zn=el("div","note","\u26a0 "+zero.length+" completed visit"+(zero.length>1?"s have":" has")+" no price set, so "+(zero.length>1?"they are":"it is")+" left out. Set a price below (or mark it No charge) and it moves into the list to bill.");zn.style.cssText="color:#7a5b00;margin:6px 0";list.appendChild(zn);
+    zero.slice().sort(function(x,y){return x.scheduled_date<y.scheduled_date?-1:1}).forEach(function(v){var c=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
+      var l=el("div");l.appendChild(el("b",null,cname(v.client_id)+" \u00b7 "+jobTitle(v.job_id)));l.appendChild(el("div","note",[dshort(v.scheduled_date),paddr(v.property_id)].filter(Boolean).join(" \u00b7 ")));top.appendChild(l);
+      top.appendChild(btn("Open job","btn alt sm",function(){openJob(v.job_id)}));c.appendChild(top);c.appendChild(priceFix(v,render));list.appendChild(c)})}
   if(!bg.order.length){list.appendChild(el("div","empty","Nothing to bill through "+dshort(billThrough)+". Completed visits that haven't been paid or invoiced show up here."));return}
   var all=btn("Create all invoices ("+bg.order.length+")","btn",function(){
     if(!confirm("Create "+bg.order.length+" invoice"+(bg.order.length>1?"s":"")+" for completed visits through "+dshort(billThrough)+"?"))return;
