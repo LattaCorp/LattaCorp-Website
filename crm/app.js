@@ -1184,7 +1184,7 @@ function expenseBox(year){
   rows.forEach(function(e){var c=e.category||"Other";by[c]=r2((by[c]||0)+expTotal(e))});
   var hr=document.createElement("tr");["Category","Totals for each"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i)th.className="r";hr.appendChild(th)});t.appendChild(hr);
   var total=0;
-  expCats().forEach(function(c){var tr=document.createElement("tr"),a=document.createElement("td"),b=document.createElement("td");a.textContent=c;b.className="r";b.textContent=by[c]?m2(by[c]):"";total+=by[c]||0;tr.appendChild(a);tr.appendChild(b);t.appendChild(tr)});
+  expCats().forEach(function(c){var tr=document.createElement("tr"),a=document.createElement("td"),b=document.createElement("td");a.textContent=c;b.className="r";b.textContent=m2(by[c]||0);total+=by[c]||0;tr.appendChild(a);tr.appendChild(b);t.appendChild(tr)});
   var ft=document.createElement("tr");ft.className="tot";var a2=document.createElement("td");a2.textContent="Overall Total";var b2=document.createElement("td");b2.className="r";b2.textContent=m2(r2(total));ft.appendChild(a2);ft.appendChild(b2);t.appendChild(ft);
   box.appendChild(t);return box}
 /* column drop-downs on the expense table: sort and filter by any column */
@@ -1450,7 +1450,7 @@ function inventorySummaryBox(year){
     invRows(c).forEach(function(r){var dc=invAllCol(c,"purchase date",r),pc=invAllCol(c,"price",r),yr=dc?invDateYear(invVal(r,dc.k)):null,pr=pc?(invNumber(invVal(r,pc.k))||0):0,mk=invMarkedOld(r);
       if(mk){n++;od+=pr;return}if(yr!=null&&yr>y){later++;return}n++;if(yr==null)un+=pr;else if(yr===y)nw+=pr;else od+=pr});
     if(!n)return;tn+=n;tNew+=nw;tOld+=od;tUn+=un;
-    var tr=document.createElement("tr");[[c.name,""],[String(n),"r"],[nw?m2(nw):"","r"],[od?m2(od):"","r old"]].forEach(function(x,i){var td=document.createElement("td");td.textContent=x[0];if(x[1])td.className=x[1];if(i===0)invPaint(td,c);tr.appendChild(td)});t.appendChild(tr)});
+    var tr=document.createElement("tr");[[c.name,""],[String(n),"r"],[m2(nw||0),"r"],[m2(od||0),"r old"]].forEach(function(x,i){var td=document.createElement("td");td.textContent=x[0];if(x[1])td.className=x[1];if(i===0)invPaint(td,c);tr.appendChild(td)});t.appendChild(tr)});
   if(!tn){var e=document.createElement("tr"),ed=document.createElement("td");ed.colSpan=4;ed.textContent="No inventory items yet.";e.appendChild(ed);t.appendChild(e)}
   var ft=document.createElement("tr");ft.className="tot";[["Total",""],[String(tn),"r"],[m2(r2(tNew)),"r"],[m2(r2(tOld)),"r old"]].forEach(function(x){var td=document.createElement("td");td.textContent=x[0];if(x[1])td.className=x[1];ft.appendChild(td)});t.appendChild(ft);
   box.appendChild(t);
@@ -1462,9 +1462,9 @@ function employeeBox(year){
   ["Employee","Payments","Total paid"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i)th.className="r";hr.appendChild(th)});t.appendChild(hr);
   var tot=0,n=0;
   people.forEach(function(p){var rs=paidBy(p.id,year);if(!rs.length)return;var a=sumAmt(rs);tot+=a;n++;
-    var tr=document.createElement("tr");[[p.full_name,""],[String(rs.length),"r"],[money(a),"r"]].forEach(function(x){var td=document.createElement("td");td.textContent=x[0];if(x[1])td.className=x[1];tr.appendChild(td)});t.appendChild(tr)});
+    var tr=document.createElement("tr");[[p.full_name,""],[String(rs.length),"r"],[m2(a),"r"]].forEach(function(x){var td=document.createElement("td");td.textContent=x[0];if(x[1])td.className=x[1];tr.appendChild(td)});t.appendChild(tr)});
   if(!n){var e=document.createElement("tr"),ed=document.createElement("td");ed.colSpan=3;ed.textContent=persErr?"Run the Stage 17 SQL (Personnel).":(isOwner()?"No payments recorded for "+year+".":"Owners only.");e.appendChild(ed);t.appendChild(e)}
-  var ft=document.createElement("tr");ft.className="tot";[["Total employee pay",""],["",""],[money(Math.round(tot*100)/100),"r"]].forEach(function(x){var td=document.createElement("td");td.textContent=x[0];if(x[1])td.className=x[1];ft.appendChild(td)});t.appendChild(ft);
+  var ft=document.createElement("tr");ft.className="tot";[["Total employee pay",""],["",""],[m2(Math.round(tot*100)/100),"r"]].forEach(function(x){var td=document.createElement("td");td.textContent=x[0];if(x[1])td.className=x[1];ft.appendChild(td)});t.appendChild(ft);
   box.appendChild(t);box.appendChild(el("div","taxnote","From Personnel > Payroll, counted by the date paid in "+year+"."));return box}
 function renderTaxReport(list){
   var tb=$("topbtns");tb.appendChild(btn("Print / Save PDF (one page)","btn",printReport));tb.appendChild(document.createTextNode(" "));
