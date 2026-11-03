@@ -2176,6 +2176,15 @@ function renderToBill(list,bg){
     zero.slice().sort(function(x,y){return x.scheduled_date<y.scheduled_date?-1:1}).forEach(function(v){var c=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
       var l=el("div");l.appendChild(el("b",null,cname(v.client_id)+" \u00b7 "+jobTitle(v.job_id)));l.appendChild(el("div","note",[dshort(v.scheduled_date),paddr(v.property_id)].filter(Boolean).join(" \u00b7 ")));top.appendChild(l);
       top.appendChild(btn("Open job","btn alt sm",function(){openJob(v.job_id)}));c.appendChild(top);c.appendChild(priceFix(v,render));list.appendChild(c)})}
+  /* visits earlier marked "No charge" (no invoice yet): make $0 invoices for them, one per client */
+  var ncHost=el("div");list.appendChild(ncHost);
+  sb.from("visits").select("*").eq("status","done").eq("paid_method","No charge").is("invoice_id",null).limit(2000).then(function(r){
+    var vs=(r.data||[]).filter(function(v){return!r.error&&!(Number(v.price)>0)});if(!vs.length)return;
+    var g={},order=[];vs.forEach(function(v){if(!g[v.client_id]){g[v.client_id]=[];order.push(v.client_id)}g[v.client_id].push(v)});
+    var c=el("div","pcard");c.style.background="#eef6ec";c.appendChild(el("b",null,vs.length+" no-charge visit"+(vs.length>1?"s have":" has")+" no invoice"));c.appendChild(el("div","note","Create a $0 invoice for each client so it shows in their invoice history: "+order.map(cname).join(", ")+"."));
+    var mk=btn("Create $0 invoices ("+order.length+")","btn sm",function(){mk.disabled=true;var made=0,fails=[];
+      order.reduce(function(pr,cid){return pr.then(function(){return createInvoice(cid,g[cid],today()).then(function(){made++},function(e){fails.push(cname(cid)+": "+e)})})},Promise.resolve()).then(function(){return loadUnbilled()}).then(function(){alert("Created "+made+" $0 invoice"+(made===1?"":"s")+"."+(fails.length?"\n\nProblems:\n"+fails.join("\n"):""));bfilter="paid";render()})});
+    mk.style.marginTop="8px";c.appendChild(mk);ncHost.appendChild(c)});
   if(!bg.order.length){list.appendChild(el("div","empty","Nothing to bill through "+dshort(billThrough)+". Completed visits that haven't been paid or invoiced show up here."));return}
   var all=btn("Create all invoices ("+bg.order.length+")","btn",function(){
     if(!confirm("Create "+bg.order.length+" invoice"+(bg.order.length>1?"s":"")+" for completed visits through "+dshort(billThrough)+"?"))return;
