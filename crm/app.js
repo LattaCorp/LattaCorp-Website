@@ -2135,6 +2135,40 @@ function renderPayments(list){
     var l=el("div");l.appendChild(el("b",null,cname(x.client_id||(iv&&iv.client_id))+" · "+money(x.amount)));l.appendChild(el("div","note",[mdy(x.paid_on),iv?"Invoice "+invNum(iv.number):"On account",x.method,x.reference?"Ref "+x.reference:"",x.note].filter(Boolean).join(" · ")));top.appendChild(l);
     var a=el("div","acts");a.style.marginTop="0";a.appendChild(btn("Edit","btn alt sm",function(){openPaymentEdit(x)}));a.appendChild(btn("Customer","btn alt sm",function(){openPayment(x.client_id||(iv&&iv.client_id))}));a.appendChild(btn("Delete","btn danger sm",function(){delPayment(x)}));top.appendChild(a);c.appendChild(top);list.appendChild(c)})}
 
+/* Past invoice: record an old invoice that was already sent and paid (one step: invoice + payment, nothing is sent or left owed). */
+function openPastInvoice(cid,pre){
+  pre=pre||{};
+  if(billErr){alert("Billing isn't set up yet. Run the Stage 5 SQL in Supabase first.");return}
+  var p=panel();p.appendChild(el("h2",null,"Past invoice (already sent and paid)"));
+  p.appendChild(el("div","note","For old invoices you already sent and collected on. It is saved as Paid with its payment, nothing is emailed, and it never shows as owed."));
+  if(pre.saved){var ok=el("div","pcard","\u2713 Saved "+pre.saved+". Enter the next one below.");ok.style.cssText="background:var(--mint);font-weight:700;margin-top:8px";p.appendChild(ok)}
+  var list=clients.filter(function(c){return!c.archived||c.id===cid});
+  var cs=fld("Client","select",cid||"",[["","Choose a client..."]].concat(list.map(function(c){return[c.id,dispName(c)+(c.company?" \u00b7 "+c.company:"")]})));p.appendChild(cs);
+  var g=el("div","grid2"),isd=fld("Original invoice date","date",pre.date||""),on=fld("Original invoice number","text","");on.input.placeholder="Their old number, if any";g.appendChild(isd);g.appendChild(on);p.appendChild(g);
+  var g2=el("div","grid2"),am=fld("Amount ($)","number",""),ds=fld("Description","text",pre.desc||"Lawn maintenance");am.input.step="0.01";am.input.min="0";am.input.inputMode="decimal";g2.appendChild(am);g2.appendChild(ds);p.appendChild(g2);
+  var g3=el("div","grid2"),pd=fld("Date paid","date",pre.paidOn||""),me=fld("Paid by","select",pre.method||"Zelle",PAYMETH);g3.appendChild(pd);g3.appendChild(me);p.appendChild(g3);
+  var nt=fld("Note (optional)","text","");p.appendChild(nt);
+  var ids=el("div","note","If the invoice and payment were the same day, enter the same date in both. Leave the number empty if there wasn't one.");p.appendChild(ids);
+  var acts=el("div","acts");acts.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin-top:14px";
+  function save(another){
+    if(!cs.input.value){alert("Choose a client.");return}if(!isd.input.value){alert("Enter the original invoice date.");return}
+    var a=parseFloat(am.input.value);if(isNaN(a)||a<0){alert("Enter the amount (0 if it was no charge).");return}
+    if(!ds.input.value.trim()){alert("Enter a description.");return}if(!pd.input.value){alert("Enter the date it was paid.");return}
+    var terms=Number(bizv("terms_days",10));terms=isNaN(terms)?10:terms;a=r2(a);
+    acts.querySelectorAll("button").forEach(function(b){b.disabled=true});
+    var row={client_id:cs.input.value,issue_date:isd.input.value,due_date:addDays(isd.input.value,terms),total:a,reference:on.input.value.trim(),notes:("Past invoice entered for records. "+nt.input.value.trim()).trim(),status:"paid",paid_at:pd.input.value+"T12:00:00",paid_method:a===0?"No charge":me.input.value};
+    function fail(msg,invId){(invId?sb.from("invoices").delete().eq("id",invId):Promise.resolve()).then(function(){acts.querySelectorAll("button").forEach(function(b){b.disabled=false});alert(msg)})}
+    sb.from("invoices").insert(row).select().single().then(function(r){
+      if(r.error||!r.data){fail("Could not save the invoice. Did you run the Stage 5 SQL?");return}
+      var inv=r.data;
+      sb.from("invoice_items").insert({invoice_id:inv.id,service_date:isd.input.value,description:ds.input.value.trim(),amount:a}).then(function(r2_){
+        if(r2_.error){fail("Could not save the invoice line.",inv.id);return}
+        function done(){invoices.unshift(inv);repData=null;render();var label=invNum(inv.number)+(inv.reference?" (old #"+inv.reference+")":"");
+          if(another)openPastInvoice(cs.input.value,{saved:label,method:me.input.value,desc:ds.input.value.trim()});else openInvoice(inv.id)}
+        if(a>0&&!payErr){sb.from("invoice_payments").insert({invoice_id:inv.id,client_id:inv.client_id,paid_on:pd.input.value,amount:a,method:me.input.value,reference:on.input.value.trim(),note:"Past invoice"}).select().single().then(function(r3){
+          if(r3.error||!r3.data){fail("Could not save the payment.",inv.id);return}invPays.unshift(r3.data);done()})}
+        else done()})})}
+  acts.appendChild(btn("Save and add another","btn",function(){save(true)}));acts.appendChild(btn("Save","btn alt",function(){save(false)}));p.appendChild(acts)}
 /* ---- Billing screen ---- */
 function renderBilling(){
   var tabs=$("tabs");tabs.textContent="";
@@ -2142,7 +2176,7 @@ function renderBilling(){
   var bg=billGroups();
   [["tobill","To bill",bg.order.length],["open","Open",op.length],["paid","Paid",pd_.length],["payments","Payments",invPays.length],["estimates","Estimates",estimates.filter(function(e){return(e.status==="draft"||e.status==="sent")&&!estExpired(e)}).length]].forEach(function(s){
     var b=el("button","tab"+(bfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){bfilter=s[0];render()});tabs.appendChild(b)});
-  if(bfilter!=="estimates"&&bfilter!=="payments"){$("topbtns").appendChild(btn("New invoice","btn",function(){openInvoiceForm(null)}));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Customer payment","btn alt",function(){openPayment(null)}));$("topbtns").appendChild(document.createTextNode(" "))}
+  if(bfilter!=="estimates"&&bfilter!=="payments"){$("topbtns").appendChild(btn("New invoice","btn",function(){openInvoiceForm(null)}));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Past invoice","btn alt",function(){openPastInvoice(null)}));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Customer payment","btn alt",function(){openPayment(null)}));$("topbtns").appendChild(document.createTextNode(" "))}
   $("topbtns").appendChild(btn("Price calculator","btn alt",openCalc));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Billing settings","btn alt",openBizSettings));
   var list=$("list");list.textContent="";
   if(bfilter==="estimates")return renderEstimates(list);
@@ -2653,7 +2687,7 @@ function clientBillingSection(c){
   var sm=el("div","note",[bal?"Balance due "+money(bal)+(od?" ("+od+" overdue)":""):"Nothing owed",ubt?money(ubt)+" not yet billed":""].filter(Boolean).join(" · "));sm.style.fontWeight="700";sec.appendChild(sm);
   if(ub.length){var cb=btn("Create invoice for completed visits ("+ub.length+")","btn alt sm",function(){cb.disabled=true;createInvoice(c.id,ub,today()).then(function(inv){return loadUnbilled().then(function(){render();openInvoice(inv.id)})},function(e){cb.disabled=false;alert(e)})});cb.style.margin="6px 0";sec.appendChild(cb)}
   var ab=el("div","acts");ab.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0";
-  ab.appendChild(btn("New invoice","btn alt sm",function(){openInvoiceForm(c.id)}));ab.appendChild(btn("Record payment","btn alt sm",function(){openPayment(c.id)}));sec.appendChild(ab);
+  ab.appendChild(btn("New invoice","btn alt sm",function(){openInvoiceForm(c.id)}));ab.appendChild(btn("Record payment","btn alt sm",function(){openPayment(c.id)}));ab.appendChild(btn("Past invoice","btn alt sm",function(){openPastInvoice(c.id)}));sec.appendChild(ab);
   /* invoice history */
   var h1=el("h4",null,"Invoice history");h1.style.margin="12px 0 6px";sec.appendChild(h1);
   var hist=mine.slice().sort(function(a,b){return b.number-a.number});
