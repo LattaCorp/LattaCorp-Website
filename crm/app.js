@@ -1176,7 +1176,7 @@ function findDup(r,ignoreId){
     if(x.spent_on===r.spent_on&&Math.abs(expTotal(x)-tot)<0.005)return x}
   return null}
 function dupText(x){return(x.vendor||"(no vendor)")+" on "+mdy(x.spent_on)+" for "+m2(expTotal(x))+(x.receipt_no?" (receipt # "+x.receipt_no+")":"")}
-function expCells(e){return[e.code||"",mdy(e.spent_on),e.vendor||"",e.note||"",e.category||"",e.payment||"",e.receipt_no||"",m2(expNet(e)),expTax(e)?m2(expTax(e)):"",m2(expTotal(e))]}
+function expCells(e){return[e.code||"",mdy(e.spent_on),e.vendor||"",e.note||"",e.category||"",e.payment||"",e.receipt_no||"",m2(expNet(e)),m2(expTax(e)),m2(expTotal(e))]}
 function expCsv(rows){return[LCSV].concat(rows.slice().sort(function(a,b){return a.spent_on<b.spent_on?-1:a.spent_on>b.spent_on?1:0}).map(function(e){return[e.code||"",mdy(e.spent_on),e.vendor||"",e.note||"",e.category||"",e.payment||"",e.receipt_no||"",expNet(e).toFixed(2),expTax(e).toFixed(2),expTotal(e).toFixed(2),e.tax_note||""]}))}
 /* the small "Expenses" box: every category with its total for the year */
 function expenseBox(year){
@@ -1981,21 +1981,21 @@ function openInvoiceForm(cid){
   g.appendChild(isd);g.appendChild(dd);p.appendChild(g);
   var ref=fld("Reference / PO number (optional, shows on the invoice)","text","");p.appendChild(ref);
   p.appendChild(el("h3",null,"Lines"));var box=el("div"),rows=[];
-  function addRow(){var r=el("div","grid2"),d=fld("Description","text",""),a=fld("Amount ($, negative = discount)","number","");a.input.step="0.01";a.input.inputMode="decimal";r.appendChild(d);r.appendChild(a);box.appendChild(r);rows.push({d:d,a:a})}
+  function addRow(){var r=el("div","grid2"),d=fld("Description","text",""),a=fld("Amount ($, negative = discount, 0 = no charge)","number","");a.input.step="0.01";a.input.inputMode="decimal";r.appendChild(d);r.appendChild(a);box.appendChild(r);rows.push({d:d,a:a})}
   p.appendChild(box);addRow();p.appendChild(btn("+ Add another line","btn alt sm",addRow));
   var nt=fld("Notes (optional)","textarea","");nt.style.marginTop="10px";p.appendChild(nt);
   var go=btn("Create invoice","btn",function(){
     if(!cs.input.value){alert("Choose a client.");return}if(!isd.input.value||!dd.input.value){alert("Pick the invoice date and due date.");return}
-    var items=[];for(var i=0;i<rows.length;i++){var d=rows[i].d.input.value.trim(),a=parseFloat(rows[i].a.input.value);if(!d&&isNaN(a))continue;if(!d||isNaN(a)){alert("Each line needs a description and an amount.");return}items.push({description:d,amount:a})}
+    var items=[];for(var i=0;i<rows.length;i++){var d=rows[i].d.input.value.trim(),raw=rows[i].a.input.value.trim(),a=raw===""?0:parseFloat(raw);if(!d&&raw==="")continue;if(!d||isNaN(a)){alert("Each line needs a description. (Leave the amount empty or 0 for a no-charge line.)");return}items.push({description:d,amount:a})}
     if(!items.length){alert("Add at least one line.");return}
-    var total=r2(items.reduce(function(s2,x){return s2+x.amount},0));if(total<0){alert("The total can't be negative.");return}
+    var total=r2(items.reduce(function(s2,x){return s2+x.amount},0));if(total<0){alert("The total can't be negative.");return}var zero=total===0;
     go.disabled=true;
-    sb.from("invoices").insert({client_id:cs.input.value,issue_date:isd.input.value,due_date:dd.input.value,total:total,reference:ref.input.value.trim(),notes:nt.input.value.trim()}).select().single().then(function(r){
+    sb.from("invoices").insert({client_id:cs.input.value,issue_date:isd.input.value,due_date:dd.input.value,total:total,reference:ref.input.value.trim(),notes:nt.input.value.trim(),status:zero?"paid":"open",paid_at:zero?isd.input.value+"T12:00:00":null,paid_method:zero?"No charge":""}).select().single().then(function(r){
       if(r.error||!r.data){go.disabled=false;alert("Could not create the invoice. Did you run the Stage 5 SQL?");return}
       var inv=r.data;items.forEach(function(x){x.invoice_id=inv.id;x.service_date=isd.input.value});
       sb.from("invoice_items").insert(items).then(function(r2_){
         if(r2_.error){sb.from("invoices").delete().eq("id",inv.id).then(function(){go.disabled=false;alert("Could not save the lines.")});return}
-        invoices.unshift(inv);repData=null;bfilter="open";render();openInvoice(inv.id)})})});
+        invoices.unshift(inv);repData=null;bfilter=zero?"paid":"open";render();openInvoice(inv.id)})})});
   go.style.marginTop="14px";p.appendChild(go)}
 /* ---- Customer payments: apply a payment to one or more open invoices (partial or full), with entry and invoice history ---- */
 var PAYMETH=[["Zelle","Zelle"],["Cash","Cash"],["Check","Check"],["Other","Other"]];
