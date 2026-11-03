@@ -507,8 +507,8 @@ function priceFix(v,after){
   var inp=document.createElement("input");inp.type="number";inp.step="0.01";inp.min="0";inp.inputMode="decimal";inp.placeholder="Price $";inp.style.cssText="width:96px";inp.setAttribute("aria-label","Price for this visit");w.appendChild(inp);
   w.appendChild(btn("Set price","btn sm",function(){var n=parseFloat(inp.value);if(!(n>0)){alert("Enter the price for this visit.");return}
     sb.from("visits").update({price:n}).eq("id",v.id).then(function(r){if(r.error){alert("Could not save the price.");return}v.price=n;loadUnbilled().then(after)})}));
-  w.appendChild(btn("No charge","btn alt sm",function(){if(!confirm("Mark this visit as no charge? It will be kept in the history and never billed."))return;
-    var when=new Date().toISOString();sb.from("visits").update({paid_at:when,paid_method:"No charge"}).eq("id",v.id).then(function(r){if(r.error){alert("Could not save that.");return}v.paid_at=when;v.paid_method="No charge";loadUnbilled().then(after)})}));
+  w.appendChild(btn("Invoice as $0 (no charge)","btn alt sm",function(){if(!confirm("Create a $0 invoice for this visit? It is kept as a paid, no-charge record in the client's invoice history."))return;
+    createInvoice(v.client_id,[v],today()).then(function(inv){return loadUnbilled().then(function(){render();openInvoice(inv.id)})},function(e){alert(e)})}));
   return w}
 function visitCard(v,after,showJob,opts){
   opts=opts||{};
@@ -1970,6 +1970,7 @@ function createInvoice(cid,vs,through){
   vs=vs.slice().sort(function(a,b){return a.scheduled_date<b.scheduled_date?-1:1});
   var issue=today(),terms=Number(bizv("terms_days",10)),total=r2(vs.reduce(function(s,v){return s+Number(v.price||0)},0));
   var row={client_id:cid,issue_date:issue,due_date:addDays(issue,isNaN(terms)?10:terms),period_start:vs[0].scheduled_date,period_end:through,total:total};
+  if(total===0){row.status="paid";row.paid_at=issue+"T12:00:00";row.paid_method="No charge"}
   return sb.from("invoices").insert(row).select().single().then(function(r){
     if(r.error||!r.data)return Promise.reject("Could not create the invoice. Did you run the Stage 5 SQL?");
     var inv=r.data;
@@ -2171,7 +2172,7 @@ function renderToBill(list,bg){
   var q=el("span");q.appendChild(btn("End of last month","btn alt sm",function(){billThrough=lastMonthEnd();render()}));q.appendChild(document.createTextNode(" "));q.appendChild(btn("Today","btn alt sm",function(){billThrough=today();render()}));bar.appendChild(q);
   list.appendChild(bar);
   var zero=unbilled.filter(function(v){return v.scheduled_date<=billThrough&&!(Number(v.price)>0)});
-  if(zero.length){var zn=el("div","note","\u26a0 "+zero.length+" completed visit"+(zero.length>1?"s have":" has")+" no price set, so "+(zero.length>1?"they are":"it is")+" left out. Set a price below (or mark it No charge) and it moves into the list to bill.");zn.style.cssText="color:#7a5b00;margin:6px 0";list.appendChild(zn);
+  if(zero.length){var zn=el("div","note","\u26a0 "+zero.length+" completed visit"+(zero.length>1?"s have":" has")+" no price set, so "+(zero.length>1?"they are":"it is")+" left out. Set a price below and it moves into the list to bill, or press Invoice as $0 to record it as a no-charge invoice.");zn.style.cssText="color:#7a5b00;margin:6px 0";list.appendChild(zn);
     zero.slice().sort(function(x,y){return x.scheduled_date<y.scheduled_date?-1:1}).forEach(function(v){var c=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
       var l=el("div");l.appendChild(el("b",null,cname(v.client_id)+" \u00b7 "+jobTitle(v.job_id)));l.appendChild(el("div","note",[dshort(v.scheduled_date),paddr(v.property_id)].filter(Boolean).join(" \u00b7 ")));top.appendChild(l);
       top.appendChild(btn("Open job","btn alt sm",function(){openJob(v.job_id)}));c.appendChild(top);c.appendChild(priceFix(v,render));list.appendChild(c)})}
