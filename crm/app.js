@@ -92,7 +92,7 @@ function load(){
     if(rs[0].error){$("msg").textContent="Could not load leads. If you just signed in, make sure this email is on the staff list.";return}
     leads=rs[0].data||[];
     clientsErr=!!(rs[1].error||rs[2].error);
-    clients=rs[1].error?[]:(rs[1].data||[]);props=rs[2].error?[]:(rs[2].data||[]);
+    clients=rs[1].error?[]:(rs[1].data||[]);sortClients();props=rs[2].error?[]:(rs[2].data||[]);
     jobsErr=!!(rs[3].error||rs[4].error||rs[5].error||clientsErr);
     services=rs[3].error?[]:(rs[3].data||[]);jobs=rs[4].error?[]:(rs[4].data||[]);visits=rs[5].error?[]:(rs[5].data||[]);histFrom=addDays(today(),-45);s3=!rs[6].error;crew=rs[6].error?[]:(rs[6].data||[]);
     billErr=!!(rs[7].error||rs[9].error||jobsErr);invoices=rs[7].error?[]:(rs[7].data||[]);biz=rs[8].error?null:((rs[8].data||[])[0]||null);unbilled=rs[9].error?[]:(rs[9].data||[]);photoErr=!!rs[12].error;photos=rs[12].error?[]:(rs[12].data||[]);expErr=!!rs[11].error;expenses=rs[11].error?[]:(rs[11].data||[]);repData=null;todoErr=!!rs[10].error;todos=rs[10].error?[]:(rs[10].data||[]);estErr=!!rs[13].error;estimates=rs[13].error?[]:(rs[13].data||[]);invErr=!!(rs[14].error||rs[15].error);invCats=rs[14].error?[]:(rs[14].data||[]);invItems=rs[15].error?[]:(rs[15].data||[]);
@@ -145,9 +145,17 @@ function renderLeads(){
     right.appendChild(el("div","sub",ago(l.created_at)));
     b.appendChild(left);b.appendChild(right);b.addEventListener("click",function(){openLead(l.id)});list.appendChild(b)});
 }
+/* Clients sort by last name (people) or by full name (HOAs and businesses). "Smith, Anna" is read as last name first; Jr/Sr/II/III are ignored. */
+function lastKey(c){
+  var n=String(c.name||"").trim().toLowerCase();if(!n)return"";
+  if(c.type==="hoa"||c.type==="commercial")return n+"|";
+  var f,l;if(n.indexOf(",")>-1){l=n.split(",")[0].trim();f=n.split(",").slice(1).join(" ").trim()}
+  else{var w=n.split(/\s+/);while(w.length>1&&/^(jr|sr|ii|iii|iv|v)\.?$/.test(w[w.length-1]))w.pop();l=w.length>1?w[w.length-1]:w[0];f=w.slice(0,-1).join(" ")}
+  return l+"|"+f}
+function sortClients(){clients.sort(function(a,b){var x=lastKey(a),y=lastKey(b);return x<y?-1:x>y?1:0})}
 function clientProps(id){return props.filter(function(p){return p.client_id===id})}
 function renderClients(){
-  var tabs=$("tabs");tabs.textContent="";
+  sortClients();var tabs=$("tabs");tabs.textContent="";
   var act=clients.filter(function(c){return!c.archived});
   var defs=[["active","Active",act.length],["residential","Residential",act.filter(function(c){return c.type==="residential"}).length],["hoa","HOA",act.filter(function(c){return c.type==="hoa"}).length],["commercial","Commercial",act.filter(function(c){return c.type==="commercial"}).length],["archived","Archived",clients.length-act.length]];
   defs.forEach(function(s){var b=el("button","tab"+(cfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){cfilter=s[0];render()});tabs.appendChild(b)});
