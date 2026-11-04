@@ -2132,14 +2132,14 @@ function backfillCards(host){
     var oa=invPays.filter(function(x){return!x.invoice_id&&x.client_id}),n=vs.length+oa.length;if(!n)return;
     var tot=r2(vs.reduce(function(a,v){return a+Number(v.price)},0)+oa.reduce(function(a,x){return a+Number(x.amount)},0));
     var c=el("div","pcard");c.style.cssText="background:#eef6ec;margin-bottom:12px";c.appendChild(el("b",null,n+" payment"+(n>1?"s have":" has")+" no invoice ("+money(tot)+")"));
-    c.appendChild(el("div","note",oa.length+" payment"+(oa.length===1?"":"s")+" on account and "+vs.length+" visit"+(vs.length===1?"":"s")+" paid at the visit. Press the button to create one paid invoice for each, dated the day the money was received, with the payment attached. Nothing is sent to clients."));
+    c.appendChild(el("div","note",oa.length+" payment"+(oa.length===1?"":"s")+" on account and "+vs.length+" visit"+(vs.length===1?"":"s")+" paid at the visit. Press the button to create one paid Lawn maintenance invoice for each payment, dated the day that payment was received, with the payment attached. Nothing is sent to clients."));
     var mk=btn("Create "+n+" invoice"+(n>1?"s":"")+" from these payments","btn sm",function(){
       if(!confirm("Create "+n+" paid invoice"+(n>1?"s":"")+" ("+money(tot)+") dated on each payment's date? This can't be undone in one step."))return;
       mk.disabled=true;var terms=Number(bizv("terms_days",10));terms=isNaN(terms)?10:terms;var made=0,fails=[];
       function mkInv(cid,date,amount,method,ref,note,periodStart){return sb.from("invoices").insert({client_id:cid,issue_date:date,due_date:addDays(date,terms),period_start:periodStart||null,period_end:periodStart||null,total:amount,reference:ref||"",notes:note,status:"paid",paid_at:date+"T12:00:00",paid_method:method||""}).select().single().then(function(r1){if(r1.error||!r1.data)return Promise.reject("invoice");return r1.data})}
       var jobs=[];function J(d,f){f.d=d;jobs.push(f)}
-      oa.forEach(function(x){J(String(x.paid_on).slice(0,10),function(){var d=String(x.paid_on).slice(0,10);return mkInv(x.client_id,d,Number(x.amount),x.method,x.reference,"Created from a payment on account (no earlier invoice on file).").then(function(inv){
-        return sb.from("invoice_items").insert({invoice_id:inv.id,service_date:d,description:"Payment received"+(x.note?" - "+x.note:""),amount:Number(x.amount)}).then(function(r2_){
+      oa.forEach(function(x){J(String(x.paid_on).slice(0,10),function(){var d=String(x.paid_on).slice(0,10);return mkInv(x.client_id,d,Number(x.amount),x.method,x.reference,"Created from a recorded payment (no earlier invoice on file).").then(function(inv){
+        return sb.from("invoice_items").insert({invoice_id:inv.id,service_date:d,description:"Lawn maintenance"+(x.note?" - "+x.note:""),amount:Number(x.amount)}).then(function(r2_){
           if(r2_.error){sb.from("invoices").delete().eq("id",inv.id);return Promise.reject("line")}
           return sb.from("invoice_payments").update({invoice_id:inv.id}).eq("id",x.id).then(function(r3){if(r3.error){sb.from("invoices").delete().eq("id",inv.id);return Promise.reject("link")}x.invoice_id=inv.id;invoices.unshift(inv);made++})})})})});
       vs.forEach(function(v){J(String(v.paid_at).slice(0,10),function(){var d=String(v.paid_at).slice(0,10);return mkInv(v.client_id,d,Number(v.price),v.paid_method,"","Created from a visit paid at the time of service.",v.scheduled_date).then(function(inv){
@@ -2207,6 +2207,7 @@ function renderBilling(){
   $("topbtns").appendChild(btn("Price calculator","btn alt",openCalc));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Billing settings","btn alt",openBizSettings));
   var list=$("list");list.textContent="";
   if(bfilter==="estimates")return renderEstimates(list);
+  if(bfilter!=="payments"&&!billErr){var bfx=el("div");list.appendChild(bfx);backfillCards(bfx)}
   if(bfilter==="payments")return renderPayments(list);
   if(billErr){list.appendChild(el("div","empty","Billing isn't set up yet. Run the Stage 5 SQL in Supabase (SQL Editor), then press Refresh."));return}
   var mon=today().slice(0,7),paidMonth=r2(pd_.filter(function(i){return i.paid_at&&String(i.paid_at).slice(0,7)===mon}).reduce(function(s,i){return s+Number(i.total||0)},0));
