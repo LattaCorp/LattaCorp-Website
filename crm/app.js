@@ -2125,8 +2125,35 @@ function openPayment(cid,pre){
   cs.input.addEventListener("change",function(){sel={};app={};amtTouched=false;am.input.value="";draw()});
   if(pre.inv){var iv0=byId(invoices,pre.inv);if(iv0&&iv0.status==="open"){sel[iv0.id]=true;am.input.value=String(balOf(iv0));distribute()}}
   draw()}
+/* Backfill: invoices for money already recorded without one (payments on account, and visits paid at the visit), dated on the day each payment was received. */
+function backfillCards(host){
+  sb.from("visits").select("*").eq("status","done").is("invoice_id",null).gte("paid_at","1900-01-01T00:00:00").limit(5000).then(function(r){
+    var vs=(r.error?[]:(r.data||[])).filter(function(v){return v.paid_method!=="No charge"&&Number(v.price)>0});
+    var oa=invPays.filter(function(x){return!x.invoice_id&&x.client_id}),n=vs.length+oa.length;if(!n)return;
+    var tot=r2(vs.reduce(function(a,v){return a+Number(v.price)},0)+oa.reduce(function(a,x){return a+Number(x.amount)},0));
+    var c=el("div","pcard");c.style.cssText="background:#eef6ec;margin-bottom:12px";c.appendChild(el("b",null,n+" payment"+(n>1?"s have":" has")+" no invoice ("+money(tot)+")"));
+    c.appendChild(el("div","note",oa.length+" payment"+(oa.length===1?"":"s")+" on account and "+vs.length+" visit"+(vs.length===1?"":"s")+" paid at the visit. Press the button to create one paid invoice for each, dated the day the money was received, with the payment attached. Nothing is sent to clients."));
+    var mk=btn("Create "+n+" invoice"+(n>1?"s":"")+" from these payments","btn sm",function(){
+      if(!confirm("Create "+n+" paid invoice"+(n>1?"s":"")+" ("+money(tot)+") dated on each payment's date? This can't be undone in one step."))return;
+      mk.disabled=true;var terms=Number(bizv("terms_days",10));terms=isNaN(terms)?10:terms;var made=0,fails=[];
+      function mkInv(cid,date,amount,method,ref,note,periodStart){return sb.from("invoices").insert({client_id:cid,issue_date:date,due_date:addDays(date,terms),period_start:periodStart||null,period_end:periodStart||null,total:amount,reference:ref||"",notes:note,status:"paid",paid_at:date+"T12:00:00",paid_method:method||""}).select().single().then(function(r1){if(r1.error||!r1.data)return Promise.reject("invoice");return r1.data})}
+      var jobs=[];function J(d,f){f.d=d;jobs.push(f)}
+      oa.forEach(function(x){J(String(x.paid_on).slice(0,10),function(){var d=String(x.paid_on).slice(0,10);return mkInv(x.client_id,d,Number(x.amount),x.method,x.reference,"Created from a payment on account (no earlier invoice on file).").then(function(inv){
+        return sb.from("invoice_items").insert({invoice_id:inv.id,service_date:d,description:"Payment received"+(x.note?" - "+x.note:""),amount:Number(x.amount)}).then(function(r2_){
+          if(r2_.error){sb.from("invoices").delete().eq("id",inv.id);return Promise.reject("line")}
+          return sb.from("invoice_payments").update({invoice_id:inv.id}).eq("id",x.id).then(function(r3){if(r3.error){sb.from("invoices").delete().eq("id",inv.id);return Promise.reject("link")}x.invoice_id=inv.id;invoices.unshift(inv);made++})})})})});
+      vs.forEach(function(v){J(String(v.paid_at).slice(0,10),function(){var d=String(v.paid_at).slice(0,10);return mkInv(v.client_id,d,Number(v.price),v.paid_method,"","Created from a visit paid at the time of service.",v.scheduled_date).then(function(inv){
+        return sb.from("invoice_items").insert({invoice_id:inv.id,visit_id:v.id,service_date:v.scheduled_date,address:paddr(v.property_id),description:jobTitle(v.job_id),amount:Number(v.price)}).then(function(r2_){
+          if(r2_.error){sb.from("invoices").delete().eq("id",inv.id);return Promise.reject("line")}
+          return sb.from("visits").update({invoice_id:inv.id}).eq("id",v.id).then(function(r3){if(r3.error){sb.from("invoices").delete().eq("id",inv.id);return Promise.reject("link")}
+            var tail=payErr?Promise.resolve():sb.from("invoice_payments").insert({invoice_id:inv.id,client_id:v.client_id,paid_on:d,amount:Number(v.price),method:v.paid_method||"Other",reference:"",note:"Paid at the visit"}).select().single().then(function(r4){if(!r4.error&&r4.data)invPays.unshift(r4.data)});
+            return tail.then(function(){invoices.unshift(inv);made++})})})})})});
+      jobs.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:0});
+      jobs.reduce(function(pr,j){return pr.then(function(){return j().then(null,function(e){fails.push(String(e))})})},Promise.resolve()).then(function(){return loadUnbilled()}).then(function(){repData=null;render();alert("Created "+made+" invoice"+(made===1?"":"s")+"."+(fails.length?"\n\n"+fails.length+" could not be created and were left as they were.":""))})});
+    mk.style.marginTop="8px";c.appendChild(mk);host.appendChild(c)})}
 function renderPayments(list){
   $("topbtns").appendChild(btn("Customer payment","btn",function(){openPayment(null)}));
+  var bfh=el("div");list.appendChild(bfh);if(!payErr||true)backfillCards(bfh);
   if(payErr){list.appendChild(el("div","empty","Customer payments aren't set up yet. Run the Stage 18 SQL in Supabase (SQL Editor), then press Refresh."));return}
   var set=invPays.filter(function(x){if(!query)return true;var iv=byId(invoices,x.invoice_id);return[cname(x.client_id),iv?invNum(iv.number):"",x.method,x.reference].join(" ").toLowerCase().indexOf(query)>-1}).sort(function(a,b){return String(b.paid_on).localeCompare(String(a.paid_on))});
   if(!set.length){list.appendChild(el("div","empty","No customer payments yet. Press Customer payment to record one."));return}
