@@ -872,9 +872,9 @@ function renderPersonnel(){
   $("topbtns").appendChild(btn("+ Add person","btn",function(){openPerson(null)}));
   syncTeam();
   if(persErr){list.appendChild(el("div","empty","Personnel isn't set up yet. Run the Stage 17 SQL in Supabase (it's in the supabase folder of the website files)."));return}
-  var counts={all:people.length,active:0,team:0,inactive:0};people.forEach(function(p){counts[p.status]=(counts[p.status]||0)+1});
+  var counts={all:0,active:0,team:0,inactive:0};people.forEach(function(p){counts[p.status]=(counts[p.status]||0)+1;if(p.status!=="inactive")counts.all++});
   [["all","All"]].concat(PSTAT).forEach(function(s){var b=el("button","tab"+(pfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+(counts[s[0]]||0)+")"));b.addEventListener("click",function(){pfilter=s[0];render()});tabs.appendChild(b)});
-  var shown=people.filter(function(p){if(pfilter!=="all"&&p.status!==pfilter)return false;if(!query)return true;return[p.full_name,empId(p),p.job_title,p.phone,p.email].join(" ").toLowerCase().indexOf(query)>-1});
+  var shown=people.filter(function(p){if(pfilter==="all"?p.status==="inactive":p.status!==pfilter)return false;if(!query)return true;return[p.full_name,empId(p),p.job_title,p.phone,p.email].join(" ").toLowerCase().indexOf(query)>-1});
   if(!shown.length){list.appendChild(el("div","empty",people.length?"Nobody matches that.":"No one added yet. Press + Add person."));return}
   shown.forEach(function(p){
     var b=el("button","row");b.type="button";b.style.alignItems="center";
