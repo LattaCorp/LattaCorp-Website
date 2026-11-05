@@ -166,7 +166,7 @@ function dispName(c){
   if(i<0)return last+", "+w.join(" ")+tail;
   var rest=w.slice(0,i).concat(w.slice(i+lw.length)).join(" ");return last+(rest?", "+rest:"")+tail}
 function sortClients(){clients.sort(function(a,b){var x=lastKey(a),y=lastKey(b);return x<y?-1:x>y?1:0})}
-function isMainProp(p){return String(p.label||"").trim().toLowerCase()==="main"}
+function isMainProp(p){return /\bmain\b/i.test(String(p.label||""))}
 /* A client's properties, with the one labeled "Main" always first; the rest stay in the order they were added. */
 function clientProps(id){var l=props.filter(function(p){return p.client_id===id}),m=l.filter(isMainProp),o=l.filter(function(p){return!isMainProp(p)});return m.concat(o)}
 function renderClients(){
@@ -300,6 +300,11 @@ function drawProps(c,holder){
     var card=el("div","pcard");card.appendChild(el("b",null,(pr.label?pr.label+": ":"")+pr.address));
     if(pr.notes)card.appendChild(el("div","note",pr.notes));
     var a=el("div","acts"),m=el("a","btn alt sm","Map");m.href=mapsUrl(pr.address);m.target="_blank";m.rel="noopener";a.appendChild(m);
+    if(ps.length>1&&!isMainProp(pr))a.appendChild(btn("Make main","btn alt sm",function(){
+      var old=ps.filter(isMainProp);
+      Promise.all(old.map(function(o){return sb.from("properties").update({label:""}).eq("id",o.id)}).concat([sb.from("properties").update({label:"Main"}).eq("id",pr.id)])).then(function(rs){
+        if(rs.some(function(r){return r.error})){alert("Could not change the main property.");return}
+        old.forEach(function(o){o.label=""});pr.label="Main";drawProps(c,holder);render()})}));
     a.appendChild(btn("Edit","btn alt sm",function(){propForm(c,pr,holder)}));
     a.appendChild(btn("Delete","btn danger sm",function(){if(!confirm("Delete this property?"))return;sb.from("properties").delete().eq("id",pr.id).then(function(r){if(r.error){alert("Could not delete.");return}props=props.filter(function(z){return z.id!==pr.id});drawProps(c,holder);render()})}));
     card.appendChild(a);holder.appendChild(card)});
