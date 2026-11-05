@@ -995,7 +995,15 @@ function personPay(host,p){
   if(!rows.length)host.appendChild(el("div","empty","No payments recorded yet."));
   rows.forEach(function(r){var c=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center";
     var l=el("div");l.appendChild(el("b",null,money(r.amount)+" · "+mdy(r.paid_on)));l.appendChild(el("div","note",[methLabel(r.method),r.hours?r.hours+" hrs":"",r.note].filter(Boolean).join(" · ")));top.appendChild(l);
-    top.appendChild(btn("Delete","btn danger sm",function(){if(!confirm("Delete this "+money(r.amount)+" payment?"))return;sb.from("personnel_pay").delete().eq("id",r.id).then(function(d){if(d.error){alert("Could not delete.");return}payRows=payRows.filter(function(x){return x.id!==r.id});render();openPerson(p,"pay")})}));c.appendChild(top);host.appendChild(c)})}
+    var pa=el("div","acts");pa.style.cssText="display:flex;gap:6px;margin:0";pa.appendChild(btn("Edit","btn alt sm",function(){
+      c.textContent="";var eg=el("div","grid2"),epd=fld("Date paid","date",String(r.paid_on).slice(0,10)),ehr=fld("Hours (optional)","number",r.hours==null?"":r.hours),eam=fld("Amount paid ($)","number",r.amount),eme=fld("Paid by","select",r.method,PMETH);
+      ehr.input.step="0.25";ehr.input.inputMode="decimal";eam.input.step="0.01";eam.input.inputMode="decimal";[epd,ehr,eam,eme].forEach(function(x){eg.appendChild(x)});c.appendChild(eg);var eno=fld("Note","text",r.note||"");c.appendChild(eno);
+      var ea=el("div");ea.style.cssText="display:flex;gap:8px;margin-top:8px";
+      var sv=btn("Save","btn sm",function(){var a=Number(eam.input.value);if(!(a>0)){alert("Enter the amount paid.");return}if(!epd.input.value){alert("Pick the date paid.");return}sv.disabled=true;
+        var up={paid_on:epd.input.value,amount:a,hours:ehr.input.value===""?null:Number(ehr.input.value),method:eme.input.value,note:eno.input.value.trim()};
+        sb.from("personnel_pay").update(up).eq("id",r.id).select().single().then(function(u){sv.disabled=false;if(u.error||!u.data){alert("Could not save the changes.");return}Object.assign(r,u.data);repData=null;render();openPerson(p,"pay")})});
+      ea.appendChild(sv);ea.appendChild(btn("Cancel","btn alt sm",function(){openPerson(p,"pay")}));c.appendChild(ea)}));
+    pa.appendChild(btn("Delete","btn danger sm",function(){if(!confirm("Delete this "+money(r.amount)+" payment?"))return;sb.from("personnel_pay").delete().eq("id",r.id).then(function(d){if(d.error){alert("Could not delete.");return}payRows=payRows.filter(function(x){return x.id!==r.id});render();openPerson(p,"pay")})}));top.appendChild(pa);c.appendChild(top);host.appendChild(c)})}
 function personBen(host,p){
   host.appendChild(el("p","note","Anything you provide besides pay: bonus, paid time off, phone stipend, uniform or tool allowance, etc."));
   var g=el("div","grid2"),ti=fld("Benefit","text",""),va=fld("Value ($, optional)","number",""),sd=fld("Starts","date",today()),de=fld("Details","text","");va.input.step="0.01";va.input.inputMode="decimal";
@@ -1005,7 +1013,13 @@ function personBen(host,p){
   var rows=benRows.filter(function(b){return b.person_id===p.id});var h=el("h3",null,"Benefits");h.style.margin="16px 0 6px";host.appendChild(h);
   if(!rows.length)host.appendChild(el("div","empty","No benefits recorded."));
   rows.forEach(function(b){var c=el("div","pcard"),top=el("div");top.style.cssText="display:flex;justify-content:space-between;gap:8px;align-items:center";var l=el("div");l.appendChild(el("b",null,b.title+(b.value!=null?" · "+money(b.value):"")));l.appendChild(el("div","note",[b.starts_on?"Since "+mdy(b.starts_on):"",b.details].filter(Boolean).join(" · ")));top.appendChild(l);
-    top.appendChild(btn("Delete","btn danger sm",function(){if(!confirm("Delete this benefit?"))return;sb.from("personnel_benefits").delete().eq("id",b.id).then(function(d){if(d.error){alert("Could not delete.");return}benRows=benRows.filter(function(x){return x.id!==b.id});openPerson(p,"ben")})}));c.appendChild(top);host.appendChild(c)})}
+    var ba=el("div","acts");ba.style.cssText="display:flex;gap:6px;margin:0";ba.appendChild(btn("Edit","btn alt sm",function(){
+      c.textContent="";var eg=el("div","grid2"),eti=fld("Benefit","text",b.title),eva=fld("Value ($, optional)","number",b.value==null?"":b.value),esd=fld("Starts","date",b.starts_on?String(b.starts_on).slice(0,10):""),ede=fld("Details","text",b.details||"");eva.input.step="0.01";eva.input.inputMode="decimal";
+      [eti,eva,esd,ede].forEach(function(x){eg.appendChild(x)});c.appendChild(eg);var ea=el("div");ea.style.cssText="display:flex;gap:8px;margin-top:8px";
+      var sv=btn("Save","btn sm",function(){if(!eti.input.value.trim()){alert("Enter the benefit name.");return}sv.disabled=true;
+        sb.from("personnel_benefits").update({title:eti.input.value.trim(),details:ede.input.value.trim(),value:eva.input.value===""?null:Number(eva.input.value),starts_on:esd.input.value||null}).eq("id",b.id).select().single().then(function(u){sv.disabled=false;if(u.error||!u.data){alert("Could not save the changes.");return}Object.assign(b,u.data);openPerson(p,"ben")})});
+      ea.appendChild(sv);ea.appendChild(btn("Cancel","btn alt sm",function(){openPerson(p,"ben")}));c.appendChild(ea)}));
+    ba.appendChild(btn("Delete","btn danger sm",function(){if(!confirm("Delete this benefit?"))return;sb.from("personnel_benefits").delete().eq("id",b.id).then(function(d){if(d.error){alert("Could not delete.");return}benRows=benRows.filter(function(x){return x.id!==b.id});openPerson(p,"ben")})}));top.appendChild(ba);c.appendChild(top);host.appendChild(c)})}
 function personDocs(host,p){
   host.appendChild(el("p","note","W-9, ID copy, signed agreement, insurance papers. PDFs and pictures up to 10 MB. Only owners can open these."));
   var g=el("div","grid2"),ti=fld("Title (optional)","text",""),ki=fld("Type","select","W-9",DKINDS);g.appendChild(ti);g.appendChild(ki);host.appendChild(g);
