@@ -454,7 +454,7 @@ function addDays(s,n){var d=pd(s);d.setDate(d.getDate()+n);return ymd(d)}
 function today(){return ymd(new Date())}
 function dlabel(s){var t=today();if(s===t)return"Today";if(s===addDays(t,1))return"Tomorrow";return pd(s).toLocaleDateString(undefined,{weekday:"long",month:"short",day:"numeric"})}
 function dshort(s){return pd(s).toLocaleDateString(undefined,{weekday:"short",month:"short",day:"numeric"})}
-function money(n){return"$"+(Number(n)||0).toFixed(2).replace(/\.00$/,"")}
+function money(n){return"$"+(Number(n)||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
 function flabel(f){var x=FREQ.filter(function(a){return a[0]===f})[0];return x?x[1]:f}
 function needSql(){alert("Run the Stage 2 SQL in Supabase first (SQL Editor), then press Refresh.")}
 

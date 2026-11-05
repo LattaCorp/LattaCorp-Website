@@ -80,7 +80,7 @@ var lang="en";try{var sv=localStorage.getItem("lc_doc_lang");if(sv==="en"||sv===
 var data=null,root=document.getElementById("root"),cfg=window.CRM_CONFIG;
 function t(k){return T[lang][k]||T.en[k]||k}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-function money(n){return"$"+(Number(n)||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2}).replace(/\.00$/,"")}
+function money(n){return"$"+(Number(n)||0).toLocaleString("en-US",{minimumFractionDigits:2,maximumFractionDigits:2})}
 function pd(s){var m=String(s||"").slice(0,10).split("-");return new Date(+m[0],+m[1]-1,+m[2])}
 function dt(s){if(!s)return"";return pd(s).toLocaleDateString(lang==="es"?"es-US":"en-US",{month:"short",day:"numeric",year:"numeric"})}
 function dts(s){if(!s)return"";var d=new Date(s);return d.toLocaleDateString(lang==="es"?"es-US":"en-US",{month:"short",day:"numeric",year:"numeric"})}
