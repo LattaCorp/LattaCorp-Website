@@ -2185,6 +2185,75 @@ function renderPayments(list){
     var l=el("div");l.appendChild(el("b",null,cname(x.client_id||(iv&&iv.client_id))+" · "+money(x.amount)));l.appendChild(el("div","note",[mdy(x.paid_on),iv?"Invoice "+invNum(iv.number):"On account",x.method,x.reference?"Ref "+x.reference:"",x.note].filter(Boolean).join(" · ")));top.appendChild(l);
     var a=el("div","acts");a.style.marginTop="0";a.appendChild(btn("Edit","btn alt sm",function(){openPaymentEdit(x)}));a.appendChild(btn("Customer","btn alt sm",function(){openPayment(x.client_id||(iv&&iv.client_id))}));a.appendChild(btn("Delete","btn danger sm",function(){delPayment(x)}));top.appendChild(a);c.appendChild(top);list.appendChild(c)})}
 
+/* Import payments from the old software's "Customer Payments" CSV: one paid invoice + one payment per row (nothing is emailed). */
+function normNm(x){return String(x||"").toLowerCase().replace(/\bthe\b/g,"").replace(/[^a-z0-9]/g,"")}
+function isoMDY(x){var m=String(x||"").match(/(\d{1,2})\/(\d{1,2})\/(\d{4})/);return m?m[3]+"-"+("0"+m[1]).slice(-2)+"-"+("0"+m[2]).slice(-2):""}
+function guessClient(name){
+  var n=normNm(name);if(!n)return"";
+  var ex=clients.filter(function(c){return[c.name,c.company,c.nickname,dispName(c)].some(function(v){return normNm(v)===n})});if(ex.length===1)return ex[0].id;if(ex.length>1)return"";
+  var part=clients.filter(function(c){return n.length>=6&&[c.name,c.company].some(function(v){var k=normNm(v);return k&&(k.indexOf(n)>-1||n.indexOf(k)>-1)})});return part.length===1?part[0].id:""}
+function openPayImport(){
+  if(billErr||payErr){alert("Run the Stage 5 and Stage 18 SQL in Supabase first, then press Refresh.");return}
+  var p=panel();p.appendChild(el("h2",null,"Import payments from CSV"));
+  p.appendChild(el("p","note","Use the old software's Customer Payments export (columns: Date, Comment, Amount, Name, Customer_Number...). Each payment becomes a paid \"Lawn maintenance\" invoice dated the same day, with the payment applied, so nothing shows as owed. Payments already in the CRM (same client, date and amount) are skipped, so running it twice is safe."));
+  var file=document.createElement("input");file.type="file";file.accept=".csv,text/csv";p.appendChild(file);
+  var out=el("div");out.style.marginTop="12px";p.appendChild(out);
+  file.addEventListener("change",function(){
+    var f=file.files[0];if(!f)return;var rd=new FileReader();
+    rd.onload=function(){
+      var rows=parseCSV(String(rd.result));out.textContent="";
+      var hd=(rows[0]||[]).map(function(h){return String(h).trim().toLowerCase()});
+      function ci(n){return hd.indexOf(n)}
+      var cD=ci("date"),cC=ci("comment"),cA=ci("amount"),cN=ci("name"),cK=ci("customer_number");
+      if(cD<0||cA<0||cN<0){out.textContent="I can't find the Date, Amount and Name columns. Is this the Customer Payments export?";return}
+      function g(r,i){return i>-1&&r[i]!=null?String(r[i]).trim():""}
+      var recs=[];rows.slice(1).forEach(function(r){var d=isoMDY(g(r,cD)),a=parseFloat(g(r,cA)),nm=g(r,cN);if(!d||isNaN(a)||!nm)return;
+        var cm=g(r,cC),im=cm.match(/inv\s*#?\s*(\d+)/i);recs.push({d:d,a:Math.round(a*100)/100,nm:nm,key:g(r,cK)||nm,cm:cm,old:im?im[1]:"",std:/payment|account credit/i.test(cm)})});
+      if(!recs.length){out.textContent="No payment rows found in that file.";return}
+      recs.sort(function(x,y){return x.d<y.d?-1:x.d>y.d?1:0});
+      var odd={};recs.forEach(function(r){if(!r.std)odd[r.cm||"(no comment)"]=(odd[r.cm||"(no comment)"]||0)+1});
+      var oddBox={};
+      var cust={},order=[];recs.forEach(function(r){if(!cust[r.key]){cust[r.key]={key:r.key,nm:r.nm,n:0,tot:0,sel:null};order.push(r.key)}cust[r.key].n++;cust[r.key].tot=r.a+cust[r.key].tot});
+      p.appendChild(el("h3",null,"Match each old customer to a CRM client"));
+      var opts=[["","Choose a client..."],["skip","Skip this customer"]].concat(clients.map(function(c){return[c.id,dispName(c)+(c.company?" · "+c.company:"")]}));
+      var tbox=el("div");
+      order.forEach(function(k){var c=cust[k],row=el("div","pcard"),sel=fld(c.nm+" (#"+k+") · "+c.n+" payment"+(c.n>1?"s":"")+" · "+money(r2(c.tot)),"select",guessClient(c.nm),opts);row.appendChild(sel);c.sel=sel;tbox.appendChild(row);sel.input.addEventListener("change",sum)});
+      p.appendChild(tbox);
+      Object.keys(odd).forEach(function(k){var lab=document.createElement("label");lab.style.cssText="display:flex;gap:8px;align-items:center;margin:8px 0";var ck=document.createElement("input");ck.type="checkbox";ck.style.cssText="width:auto;margin:0";ck.checked=false;lab.appendChild(ck);lab.appendChild(document.createTextNode("Also import "+odd[k]+" row"+(odd[k]>1?"s":"")+' labeled "'+k+'" (off by default: these are carried credits, not payments)'));oddBox[k]=ck;ck.addEventListener("change",sum);p.appendChild(lab)});
+      var info=el("div","note");info.style.margin="10px 0";p.appendChild(info);
+      var go=btn("Import payments","btn",run);p.appendChild(go);
+      var plan=[];
+      function sum(){
+        var have={};invPays.forEach(function(x){var k=(x.client_id||(byId(invoices,x.invoice_id)||{}).client_id)+"|"+String(x.paid_on).slice(0,10)+"|"+r2(Number(x.amount));have[k]=(have[k]||0)+1});
+        plan=[];var dup=0,skipped=0,unmapped=0,tot=0;
+        recs.forEach(function(r){var c=cust[r.key],v=c.sel.input.value;if(!r.std&&!(oddBox[r.cm||"(no comment)"]&&oddBox[r.cm||"(no comment)"].checked)){skipped++;return}
+          if(v==="skip"){skipped++;return}if(!v){unmapped++;return}
+          var k=v+"|"+r.d+"|"+r.a;if(have[k]>0){have[k]--;dup++;return}
+          plan.push({r:r,cid:v});tot+=r.a});
+        info.textContent="Will create "+plan.length+" paid invoice"+(plan.length===1?"":"s")+" and payment"+(plan.length===1?"":"s")+" totaling "+money(r2(tot))+". Already in the CRM: "+dup+". Skipped: "+skipped+"."+(unmapped?" Still to match: "+unmapped+" row(s).":"");
+        go.disabled=!plan.length||unmapped>0}
+      sum();
+      function run(){
+        if(!confirm("Create "+plan.length+" paid invoices with payments?"))return;
+        go.disabled=true;var made=0,fails=[],terms=Number(bizv("terms_days",10));terms=isNaN(terms)?10:terms;
+        function one(i){
+          if(i>=plan.length)return Promise.resolve();
+          go.textContent="Importing "+(i+1)+" of "+plan.length+"...";
+          var x=plan[i],r=x.r,ps=clientProps(x.cid),adr=ps.length===1?ps[0].address:"";
+          return sb.from("invoices").insert({client_id:x.cid,issue_date:r.d,due_date:addDays(r.d,terms),total:r.a,reference:r.old,notes:"Imported from the old software's payment history."+(r.cm?" ("+r.cm+")":""),status:"paid",paid_at:r.d+"T12:00:00",paid_method:"Other"}).select().single().then(function(q){
+            if(q.error||!q.data){fails.push(r.d+" "+money(r.a)+" "+r.nm);return}
+            var inv=q.data;
+            function undo(){return sb.from("invoices").delete().eq("id",inv.id).then(function(){fails.push(r.d+" "+money(r.a)+" "+r.nm)})}
+            return sb.from("invoice_items").insert({invoice_id:inv.id,service_date:r.d,address:adr,description:"Lawn maintenance",amount:r.a}).then(function(q2){
+              if(q2.error)return undo();
+              return sb.from("invoice_payments").insert({invoice_id:inv.id,client_id:x.cid,paid_on:r.d,amount:r.a,method:"Other",reference:r.old,note:"Imported"+(r.cm?": "+r.cm:"")}).then(function(q3){if(q3.error)return undo();made++})})}).then(function(){return one(i+1)})}
+        one(0).then(function(){
+          return Promise.all([reloadInvoices(),sb.from("invoice_payments").select("*").order("paid_on",{ascending:false}).limit(10000).then(function(q){if(!q.error)invPays=q.data||[]})])}).then(function(){
+          repData=null;closeDetail();bfilter="paid";render();
+          alert("Imported "+made+" payment"+(made===1?"":"s")+" with paid invoices."+(fails.length?"\n\nCould not import:\n"+fails.slice(0,15).join("\n")+(fails.length>15?"\n...and "+(fails.length-15)+" more":""):""))})}
+    };
+    rd.readAsText(f)});
+}
 /* Past invoice: record an old invoice that was already sent and paid (one step: invoice + payment, nothing is sent or left owed). */
 function openPastInvoice(cid,pre){
   pre=pre||{};
@@ -2227,7 +2296,7 @@ function renderBilling(){
   var bg=billGroups();
   [["tobill","To bill",bg.order.length],["open","Open",op.length],["paid","Paid",pd_.length],["payments","Payments",invPays.length],["estimates","Estimates",estimates.filter(function(e){return(e.status==="draft"||e.status==="sent")&&!estExpired(e)}).length]].forEach(function(s){
     var b=el("button","tab"+(bfilter===s[0]?" on":""),s[1]);b.type="button";b.appendChild(el("span",null,"("+s[2]+")"));b.addEventListener("click",function(){bfilter=s[0];render()});tabs.appendChild(b)});
-  if(bfilter!=="estimates"&&bfilter!=="payments"){$("topbtns").appendChild(btn("New invoice","btn",function(){openInvoiceForm(null)}));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Past invoice","btn alt",function(){openPastInvoice(null)}));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Customer payment","btn alt",function(){openPayment(null)}));$("topbtns").appendChild(document.createTextNode(" "))}
+  if(bfilter!=="estimates"&&bfilter!=="payments"){$("topbtns").appendChild(btn("New invoice","btn",function(){openInvoiceForm(null)}));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Past invoice","btn alt",function(){openPastInvoice(null)}));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Customer payment","btn alt",function(){openPayment(null)}));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Import payments","btn alt",openPayImport));$("topbtns").appendChild(document.createTextNode(" "))}
   $("topbtns").appendChild(btn("Price calculator","btn alt",openCalc));$("topbtns").appendChild(document.createTextNode(" "));$("topbtns").appendChild(btn("Billing settings","btn alt",openBizSettings));
   var list=$("list");list.textContent="";
   if(bfilter==="estimates")return renderEstimates(list);
