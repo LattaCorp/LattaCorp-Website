@@ -166,7 +166,9 @@ function dispName(c){
   if(i<0)return last+", "+w.join(" ")+tail;
   var rest=w.slice(0,i).concat(w.slice(i+lw.length)).join(" ");return last+(rest?", "+rest:"")+tail}
 function sortClients(){clients.sort(function(a,b){var x=lastKey(a),y=lastKey(b);return x<y?-1:x>y?1:0})}
-function clientProps(id){return props.filter(function(p){return p.client_id===id})}
+function isMainProp(p){return String(p.label||"").trim().toLowerCase()==="main"}
+/* A client's properties, with the one labeled "Main" always first; the rest stay in the order they were added. */
+function clientProps(id){var l=props.filter(function(p){return p.client_id===id}),m=l.filter(isMainProp),o=l.filter(function(p){return!isMainProp(p)});return m.concat(o)}
 function renderClients(){
   sortClients();var tabs=$("tabs");tabs.textContent="";
   var act=clients.filter(function(c){return!c.archived});
