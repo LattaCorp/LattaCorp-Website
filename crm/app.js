@@ -2878,30 +2878,61 @@ function clientBillingSection(c){
   var mine=invoices.filter(function(i){return i.client_id===c.id}),bal=openTotal(mine),od=mine.filter(isOverdue).length,ub=unbilled.filter(function(v){return v.client_id===c.id&&Number(v.price)>0});
   var ubt=r2(ub.reduce(function(s,v){return s+Number(v.price||0)},0));
   var sm=el("div","note",[bal?"Balance due "+money(bal)+(od?" ("+od+" overdue)":""):"Nothing owed",ubt?money(ubt)+" not yet billed":""].filter(Boolean).join(" · "));sm.style.fontWeight="700";sec.appendChild(sm);
-  if(ub.length){var ug=groupVisits(ub);ug.order.forEach(function(k){var x=ug.g[k];var cb=btn("Create invoice for completed visits ("+x.vs.length+")"+(x.pid?" \u00b7 "+paddr(x.pid):""),"btn alt sm",function(){cb.disabled=true;createInvoice(c.id,x.vs,today(),x.pid).then(function(inv){return loadUnbilled().then(function(){render();openInvoice(inv.id)})},function(e){cb.disabled=false;alert(e)})});cb.style.margin="6px 6px 6px 0";sec.appendChild(cb)})}
+  if(ub.length){var ug=groupVisits(ub);ug.order.forEach(function(k){var x=ug.g[k];var cb=btn("Create invoice for completed visits ("+x.vs.length+")"+(x.pid?" · "+paddr(x.pid):""),"btn alt sm",function(){cb.disabled=true;createInvoice(c.id,x.vs,today(),x.pid).then(function(inv){return loadUnbilled().then(function(){render();openInvoice(inv.id)})},function(e){cb.disabled=false;alert(e)})});cb.style.margin="6px 6px 6px 0";sec.appendChild(cb)})}
   var ab=el("div","acts");ab.style.cssText="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0";
   ab.appendChild(btn("New invoice","btn alt sm",function(){openInvoiceForm(c.id)}));ab.appendChild(btn("Record payment","btn alt sm",function(){openPayment(c.id)}));ab.appendChild(btn("Past invoice","btn alt sm",function(){openPastInvoice(c.id)}));sec.appendChild(ab);
+  var hist=mine.slice().sort(function(a,b){return b.number-a.number});
+  /* payments, each tied to a property through its invoice */
+  var pays=[];
+  if(!payErr){
+    var legacy=hist.filter(function(i){return i.status==="paid"&&!invPays.some(function(x){return x.invoice_id===i.id})}).map(function(i){return{date:String(i.paid_at||i.issue_date).slice(0,10),inv:invNum(i.number),method:i.paid_method||"",amount:Number(i.total),pr:null,pid:i.property_id||""}});
+    var ent=invPays.filter(function(x){return x.client_id===c.id||(byId(invoices,x.invoice_id)||{}).client_id===c.id}).map(function(x){var iv=byId(invoices,x.invoice_id);return{date:String(x.paid_on).slice(0,10),inv:iv?invNum(iv.number):"On account",method:x.method,amount:Number(x.amount),pr:x,pid:iv?(iv.property_id||""):"",onacct:!iv}});
+    pays=ent.concat(legacy).sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0})}
+  /* split by property when the client has more than one, or any invoice is tied to one */
+  var cps=clientProps(c.id),split=cps.length>1||mine.some(function(i){return i.property_id});
+  var keys=cps.map(function(p){return p.id});
+  mine.forEach(function(i){var k=i.property_id||"";if(k&&keys.indexOf(k)<0)keys.push(k)});
+  keys.push("");
+  function plabel(k){if(!k)return"Not tied to a property";var p=byId(props,k);return p?(p.label?p.label+" · ":"")+p.address:"Removed property"}
+  function invsOf(k){return hist.filter(function(i){return(i.property_id||"")===k})}
+  function paysOf(k,onacct){return pays.filter(function(x){return x.pid===k&&(onacct===undefined||!!x.onacct===onacct)})}
+  if(split){
+    var hs=el("h4",null,"Summary by property");hs.style.margin="12px 0 6px";sec.appendChild(hs);
+    var ws=el("div","invwrap"),ts=document.createElement("table");ts.className="ptable";var sh=document.createElement("tr");["Property","Invoiced","Paid","Balance due","Not yet billed"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i)th.className="r";sh.appendChild(th)});ts.appendChild(sh);
+    var T=[0,0,0,0];
+    keys.forEach(function(k){var iv=invsOf(k),py=paysOf(k),uv=k?ub.filter(function(v){return v.property_id===k}):ub.filter(function(v){return!v.property_id||keys.indexOf(v.property_id)<0});
+      var n=[r2(iv.filter(function(i){return i.status!=="void"}).reduce(function(s,i){return s+Number(i.total||0)},0)),r2(py.reduce(function(s,x){return s+x.amount},0)),openTotal(iv),r2(uv.reduce(function(s,v){return s+Number(v.price||0)},0))];
+      if(!k&&!iv.length&&!py.length&&!uv.length)return;
+      n.forEach(function(v,i){T[i]=r2(T[i]+v)});
+      var ovd=iv.filter(isOverdue).length,tr=document.createElement("tr");[plabel(k),money(n[0]),money(n[1]),money(n[2])+(ovd?" ("+ovd+" overdue)":""),n[3]?money(n[3]):""].forEach(function(v,i){var td=document.createElement("td");td.textContent=v;if(i)td.className="r";tr.appendChild(td)});ts.appendChild(tr)});
+    var stt=document.createElement("tr");stt.className="tot";["Account total",money(T[0]),money(T[1]),money(T[2]),T[3]?money(T[3]):""].forEach(function(v,i){var td=document.createElement("td");td.textContent=v;td.style.fontWeight="800";if(i)td.className="r";stt.appendChild(td)});ts.appendChild(stt);
+    ws.appendChild(ts);sec.appendChild(ws);
+    if(pays.some(function(x){return x.onacct}))sec.appendChild(el("div","note","Payments recorded on account (not applied to an invoice) are listed under \"Not tied to a property\"."))}
   sec.appendChild(accountHistorySection(c));
   /* invoice history */
-  var h1=el("h4",null,"Invoice history");h1.style.margin="12px 0 6px";sec.appendChild(h1);
-  var hist=mine.slice().sort(function(a,b){return b.number-a.number});
-  if(!hist.length)sec.appendChild(el("div","note","No invoices yet."));
-  else{var w=el("div","invwrap"),t=document.createElement("table");t.className="ptable";var hr=document.createElement("tr");["Number","Date","Amount","Balance","Status"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i===2||i===3)th.className="r";hr.appendChild(th)});t.appendChild(hr);
-    hist.forEach(function(i){var tr=document.createElement("tr");tr.style.cursor="pointer";tr.title="Open invoice";
+  function invTable(list){var w=el("div","invwrap"),t=document.createElement("table");t.className="ptable";var hr=document.createElement("tr");["Number","Date","Amount","Balance","Status"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i===2||i===3)th.className="r";hr.appendChild(th)});t.appendChild(hr);
+    var ta=0,tb=0;list.forEach(function(i){var tr=document.createElement("tr");tr.style.cursor="pointer";tr.title="Open invoice";if(i.status!=="void")ta+=Number(i.total||0);tb+=balOf(i);
       var stt=i.status==="paid"?"Paid"+(i.paid_at?" "+mdy(String(i.paid_at).slice(0,10)):"")+(i.paid_method?" ("+i.paid_method+")":""):i.status==="void"?"Void":isOverdue(i)?"Overdue":(!payErr&&invPaidSum(i)>0?"Partly paid":"Open");
       [invNum(i.number),mdy(i.issue_date),money(i.total),money(balOf(i)),stt].forEach(function(v,k){var td=document.createElement("td");td.textContent=v;if(k===2||k===3)td.className="r";tr.appendChild(td)});
-      tr.addEventListener("click",function(){openInvoice(i.id)});t.appendChild(tr)});w.appendChild(t);sec.appendChild(w)}
+      tr.addEventListener("click",function(){openInvoice(i.id)});t.appendChild(tr)});
+    if(split){var ft=document.createElement("tr");ft.className="tot";["Total","",money(r2(ta)),money(r2(tb)),""].forEach(function(v,k){var td=document.createElement("td");td.textContent=v;td.style.fontWeight="800";if(k===2||k===3)td.className="r";ft.appendChild(td)});t.appendChild(ft)}
+    w.appendChild(t);return w}
+  function sub(txt){var s=el("div","note",txt);s.style.cssText="font-weight:700;margin:10px 0 4px";return s}
+  var h1=el("h4",null,"Invoice history");h1.style.margin="12px 0 6px";sec.appendChild(h1);
+  if(!hist.length)sec.appendChild(el("div","note","No invoices yet."));
+  else if(!split)sec.appendChild(invTable(hist));
+  else keys.forEach(function(k){var l=invsOf(k);if(!l.length){if(k)sec.appendChild(sub(plabel(k))).insertAdjacentHTML("beforeend",' <span style="font-weight:400">— no invoices</span>');return}sec.appendChild(sub(plabel(k)));sec.appendChild(invTable(l))});
   /* payment history */
   var h2=el("h4",null,"Payment history");h2.style.margin="14px 0 6px";sec.appendChild(h2);
   if(payErr){sec.appendChild(el("div","note","Run the Stage 18 SQL in Supabase to turn on payment history."));return sec}
-  var legacy=hist.filter(function(i){return i.status==="paid"&&!invPays.some(function(x){return x.invoice_id===i.id})}).map(function(i){return{date:String(i.paid_at||i.issue_date).slice(0,10),inv:invNum(i.number),method:i.paid_method||"",amount:Number(i.total),pr:null}});
-  var ent=invPays.filter(function(x){return x.client_id===c.id||(byId(invoices,x.invoice_id)||{}).client_id===c.id}).map(function(x){var iv=byId(invoices,x.invoice_id);return{date:String(x.paid_on).slice(0,10),inv:iv?invNum(iv.number):"On account",method:x.method,amount:Number(x.amount),pr:x}});
-  var all=ent.concat(legacy).sort(function(a,b){return a.date<b.date?1:a.date>b.date?-1:0});
-  if(!all.length)sec.appendChild(el("div","note","No payments yet."));
-  else{var w2=el("div","invwrap"),t2=document.createElement("table");t2.className="ptable";var h3=document.createElement("tr");["Date","Invoice","Method","Amount",""].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i===3)th.className="r";h3.appendChild(th)});t2.appendChild(h3);
-    var tot=0;all.forEach(function(x){tot+=x.amount;var tr=document.createElement("tr");[mdy(x.date),x.inv,x.method,money(x.amount)].forEach(function(v,k){var td=document.createElement("td");td.textContent=v;if(k===3)td.className="r";tr.appendChild(td)});
+  function payTable(list,label){var w2=el("div","invwrap"),t2=document.createElement("table");t2.className="ptable";var h3=document.createElement("tr");["Date","Invoice","Method","Amount",""].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i===3)th.className="r";h3.appendChild(th)});t2.appendChild(h3);
+    var tot=0;list.forEach(function(x){tot+=x.amount;var tr=document.createElement("tr");[mdy(x.date),x.inv,x.method,money(x.amount)].forEach(function(v,k){var td=document.createElement("td");td.textContent=v;if(k===3)td.className="r";tr.appendChild(td)});
       var ex=document.createElement("td");if(x.pr){var eb=btn("Edit","btn alt sm",function(){openPaymentEdit(x.pr)});ex.appendChild(eb)}tr.appendChild(ex);t2.appendChild(tr)});
-    var ft=document.createElement("tr");ft.className="tot";["Total paid","","",money(r2(tot)),""].forEach(function(v,k){var td=document.createElement("td");td.textContent=v;td.style.fontWeight="800";if(k===3)td.className="r";ft.appendChild(td)});t2.appendChild(ft);w2.appendChild(t2);sec.appendChild(w2)}
+    var ft=document.createElement("tr");ft.className="tot";[label,"","",money(r2(tot)),""].forEach(function(v,k){var td=document.createElement("td");td.textContent=v;td.style.fontWeight="800";if(k===3)td.className="r";ft.appendChild(td)});t2.appendChild(ft);w2.appendChild(t2);return w2}
+  if(!pays.length)sec.appendChild(el("div","note","No payments yet."));
+  else if(!split)sec.appendChild(payTable(pays,"Total paid"));
+  else{keys.forEach(function(k){var l=paysOf(k);if(!l.length){if(k)sec.appendChild(sub(plabel(k))).insertAdjacentHTML("beforeend",' <span style="font-weight:400">— no payments</span>');return}sec.appendChild(sub(plabel(k)));sec.appendChild(payTable(l,"Paid"))});
+    var gt=el("div","note","Total paid, all properties: "+money(r2(pays.reduce(function(s,x){return s+x.amount},0))));gt.style.cssText="font-weight:800;margin-top:8px";sec.appendChild(gt)}
   return sec}
 
 })();
