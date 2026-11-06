@@ -1997,6 +1997,7 @@ function createInvoice(cid,vs,through,pid){
   vs=vs.slice().sort(function(a,b){return a.scheduled_date<b.scheduled_date?-1:1});
   var issue=today(),terms=Number(bizv("terms_days",10)),total=r2(vs.reduce(function(s,v){return s+Number(v.price||0)},0));
   var row={client_id:cid,issue_date:issue,due_date:addDays(issue,isNaN(terms)?10:terms),period_start:vs[0].scheduled_date,period_end:through,total:total};
+  if(!pid){var vp=vs.map(function(v){return v.property_id||""}).filter(function(x,i,a){return a.indexOf(x)===i});if(vp.length===1&&vp[0])pid=vp[0]}
   if(pid)row.property_id=pid;
   if(total===0){row.status="paid";row.paid_at=issue+"T12:00:00";row.paid_method="No charge"}
   return sb.from("invoices").insert(row).select().single().then(function(r){
@@ -2173,13 +2174,13 @@ function backfillCards(host){
     var mk=btn("Create "+n+" invoice"+(n>1?"s":"")+" from these payments","btn sm",function(){
       if(!confirm("Create "+n+" paid invoice"+(n>1?"s":"")+" ("+money(tot)+") dated on each payment's date? This can't be undone in one step."))return;
       mk.disabled=true;var terms=Number(bizv("terms_days",10));terms=isNaN(terms)?10:terms;var made=0,fails=[];
-      function mkInv(cid,date,amount,method,ref,note,periodStart){return sb.from("invoices").insert({client_id:cid,issue_date:date,due_date:addDays(date,terms),period_start:periodStart||null,period_end:periodStart||null,total:amount,reference:ref||"",notes:note,status:"paid",paid_at:date+"T12:00:00",paid_method:method||""}).select().single().then(function(r1){if(r1.error||!r1.data)return Promise.reject("invoice");return r1.data})}
+      function mkInv(cid,date,amount,method,ref,note,periodStart,pid){var row_={client_id:cid,issue_date:date,due_date:addDays(date,terms),period_start:periodStart||null,period_end:periodStart||null,total:amount,reference:ref||"",notes:note,status:"paid",paid_at:date+"T12:00:00",paid_method:method||""};if(pid)row_.property_id=pid;return sb.from("invoices").insert(row_).select().single().then(function(r1){if(r1.error||!r1.data)return Promise.reject("invoice");return r1.data})}
       var jobs=[];function J(d,f){f.d=d;jobs.push(f)}
       oa.forEach(function(x){J(String(x.paid_on).slice(0,10),function(){var d=String(x.paid_on).slice(0,10);return mkInv(x.client_id,d,Number(x.amount),x.method,x.reference,"Created from a recorded payment (no earlier invoice on file).").then(function(inv){
         return sb.from("invoice_items").insert({invoice_id:inv.id,service_date:d,description:"Lawn maintenance"+(x.note?" - "+x.note:""),amount:Number(x.amount)}).then(function(r2_){
           if(r2_.error){sb.from("invoices").delete().eq("id",inv.id);return Promise.reject("line")}
           return sb.from("invoice_payments").update({invoice_id:inv.id}).eq("id",x.id).then(function(r3){if(r3.error){sb.from("invoices").delete().eq("id",inv.id);return Promise.reject("link")}x.invoice_id=inv.id;invoices.unshift(inv);made++})})})})});
-      vs.forEach(function(v){J(String(v.paid_at).slice(0,10),function(){var d=String(v.paid_at).slice(0,10);return mkInv(v.client_id,d,Number(v.price),v.paid_method,"","Created from a visit paid at the time of service.",v.scheduled_date).then(function(inv){
+      vs.forEach(function(v){J(String(v.paid_at).slice(0,10),function(){var d=String(v.paid_at).slice(0,10);return mkInv(v.client_id,d,Number(v.price),v.paid_method,"","Created from a visit paid at the time of service.",v.scheduled_date,v.property_id||null).then(function(inv){
         return sb.from("invoice_items").insert({invoice_id:inv.id,visit_id:v.id,service_date:v.scheduled_date,address:paddr(v.property_id),description:jobTitle(v.job_id),amount:Number(v.price)}).then(function(r2_){
           if(r2_.error){sb.from("invoices").delete().eq("id",inv.id);return Promise.reject("line")}
           return sb.from("visits").update({invoice_id:inv.id}).eq("id",v.id).then(function(r3){if(r3.error){sb.from("invoices").delete().eq("id",inv.id);return Promise.reject("link")}
@@ -2254,7 +2255,7 @@ function openPayImport(){
           if(i>=plan.length)return Promise.resolve();
           go.textContent="Importing "+(i+1)+" of "+plan.length+"...";
           var x=plan[i],r=x.r,ps=clientProps(x.cid),adr=ps.length===1?ps[0].address:"";
-          return sb.from("invoices").insert({client_id:x.cid,issue_date:r.d,due_date:addDays(r.d,terms),total:r.a,reference:r.old,notes:"Imported from the old software's payment history."+(r.cm?" ("+r.cm+")":""),status:"paid",paid_at:r.d+"T12:00:00",paid_method:"Other"}).select().single().then(function(q){
+          return sb.from("invoices").insert({client_id:x.cid,issue_date:r.d,due_date:addDays(r.d,terms),total:r.a,reference:r.old,notes:"Imported from the old software's payment history."+(r.cm?" ("+r.cm+")":""),status:"paid",paid_at:r.d+"T12:00:00",paid_method:"Other",property_id:ps.length===1?ps[0].id:null}).select().single().then(function(q){
             if(q.error||!q.data){fails.push(r.d+" "+money(r.a)+" "+r.nm);return}
             var inv=q.data;
             function undo(){return sb.from("invoices").delete().eq("id",inv.id).then(function(){fails.push(r.d+" "+money(r.a)+" "+r.nm)})}
@@ -2372,7 +2373,10 @@ function renderToBill(list,bg){
 function openInvoice(id){
   var inv=byId(invoices,id);if(!inv)return;var c=byId(clients,inv.client_id),p=panel();
   p.appendChild(el("h2",null,invNum(inv.number)+" · "+cname(inv.client_id)));
-  if(inv.property_id)p.appendChild(el("div","note","Property: "+paddr(inv.property_id)));
+  var ips=clientProps(inv.client_id);
+  if(ips.length>1){var ipf=fld("Property","select",inv.property_id||"",[["","Not tied to a property (whole account)"]].concat(ips.map(function(q){return[q.id,(q.label?q.label+" \u00b7 ":"")+q.address]})));ipf.style.cssText="margin:6px 0;max-width:420px";
+    ipf.input.addEventListener("change",function(){var v=ipf.input.value||null;ipf.input.disabled=true;sb.from("invoices").update({property_id:v}).eq("id",inv.id).then(function(r){ipf.input.disabled=false;if(r.error){alert("Could not change the property.");ipf.input.value=inv.property_id||"";return}inv.property_id=v;render()})});p.appendChild(ipf)}
+  else if(inv.property_id)p.appendChild(el("div","note","Property: "+paddr(inv.property_id)));
   var st=inv.status==="paid"?"Paid":inv.status==="void"?"Void":isOverdue(inv)?"Overdue":"Open";
   p.appendChild(el("div","note",st+" · issued "+dshort(inv.issue_date)+" · due "+dshort(inv.due_date)+(inv.sent_at?" · sent "+dshort(String(inv.sent_at).slice(0,10)):" · not sent yet")));
   var body=el("div");body.appendChild(el("div","note","Loading..."));p.appendChild(body);
@@ -2872,6 +2876,16 @@ function showStatement(c,from,to,pid){
     +(L.close>0?'<div class="pay"><b>How to pay</b><div>'+(bizv("zelle","")?"Zelle: "+esc(biz.zelle)+"<br>":"")+esc(bizv("payment_note",""))+"</div></div>":"")
     +'<div class="foot">'+esc(bizv("footer","Thank you!"))+"</div></div>";
   var v=$("invview");v.hidden=false;document.body.classList.add("printing");v.scrollTop=0}
+/* Assign untagged invoices to a client property when every line's address is that property's address. */
+function matchInvProps(c,list){
+  function nrm(a){return String(a||"").toLowerCase().split(",")[0].replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim()}
+  var ps=clientProps(c.id),ids=list.map(function(i){return i.id});
+  return sb.from("invoice_items").select("invoice_id,address").in("invoice_id",ids).limit(5000).then(function(r){
+    if(r.error)return Promise.reject(r.error);var by={};(r.data||[]).forEach(function(x){(by[x.invoice_id]=by[x.invoice_id]||[]).push(x)});
+    var ups=[];
+    list.forEach(function(i){var hits=[],miss=false;(by[i.id]||[]).forEach(function(x){var a=nrm(x.address);if(!a)return;var m=ps.filter(function(p){return nrm(p.address)===a});if(m.length!==1){miss=true;return}if(hits.indexOf(m[0].id)<0)hits.push(m[0].id)});
+      if(!miss&&hits.length===1)ups.push({inv:i,pid:hits[0]})});
+    return ups.reduce(function(pr,u){return pr.then(function(){return sb.from("invoices").update({property_id:u.pid}).eq("id",u.inv.id).then(function(q){if(!q.error)u.inv.property_id=u.pid})})},Promise.resolve()).then(function(){var done=list.filter(function(i){return i.property_id}).length;return{done:done,left:list.length-done}})})}
 function clientBillingSection(c,only){
   var sec=el("div","sec"),h=el("h3",null,"Billing");sec.appendChild(h);
   if(billErr){sec.appendChild(el("div","note","Run the Stage 5 SQL in Supabase to turn on billing."));return sec}
@@ -2926,7 +2940,10 @@ function clientBillingSection(c,only){
   var h1=el("h4",null,"Invoice history");h1.style.margin="12px 0 6px";sec.appendChild(h1);
   if(!hist.length)sec.appendChild(el("div","note","No invoices yet."));
   else if(!split)sec.appendChild(invTable(hist));
-  else keys.forEach(function(k){var l=invsOf(k);if(!l.length){if(k)sec.appendChild(sub(plabel(k))).insertAdjacentHTML("beforeend",' <span style="font-weight:400">— no invoices</span>');return}sec.appendChild(sub(plabel(k)));sec.appendChild(invTable(l))});
+  else keys.forEach(function(k){var l=invsOf(k);if(!l.length){if(k)sec.appendChild(sub(plabel(k))).insertAdjacentHTML("beforeend",' <span style="font-weight:400">— no invoices</span>');return}sec.appendChild(sub(plabel(k)));
+    if(!k&&cps.length>1){sec.appendChild(el("div","note","These invoices aren't assigned to a property. Open one to pick its property, or match them all by the address on their lines."));
+      var mb=btn("Match these to properties by address","btn alt sm",function(){mb.disabled=true;mb.textContent="Matching...";matchInvProps(c,l).then(function(n){alert(n.done+" invoice"+(n.done===1?"":"s")+" assigned to a property."+(n.left?"\n\n"+n.left+" couldn't be matched (no address on the lines, an address that isn't one of this client's properties, or lines for more than one property). Open those to pick the property.":""));sec.replaceWith(clientBillingSection(c,only))},function(){mb.disabled=false;mb.textContent="Match these to properties by address";alert("Could not load the invoice lines.")})});mb.style.margin="4px 0 6px";sec.appendChild(mb)}
+    sec.appendChild(invTable(l))});
   /* payment history */
   var h2=el("h4",null,"Payment history");h2.style.margin="14px 0 6px";sec.appendChild(h2);
   if(payErr){sec.appendChild(el("div","note","Run the Stage 18 SQL in Supabase to turn on payment history."));return sec}
