@@ -2829,7 +2829,7 @@ function acctLedger(cid,pid){
     if(i.status==="paid"&&Number(i.total)>0&&!invPays.some(function(x){return x.invoice_id===i.id}))rows.push({pid:i.property_id||null,d:String(i.paid_at||i.issue_date).slice(0,10),ord:1,n:i.number,desc:"Payment"+(i.paid_method?" - "+i.paid_method:"")+" (invoice "+invNum(i.number)+")",charge:0,pay:Number(i.total)||0})});
   invPays.forEach(function(x){var iv=x.invoice_id?byId(invoices,x.invoice_id):null;if(x.client_id!==cid&&!(iv&&iv.client_id===cid))return;
     rows.push({pid:iv?iv.property_id||null:null,d:String(x.paid_on).slice(0,10),ord:1,n:iv?iv.number:0,desc:"Payment"+(x.method?" - "+x.method:"")+(x.reference?" #"+x.reference:"")+(iv?" (invoice "+invNum(iv.number)+")":" (on account)"),charge:0,pay:Number(x.amount)||0,pr:x})});
-  if(pid)rows=rows.filter(function(r){return r.pid===pid});
+  if(pid==="none")rows=rows.filter(function(r){return!r.pid});else if(pid)rows=rows.filter(function(r){return r.pid===pid});
   rows.sort(function(a,b){return a.d<b.d?-1:a.d>b.d?1:a.ord-b.ord||a.n-b.n});return rows}
 function acctPeriod(rows,from,to){
   var open=0,list=[],ch=0,py=0;
@@ -2859,10 +2859,11 @@ function accountHistorySection(c,fixedPid){
     if(!L.rows.length)add(["","Nothing in this timeframe","","",""],0);
     L.rows.forEach(function(x){var tr=add([mdy(x.d),x.desc,x.charge?money(x.charge):"",x.pay?money(x.pay):"",sm(x.bal)]);if(x.pr){tr.style.cursor="pointer";tr.title="Edit this payment";tr.addEventListener("click",function(){openPaymentEdit(x.pr)})}});
     w.appendChild(t);host.appendChild(w);
-    var b=btn("Client statement (print / PDF)","btn sm",function(){showStatement(c,rng()[0],rng()[1],pf.input.value||null)});b.style.marginTop="8px";host.appendChild(b)}
+    var b=btn(pf.input.value?"Statement for this property (print / PDF)":"Client statement (print / PDF)","btn sm",function(){showStatement(c,rng()[0],rng()[1],pf.input.value||null)});b.style.margin="8px 8px 0 0";host.appendChild(b);
+    if(cps.length>1&&!pf.input.value){var b2=btn("Statement separated by property (print / PDF)","btn alt sm",function(){showStatementSplit(c,rng()[0],rng()[1])});b2.style.marginTop="8px";host.appendChild(b2)}}
   [ks.input,cf.input,ct.input,pf.input].forEach(function(x){x.addEventListener("change",draw)});draw();return box}
 function showStatement(c,from,to,pid){
-  var all=acctLedger(c.id,pid),L=acctPeriod(all,from,to),paper=$("invpaper"),addrs=(pid?clientProps(c.id).filter(function(p){return p.id===pid}):clientProps(c.id)).map(function(p){return p.address}).filter(Boolean);
+  var all=acctLedger(c.id,pid),L=acctPeriod(all,from,to),paper=$("invpaper"),addrs=(pid==="none"?[]:pid?clientProps(c.id).filter(function(p){return p.id===pid}):clientProps(c.id)).map(function(p){return p.address}).filter(Boolean);
   var first=all.length?all[0].d:today(),per=from?fdate(from)+" – "+fdate(to):"All activity through "+fdate(to);
   var rows="";if(from)rows+='<tr><td></td><td><i>Balance forward</i></td><td class="r"></td><td class="r"></td><td class="r">'+esc(sm(L.open))+"</td></tr>";
   if(!L.rows.length)rows+='<tr><td></td><td><i>No activity in this timeframe</i></td><td class="r"></td><td class="r"></td><td class="r">'+esc(sm(L.close))+"</td></tr>";
@@ -2876,6 +2877,22 @@ function showStatement(c,from,to,pid){
     +(L.close>0?'<div class="pay"><b>How to pay</b><div>'+(bizv("zelle","")?"Zelle: "+esc(biz.zelle)+"<br>":"")+esc(bizv("payment_note",""))+"</div></div>":"")
     +'<div class="foot">'+esc(bizv("footer","Thank you!"))+"</div></div>";
   var v=$("invview");v.hidden=false;document.body.classList.add("printing");v.scrollTop=0}
+/* One statement with a summary per property, then each property's activity in its own table. */
+function showStatementSplit(c,from,to){
+  showStatement(c,from,to,null);
+  var paper=$("invpaper"),tab=paper.querySelector("table.itab");if(!tab)return;
+  var ks=clientProps(c.id).map(function(p){return p.id});if(acctLedger(c.id,"none").length)ks.push("none");
+  function lab(k){if(k==="none")return"Not tied to a property";var p=byId(props,k);return p?(p.label?p.label+" \u00b7 ":"")+p.address:""}
+  var sumRows="",secs="",T=[0,0,0];
+  ks.forEach(function(k){var L=acctPeriod(acctLedger(c.id,k),from,to);T[0]+=L.charges;T[1]+=L.payments;T[2]+=L.close;
+    sumRows+="<tr><td>"+esc(lab(k))+'</td><td class="r">'+esc(money(L.charges))+'</td><td class="r">'+esc(money(L.payments))+'</td><td class="r">'+esc(sm(L.close))+"</td></tr>";
+    var rows="";if(from)rows+='<tr><td></td><td><i>Balance forward</i></td><td class="r"></td><td class="r"></td><td class="r">'+esc(sm(L.open))+"</td></tr>";
+    if(!L.rows.length)rows+='<tr><td></td><td><i>No activity in this timeframe</i></td><td class="r"></td><td class="r"></td><td class="r">'+esc(sm(L.close))+"</td></tr>";
+    L.rows.forEach(function(x){rows+="<tr><td>"+esc(mdy(x.d))+"</td><td>"+esc(x.desc)+'</td><td class="r">'+esc(x.charge?money(x.charge):"")+'</td><td class="r">'+esc(x.pay?money(x.pay):"")+'</td><td class="r">'+esc(sm(x.bal))+"</td></tr>"});
+    secs+='<div style="margin-top:16px;font-weight:800">'+esc(lab(k))+'</div><table class="itab"><thead><tr><th>Date</th><th>Description</th><th class="r">Charges</th><th class="r">Payments</th><th class="r">Balance</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td></td><td class="r"><b>Property totals</b></td><td class="r"><b>'+esc(money(L.charges))+'</b></td><td class="r"><b>'+esc(money(L.payments))+'</b></td><td class="r"><b>'+esc(sm(L.close))+"</b></td></tr></tfoot></table>"});
+  var box=document.createElement("div");
+  box.innerHTML='<div style="font-weight:800;margin-bottom:4px">Summary by property</div><table class="itab"><thead><tr><th>Property</th><th class="r">Charges</th><th class="r">Payments</th><th class="r">Balance</th></tr></thead><tbody>'+sumRows+'</tbody><tfoot><tr><td class="r"><b>Account total</b></td><td class="r"><b>'+esc(money(r2(T[0])))+'</b></td><td class="r"><b>'+esc(money(r2(T[1])))+'</b></td><td class="r"><b>'+esc(sm(r2(T[2])))+"</b></td></tr></tfoot></table>"+secs;
+  tab.replaceWith(box)}
 /* Assign untagged invoices to a client property when every line's address is that property's address. */
 function matchInvProps(c,list){
   function nrm(a){return String(a||"").toLowerCase().split(",")[0].replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim()}
@@ -2917,14 +2934,14 @@ function clientBillingSection(c,only){
   function paysOf(k,onacct){return pays.filter(function(x){return x.pid===k&&(onacct===undefined||!!x.onacct===onacct)})}
   if(split){
     var hs=el("h4",null,"Summary by property");hs.style.margin="12px 0 6px";sec.appendChild(hs);
-    var ws=el("div","invwrap"),ts=document.createElement("table");ts.className="ptable";var sh=document.createElement("tr");["Property","Invoiced","Paid","Balance due","Not yet billed"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i)th.className="r";sh.appendChild(th)});ts.appendChild(sh);
+    var ws=el("div","invwrap"),ts=document.createElement("table");ts.className="ptable";var sh=document.createElement("tr");["Property","Invoiced","Paid","Balance due","Not yet billed",""].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i)th.className="r";sh.appendChild(th)});ts.appendChild(sh);
     var T=[0,0,0,0];
     keys.forEach(function(k){var iv=invsOf(k),py=paysOf(k),uv=k?ub.filter(function(v){return v.property_id===k}):ub.filter(function(v){return!v.property_id||keys.indexOf(v.property_id)<0});
       var n=[r2(iv.filter(function(i){return i.status!=="void"}).reduce(function(s,i){return s+Number(i.total||0)},0)),r2(py.reduce(function(s,x){return s+x.amount},0)),openTotal(iv),r2(uv.reduce(function(s,v){return s+Number(v.price||0)},0))];
       if(!k&&!iv.length&&!py.length&&!uv.length)return;
       n.forEach(function(v,i){T[i]=r2(T[i]+v)});
-      var ovd=iv.filter(isOverdue).length,tr=document.createElement("tr");[plabel(k),money(n[0]),money(n[1]),money(n[2])+(ovd?" ("+ovd+" overdue)":""),n[3]?money(n[3]):""].forEach(function(v,i){var td=document.createElement("td");td.textContent=v;if(i)td.className="r";tr.appendChild(td)});ts.appendChild(tr)});
-    if(!only){var stt=document.createElement("tr");stt.className="tot";["Account total",money(T[0]),money(T[1]),money(T[2]),T[3]?money(T[3]):""].forEach(function(v,i){var td=document.createElement("td");td.textContent=v;td.style.fontWeight="800";if(i)td.className="r";stt.appendChild(td)});ts.appendChild(stt)}
+      var ovd=iv.filter(isOverdue).length,tr=document.createElement("tr");[plabel(k),money(n[0]),money(n[1]),money(n[2])+(ovd?" ("+ovd+" overdue)":""),n[3]?money(n[3]):""].forEach(function(v,i){var td=document.createElement("td");td.textContent=v;if(i)td.className="r";tr.appendChild(td)});var sx=document.createElement("td");sx.className="r";if(iv.length||py.length)sx.appendChild(btn("Statement","btn alt sm",function(){showStatement(c,"",today(),k||"none")}));tr.appendChild(sx);ts.appendChild(tr)});
+    if(!only){var stt=document.createElement("tr");stt.className="tot";["Account total",money(T[0]),money(T[1]),money(T[2]),T[3]?money(T[3]):"",""].forEach(function(v,i){var td=document.createElement("td");td.textContent=v;td.style.fontWeight="800";if(i)td.className="r";stt.appendChild(td)});ts.appendChild(stt)}
     ws.appendChild(ts);sec.appendChild(ws);
     if(!only&&pays.some(function(x){return x.onacct}))sec.appendChild(el("div","note","Payments recorded on account (not applied to an invoice) are listed under \"Not tied to a property\"."))}
   sec.appendChild(accountHistorySection(c,only));
