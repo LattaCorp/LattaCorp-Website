@@ -2834,14 +2834,14 @@ function acctPeriod(rows,from,to){
   return{open:open,rows:list,charges:r2(ch),payments:r2(py),close:bal}}
 function acctRange(kind,cf,ct){var t=today(),y=t.slice(0,4);
   if(kind==="year")return[y+"-01-01",t];if(kind==="last")return[(y-1)+"-01-01",(y-1)+"-12-31"];if(kind==="12")return[addDays(t,-365),t];if(kind==="custom")return[cf||"",ct||t];return["",t]}
-function accountHistorySection(c){
+function accountHistorySection(c,fixedPid){
   var box=el("div");var h=el("h4",null,"Account history");h.style.margin="14px 0 6px";box.appendChild(h);
   if(!acctLedger(c.id).length){box.appendChild(el("div","note","No invoices or payments yet."));return box}
   var bar=el("div");bar.style.cssText="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end;margin-bottom:8px";
   var ks=fld("Timeframe","select","all",[["all","All time"],["year","This year"],["last","Last year"],["12","Last 12 months"],["custom","Custom dates"]]);ks.style.margin="0";
   var cf=fld("From","date",""),ct=fld("To","date",today());cf.style.margin="0";ct.style.margin="0";cf.style.display=ct.style.display="none";
-  var cps=clientProps(c.id),pf=fld("Property","select","",[["","All properties"]].concat(cps.map(function(p){return[p.id,(p.label?p.label+" \u00b7 ":"")+p.address]})));pf.style.margin="0";
-  if(cps.length>1)bar.appendChild(pf);
+  var cps=clientProps(c.id),pf=fld("Property","select",fixedPid||"",[["","All properties"]].concat(cps.map(function(p){return[p.id,(p.label?p.label+" \u00b7 ":"")+p.address]})));pf.style.margin="0";
+  if(cps.length>1&&!fixedPid)bar.appendChild(pf);
   bar.appendChild(ks);bar.appendChild(cf);bar.appendChild(ct);box.appendChild(bar);
   var host=el("div");box.appendChild(host);
   function rng(){return acctRange(ks.input.value,cf.input.value,ct.input.value)}
@@ -2872,7 +2872,7 @@ function showStatement(c,from,to,pid){
     +(L.close>0?'<div class="pay"><b>How to pay</b><div>'+(bizv("zelle","")?"Zelle: "+esc(biz.zelle)+"<br>":"")+esc(bizv("payment_note",""))+"</div></div>":"")
     +'<div class="foot">'+esc(bizv("footer","Thank you!"))+"</div></div>";
   var v=$("invview");v.hidden=false;document.body.classList.add("printing");v.scrollTop=0}
-function clientBillingSection(c){
+function clientBillingSection(c,only){
   var sec=el("div","sec"),h=el("h3",null,"Billing");sec.appendChild(h);
   if(billErr){sec.appendChild(el("div","note","Run the Stage 5 SQL in Supabase to turn on billing."));return sec}
   var mine=invoices.filter(function(i){return i.client_id===c.id}),bal=openTotal(mine),od=mine.filter(isOverdue).length,ub=unbilled.filter(function(v){return v.client_id===c.id&&Number(v.price)>0});
@@ -2893,6 +2893,11 @@ function clientBillingSection(c){
   var keys=cps.map(function(p){return p.id});
   mine.forEach(function(i){var k=i.property_id||"";if(k&&keys.indexOf(k)<0)keys.push(k)});
   keys.push("");
+  only=only&&keys.indexOf(only)>-1?only:"";
+  if(split&&cps.length>1){
+    var vf=fld("Show history for","select",only,[["","All properties"]].concat(cps.map(function(p){return[p.id,(p.label?p.label+" \u00b7 ":"")+p.address]})));vf.style.cssText="margin:10px 0 0;max-width:420px";
+    vf.input.addEventListener("change",function(){sec.replaceWith(clientBillingSection(c,vf.input.value))});sec.appendChild(vf)}
+  if(only)keys=[only];
   function plabel(k){if(!k)return"Not tied to a property";var p=byId(props,k);return p?(p.label?p.label+" · ":"")+p.address:"Removed property"}
   function invsOf(k){return hist.filter(function(i){return(i.property_id||"")===k})}
   function paysOf(k,onacct){return pays.filter(function(x){return x.pid===k&&(onacct===undefined||!!x.onacct===onacct)})}
@@ -2905,10 +2910,10 @@ function clientBillingSection(c){
       if(!k&&!iv.length&&!py.length&&!uv.length)return;
       n.forEach(function(v,i){T[i]=r2(T[i]+v)});
       var ovd=iv.filter(isOverdue).length,tr=document.createElement("tr");[plabel(k),money(n[0]),money(n[1]),money(n[2])+(ovd?" ("+ovd+" overdue)":""),n[3]?money(n[3]):""].forEach(function(v,i){var td=document.createElement("td");td.textContent=v;if(i)td.className="r";tr.appendChild(td)});ts.appendChild(tr)});
-    var stt=document.createElement("tr");stt.className="tot";["Account total",money(T[0]),money(T[1]),money(T[2]),T[3]?money(T[3]):""].forEach(function(v,i){var td=document.createElement("td");td.textContent=v;td.style.fontWeight="800";if(i)td.className="r";stt.appendChild(td)});ts.appendChild(stt);
+    if(!only){var stt=document.createElement("tr");stt.className="tot";["Account total",money(T[0]),money(T[1]),money(T[2]),T[3]?money(T[3]):""].forEach(function(v,i){var td=document.createElement("td");td.textContent=v;td.style.fontWeight="800";if(i)td.className="r";stt.appendChild(td)});ts.appendChild(stt)}
     ws.appendChild(ts);sec.appendChild(ws);
-    if(pays.some(function(x){return x.onacct}))sec.appendChild(el("div","note","Payments recorded on account (not applied to an invoice) are listed under \"Not tied to a property\"."))}
-  sec.appendChild(accountHistorySection(c));
+    if(!only&&pays.some(function(x){return x.onacct}))sec.appendChild(el("div","note","Payments recorded on account (not applied to an invoice) are listed under \"Not tied to a property\"."))}
+  sec.appendChild(accountHistorySection(c,only));
   /* invoice history */
   function invTable(list){var w=el("div","invwrap"),t=document.createElement("table");t.className="ptable";var hr=document.createElement("tr");["Number","Date","Amount","Balance","Status"].forEach(function(x,i){var th=document.createElement("th");th.textContent=x;if(i===2||i===3)th.className="r";hr.appendChild(th)});t.appendChild(hr);
     var ta=0,tb=0;list.forEach(function(i){var tr=document.createElement("tr");tr.style.cursor="pointer";tr.title="Open invoice";if(i.status!=="void")ta+=Number(i.total||0);tb+=balOf(i);
@@ -2932,7 +2937,7 @@ function clientBillingSection(c){
   if(!pays.length)sec.appendChild(el("div","note","No payments yet."));
   else if(!split)sec.appendChild(payTable(pays,"Total paid"));
   else{keys.forEach(function(k){var l=paysOf(k);if(!l.length){if(k)sec.appendChild(sub(plabel(k))).insertAdjacentHTML("beforeend",' <span style="font-weight:400">— no payments</span>');return}sec.appendChild(sub(plabel(k)));sec.appendChild(payTable(l,"Paid"))});
-    var gt=el("div","note","Total paid, all properties: "+money(r2(pays.reduce(function(s,x){return s+x.amount},0))));gt.style.cssText="font-weight:800;margin-top:8px";sec.appendChild(gt)}
+    if(!only){var gt=el("div","note","Total paid, all properties: "+money(r2(pays.reduce(function(s,x){return s+x.amount},0))));gt.style.cssText="font-weight:800;margin-top:8px";sec.appendChild(gt)}}
   return sec}
 
 })();
