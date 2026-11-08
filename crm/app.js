@@ -2369,7 +2369,7 @@ function openHistImport(cid){
   var cs=fld("Whose history is this?","select",cid||"",[["","A file with a Customer column (several clients)"]].concat(list.map(function(c){return[c.id,dispName(c)+(c.company?" · "+c.company:"")]})));p.appendChild(cs);
   var pp=fld("Property for rows with no address","select","",[["","Whole account / no specific property"]]);p.appendChild(pp);
   function fillProps(){var ps=cs.input.value?clientProps(cs.input.value):[];pp.input.textContent="";[["","Whole account / no specific property"]].concat(ps.map(function(x){return[x.id,(x.label?x.label+" · ":"")+x.address]})).forEach(function(o){var op=document.createElement("option");op.value=o[0];op.textContent=o[1];pp.input.appendChild(op)});
-    pp.input.value=ps.length===1?ps[0].id:"";pp.hidden=ps.length<2}
+    var mn=ps.filter(isMainProp);pp.input.value=ps.length===1?ps[0].id:mn.length?mn[0].id:"";pp.hidden=ps.length<2}
   cs.input.addEventListener("change",function(){fillProps();if(parsed)preview()});fillProps();
   p.appendChild(el("h3",null,"1. The statement"));
   var file=document.createElement("input");file.type="file";file.accept=".csv,.tsv,.txt,text/csv";p.appendChild(file);
@@ -3127,7 +3127,17 @@ function clientBillingSection(c,only){
   else if(!split)sec.appendChild(invTable(hist));
   else keys.forEach(function(k){var l=invsOf(k);if(!l.length){if(k)sec.appendChild(sub(plabel(k))).insertAdjacentHTML("beforeend",' <span style="font-weight:400">— no invoices</span>');return}sec.appendChild(sub(plabel(k)));
     if(!k&&cps.length>1){sec.appendChild(el("div","note","These invoices aren't assigned to a property. Open one to pick its property, or match them all by the address on their lines."));
-      var mb=btn("Match these to properties by address","btn alt sm",function(){mb.disabled=true;mb.textContent="Matching...";matchInvProps(c,l).then(function(n){alert(n.done+" invoice"+(n.done===1?"":"s")+" assigned to a property."+(n.left?"\n\n"+n.left+" couldn't be matched (no address on the lines, an address that isn't one of this client's properties, or lines for more than one property). Open those to pick the property.":""));sec.replaceWith(clientBillingSection(c,only))},function(){mb.disabled=false;mb.textContent="Match these to properties by address";alert("Could not load the invoice lines.")})});mb.style.margin="4px 0 6px";sec.appendChild(mb)}
+      var mb=btn("Match these to properties by address","btn alt sm",function(){mb.disabled=true;mb.textContent="Matching...";matchInvProps(c,l).then(function(n){alert(n.done+" invoice"+(n.done===1?"":"s")+" assigned to a property."+(n.left?"\n\n"+n.left+" couldn't be matched (no address on the lines, an address that isn't one of this client's properties, or lines for more than one property). Open those to pick the property.":""));sec.replaceWith(clientBillingSection(c,only))},function(){mb.disabled=false;mb.textContent="Match these to properties by address";alert("Could not load the invoice lines.")})});mb.style.margin="4px 0 6px";sec.appendChild(mb);
+      var ab=el("div");ab.style.cssText="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:4px 0 8px";
+      var af=fld("Or assign all "+l.length+" to","select","",[["","Choose a property..."]].concat(cps.map(function(p){return[p.id,(p.label?p.label+" \u00b7 ":"")+p.address]})));af.style.cssText="margin:0;min-width:260px;flex:1;max-width:420px";ab.appendChild(af);
+      var ag=btn("Assign","btn sm",function(){var pid=af.input.value;if(!pid){alert("Choose a property first.");return}
+        if(!confirm("Assign all "+l.length+" invoice"+(l.length===1?"":"s")+" (and their payments) to "+paddr(pid)+"?"))return;
+        ag.disabled=true;ag.textContent="Assigning...";var ids=l.map(function(i){return i.id});
+        sb.from("invoices").update({property_id:pid}).in("id",ids).then(function(r){
+          if(r.error){ag.disabled=false;ag.textContent="Assign";alert("Could not assign them. Did you run the Stage 20 SQL?");return}
+          l.forEach(function(i){i.property_id=pid});
+          return sb.from("invoice_items").update({address:paddr(pid)}).in("invoice_id",ids).eq("address","").then(function(){repData=null;sec.replaceWith(clientBillingSection(c,only))})})});
+      ab.appendChild(ag);sec.appendChild(ab)}
     sec.appendChild(invTable(l))});
   /* payment history */
   var h2=el("h4",null,"Payment history");h2.style.margin="14px 0 6px";sec.appendChild(h2);
