@@ -10,6 +10,8 @@ var todos=[],todoErr=false,tfilter="open",team=[];
 var role="owner",myEmail="";function isOwner(){return role==="owner"}
 var view="leads",lfilter="all",cfilter="active",jfilter="active",smode="day",selDate=today(),crewF="all",query="";
 var estimates=[],estErr=false;
+var ccontacts=[],ccErr=false;
+var CROLES=["Spouse","Partner","Board member","HOA president","Property manager","Tenant","Family member","Office / billing"];
 var teamSyncAt=0,teamSyncing=false,invPays=[],payErr=false;
 var people=[],payRows=[],benRows=[],docRows=[],persErr=false,pfilter="all";
 var invCats=[],invItems=[],invErr=false,invCat=null,invq="",invSort=null,invFocus=null;
@@ -85,8 +87,10 @@ function load(){
     sb.from("personnel_pay").select("*").order("paid_on",{ascending:false}).limit(20000),
     sb.from("personnel_benefits").select("*").order("created_at",{ascending:false}).limit(5000),
     sb.from("personnel_docs").select("*").order("created_at",{ascending:false}).limit(5000),
-    sb.from("invoice_payments").select("*").order("paid_on",{ascending:false}).limit(20000)
+    sb.from("invoice_payments").select("*").order("paid_on",{ascending:false}).limit(20000),
+    sb.from("client_contacts").select("*").order("created_at",{ascending:true}).limit(20000)
   ]).then(function(rs){
+    ccErr=!!rs[21].error;ccontacts=rs[21].error?[]:(rs[21].data||[]);
     payErr=!!rs[20].error;invPays=rs[20].error?[]:(rs[20].data||[]);
     persErr=!!(rs[16].error||rs[17].error||rs[18].error||rs[19].error);people=rs[16].error?[]:(rs[16].data||[]);payRows=rs[17].error?[]:(rs[17].data||[]);benRows=rs[18].error?[]:(rs[18].data||[]);docRows=rs[19].error?[]:(rs[19].data||[]);
     if(rs[0].error){$("msg").textContent="Could not load leads. If you just signed in, make sure this email is on the staff list.";return}
@@ -182,7 +186,7 @@ function renderClients(){
     if(cfilter==="archived"){if(!c.archived)return false}else{if(c.archived)return false;if(cfilter!=="active"&&c.type!==cfilter)return false}
     if(!query)return true;
     var addr=clientProps(c.id).map(function(p){return p.address}).join(" ");
-    return[c.name,c.nickname,c.last_name,c.company,c.email,c.phone,c.phone2,c.notes,addr].join(" ").toLowerCase().indexOf(query)>-1});
+    return[c.name,c.nickname,c.last_name,c.company,c.email,c.phone,c.phone2,c.notes,addr,ccText(c.id)].join(" ").toLowerCase().indexOf(query)>-1});
   if(!shown.length){list.appendChild(el("div","empty",clients.length?"Nothing matches that.":"No clients yet. Add one, import a CSV, or convert a lead."));return}
   shown.forEach(function(c){
     var b=el("button","row client"+(c.archived?" archived":""));b.type="button";
@@ -277,6 +281,7 @@ function openClient(id){
   var acts=el("div","contact");acts.appendChild(btn("Edit details","btn alt sm",function(){openClientForm(c)}));
   acts.appendChild(btn(c.archived?"Unarchive":"Archive","btn alt sm",function(){sb.from("clients").update({archived:!c.archived}).eq("id",c.id).then(function(r){if(r.error){alert("Could not update.");return}c.archived=!c.archived;render();openClient(c.id)})}));
   p.appendChild(acts);
+  p.appendChild(clientContactsSection(c));
   /* properties */
   var sec=el("div","sec"),h=el("h3",null,"Properties"),addp=btn("+ Add property","btn alt sm",function(){propForm(c,null,sec,h)});h.appendChild(addp);sec.appendChild(h);p.appendChild(sec);
   var holder=el("div");sec.appendChild(holder);drawProps(c,holder);
@@ -292,6 +297,48 @@ function openClient(id){
   var d=el("div","actions");d.appendChild(el("span"));
   d.appendChild(btn("Delete client","btn danger",function(){if(!confirm("Delete this client and all their properties for good? (Archive keeps the history.)"))return;sb.from("clients").delete().eq("id",c.id).then(function(r){if(r.error){alert("Could not delete. A client with invoices can't be deleted, so Archive them instead.");return}clients=clients.filter(function(z){return z.id!==c.id});props=props.filter(function(z){return z.client_id!==c.id});leads.forEach(function(l){if(l.client_id===c.id)l.client_id=null});closeDetail();render()})}));
   p.appendChild(d);
+}
+/* ---- other contacts on a client (spouse, board members...) ---- */
+function clientCC(id){return ccontacts.filter(function(x){return x.client_id===id})}
+function ccText(id){return clientCC(id).map(function(x){return[x.name,x.role,x.phone,x.email].join(" ")}).join(" ")}
+function clientContactsSection(c){
+  var sec=el("div","sec"),h=el("h3",null,"Other contacts"),holder=el("div");
+  if(!ccErr)h.appendChild(btn("+ Add contact","btn alt sm",function(){ccForm(c,null,holder)}));
+  sec.appendChild(h);sec.appendChild(holder);drawCC(c,holder);return sec}
+function drawCC(c,holder){
+  holder.textContent="";
+  if(ccErr){holder.appendChild(el("div","note","To add spouses, board members and other contacts, run the Stage 21 SQL in Supabase (SQL Editor), then press Refresh."));return}
+  var cs=clientCC(c.id);
+  if(!cs.length){holder.appendChild(el("div","note","None yet. Add a spouse, board member, property manager or anyone else you may need to reach."));return}
+  cs.forEach(function(x){
+    var card=el("div","pcard");card.appendChild(el("b",null,(x.name||"(no name)")+(x.role?" · "+x.role:"")));
+    var info=[x.phone,x.email].filter(Boolean).join(" · ");if(info)card.appendChild(el("div","note",info));
+    if(x.notes)card.appendChild(el("div","note",x.notes));
+    var a=el("div","acts"),dg=digits(x.phone);
+    if(dg){(isOwner()?["Call","Text"]:["Call"]).forEach(function(t){var l=el("a","btn alt sm",t);l.href=(t==="Call"?"tel:":"sms:")+dg;a.appendChild(l)})}
+    if(x.email){var m=el("a","btn alt sm","Email");m.href="mailto:"+x.email;a.appendChild(m)}
+    a.appendChild(btn("Edit","btn alt sm",function(){ccForm(c,x,holder)}));
+    a.appendChild(btn("Delete","btn danger sm",function(){if(!confirm("Remove "+(x.name||"this contact")+" from this client?"))return;
+      sb.from("client_contacts").delete().eq("id",x.id).then(function(r){if(r.error){alert("Could not delete.");return}ccontacts=ccontacts.filter(function(z){return z.id!==x.id});drawCC(c,holder)})}));
+    card.appendChild(a);holder.appendChild(card)});
+}
+function ccForm(c,x,holder){
+  var box=el("div","pcard"),g=el("div","grid2");
+  var nm=fld("Name","text",x?x.name:""),rl=fld("Role (Spouse, Board member...)","text",x?x.role:"");
+  var dl=document.createElement("datalist");dl.id="ccroles";CROLES.forEach(function(r){var o=document.createElement("option");o.value=r;dl.appendChild(o)});rl.appendChild(dl);rl.input.setAttribute("list","ccroles");
+  var ph=fld("Phone","tel",x?x.phone:""),em=fld("Email","email",x?x.email:"");
+  g.appendChild(nm);g.appendChild(rl);g.appendChild(ph);g.appendChild(em);box.appendChild(g);
+  var nt=fld("Notes (best time to call, what to contact them about...)","text",x?x.notes:"");box.appendChild(nt);
+  var a=el("div","acts");
+  var save=btn("Save contact","btn sm",function(){
+    if(!nm.input.value.trim()&&!ph.input.value.trim()&&!em.input.value.trim()){alert("Enter a name, phone or email.");return}
+    var row={name:nm.input.value.trim(),role:rl.input.value.trim(),phone:ph.input.value.trim(),email:em.input.value.trim(),notes:nt.input.value.trim()};save.disabled=true;
+    var q=x?sb.from("client_contacts").update(row).eq("id",x.id).select().single():sb.from("client_contacts").insert(Object.assign({client_id:c.id},row)).select().single();
+    q.then(function(r){save.disabled=false;if(r.error||!r.data){alert("Could not save.");return}
+      if(x)Object.assign(x,r.data);else ccontacts.push(r.data);drawCC(c,holder)})});
+  a.appendChild(save);a.appendChild(btn("Cancel","btn alt sm",function(){drawCC(c,holder)}));box.appendChild(a);
+  if(x){holder.textContent="";holder.appendChild(box)}else{var e=holder.querySelector(".note");if(e)e.remove();holder.insertBefore(box,holder.firstChild)}
+  nm.input.focus();
 }
 function drawProps(c,holder){
   holder.textContent="";var ps=clientProps(c.id);
@@ -418,7 +465,7 @@ function openImport(){
   function close(){res.classList.remove("on");res.textContent=""}
   function run(){
     var t=toks(gs.value);lastQ=gs.value.trim();res.textContent="";if(!t.length){close();return}
-    var cl=clients.filter(function(c){return all(["client",c.name,c.company,c.phone,c.phone2,c.email,clientProps(c.id).map(function(p){return p.address}).join(" ")].join(" "),t)});
+    var cl=clients.filter(function(c){return all(["client",c.name,c.company,c.phone,c.phone2,c.email,ccText(c.id),clientProps(c.id).map(function(p){return p.address}).join(" ")].join(" "),t)});
     var jb=jobs.filter(function(j){var sv=byId(services,j.service_id);return all(["job",j.title,sv?sv.name:"",cname(j.client_id),paddr(j.property_id),flabel(j.frequency)].join(" "),t)});
     var ld=leads.filter(function(l){return all(["lead",l.name,l.email,l.phone,l.address,l.service,l.kind].join(" "),t)});
     var tp=TOPICS.filter(function(x){return topicHit(x,t)&&!(x[0]==="Team"&&!isOwner())});
