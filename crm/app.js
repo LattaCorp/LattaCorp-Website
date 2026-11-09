@@ -14672,11 +14672,6 @@ function openBizSettings() {
       "text",
       bizv("zelle", "")
     ),
-    accepts: fld(
-      "We accept (payment methods listed on every invoice, separated by commas)",
-      "text",
-      bizv("accepts", "Zelle, Cash, Check, Credit/Debit Card, Automated Payments")
-    ),
     payment_note: fld("Other payment note", "text", bizv("payment_note", "")),
     terms_days: fld(
       "Payment due within (days after the invoice date; 0 = due on receipt)",
