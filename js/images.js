@@ -16,5 +16,8 @@ var IMG={
  "street": "images/photo-street.jpg",
  "oak": "images/photo-oak.jpg",
  "hedge": "images/photo-hedge.jpg",
- "bed2": "images/photo-bed2.jpg"
+ "bed2": "images/photo-bed2.jpg",
+ "lake_diamond": "images/photo-lake_diamond.jpg",
+ "clubhouse": "images/photo-clubhouse.jpg",
+ "tree_trim": "images/photo-tree_trim.jpg"
 };

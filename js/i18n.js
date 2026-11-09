@@ -498,4 +498,7 @@ var ES={
 "Close": "Cerrar",
 "Previous photo": "Foto anterior",
 "Next photo": "Foto siguiente",
+"Diamond-pattern mowing stripes along a lakefront backyard.": "Rayas de corte en patrón de diamante en un patio junto al lago.",
+"Crew finishing a striped commercial lawn at a community clubhouse.": "Nuestro equipo terminando un césped comercial con rayas en la casa club de una comunidad.",
+"Crew member shaping trees along a retention pond.": "Miembro del equipo dando forma a los árboles junto a un estanque.",
 "Click a photo to enlarge.": "Haga clic en una foto para ampliarla."};
