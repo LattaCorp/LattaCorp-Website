@@ -592,3 +592,19 @@ footer .brand.fbrand img.wword{width:100%;max-width:280px;min-width:170px}
 .iglink{display:inline-flex;align-items:center;gap:12px;padding:10px 22px 10px 16px;border:1px solid var(--line)!important;border-radius:14px;font-weight:700;color:var(--forest);text-decoration:none}
 .iglink:hover{background:var(--mint)}.iglink svg{flex:none}.igtext{display:flex;flex-direction:column;line-height:1.25}.ighandle{font-weight:400;font-size:.9rem;color:var(--muted)}
 .tsbox{margin:4px 0 12px}.tsbox:empty{margin:0}
+/* Client Portal page: sign-in card (js/portal-signin.js) */
+.psi-wrap{padding:28px 0 8px}
+.psi{max-width:440px;margin:0 auto;background:#fff;border:1px solid var(--line);border-radius:12px;padding:26px 24px;box-shadow:0 10px 30px rgba(27,85,43,.08)}
+.psi h2{margin:0 0 .3em;text-align:center}
+.psi form{border:0;padding:0;background:none;box-shadow:none;gap:14px}
+.psi input{font-size:1rem}
+.psi .btn{width:100%;text-align:center;box-sizing:border-box}
+.psim{margin:0;color:var(--muted);text-align:center}
+.psicd{letter-spacing:.35em;text-align:center;font-size:1.4rem!important;font-weight:700}
+.psis{margin:0;font-size:.86rem;color:var(--muted)}
+.psierr{margin:0;color:#a3322a;font-weight:600}.psierr.ok{color:var(--forest)}
+.psif{margin:14px 0 0;font-size:.88rem;color:var(--muted);text-align:center}
+.psil{background:none;border:0;padding:0;color:var(--forest);text-decoration:underline;cursor:pointer;font:inherit;font-weight:600}
+#psi-in .btn{margin-top:14px}
+@media (max-width:480px){.psi{padding:22px 16px}}
+.psi [hidden]{display:none!important}

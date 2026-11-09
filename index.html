@@ -241,12 +241,28 @@
 </main>
 <main id="portal" class="page">
 <div class="band tband"><div class="wrap"><h1>Client Portal <span class="soon big">NEW!</span></h1><p>Your LattaCorp account online, for homeowners, HOAs, property managers, landlords, and commercial clients.</p>
-<div class="cta" style="display:flex;flex-wrap:wrap;gap:12px;margin-top:14px"><a class="btn" href="/portal/">Sign in to your portal</a></div></div></div>
-<section style="padding-top:44px"><div class="wrap narrow"><h2>What you can do</h2>
+</div></div>
+<section class="psi-wrap"><div class="wrap"><div class="psi" id="psi">
+<h2 id="psih">Sign in to your account</h2>
+<div id="psi-out">
+<form id="psiemail" class="single" novalidate><p class="psim">Enter the email we have on file. We'll send you a sign-in code. No password needed.</p>
+<label>Email<input id="psiem" type="email" autocomplete="email" inputmode="email" required></label>
+<p class="psierr" id="psierr" role="alert" hidden></p>
+<button class="btn" type="submit" id="psisend">Send my code</button></form>
+<form id="psicode" class="single" novalidate hidden><p class="psim"><span>If this email is on file with us, a code is on its way to</span> <b id="psito"></b>.</p>
+<label>Sign-in code<input id="psicd" class="psicd" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]*" required></label>
+<p class="psis">Can't find it? Check your Spam or Junk folder. It comes from website@lattacorpfl.com.</p>
+<p class="psierr" id="psicerr" role="alert" hidden></p>
+<button class="btn" type="submit" id="psigo">Sign in</button>
+<p class="psif"><button type="button" class="psil" id="psire">Send a new code</button> · <button type="button" class="psil" id="psiother">Use a different email</button></p></form>
+<p class="psif">No code, or not on file yet? Call or text <a href="tel:4074705309">407-470-5309</a>.</p>
+</div>
+<div id="psi-in" hidden><p class="psim">You're already signed in on this device.</p><a class="btn" href="/portal/" id="psiopen">Open my portal</a>
+<p class="psif"><button type="button" class="psil" id="psiout">Sign out</button></p></div>
+</div></div></section>
+<section style="padding-top:20px"><div class="wrap narrow"><h2>What you can do</h2>
 <ul class="plist"><li>See your upcoming and past visits</li><li>View invoices and payments, and print statements</li><li>Send service requests and ask for quotes</li><li>See photos from your properties</li><li>Share access with a spouse, board members, or your property manager</li></ul>
-<h2 style="margin-top:1.4em">How to sign in</h2>
-<p>Enter the email we have on file and we'll send you a one-time code. There's no password to remember. If the code doesn't arrive, check your spam or junk folder.</p>
-<p class="draftn2">Not set up yet? Call or text us and we'll add your email.</p>
+<p class="draftn2">Tip: once you're in, you can add the portal to your phone's home screen like an app. You'll stay signed in.</p>
 <h2 style="margin-top:1.4em">Need something now?</h2>
 <p>Call or text us any time, or send a request through our website.</p>
 <div class="cta" style="display:flex;flex-wrap:wrap;gap:12px"><a class="btn" href="tel:4074705309">Call or text 407-470-5309</a><a class="btn alt" href="#/community">Send a service request</a><a class="btn alt" href="#/services/hoa">Request a proposal</a></div>
@@ -338,4 +354,5 @@
 <script src="js/forms.js"></script>
 <script src="crm/config.js"></script>
 <script src="js/app.js"></script>
-<script src="js/calc.js"></script></body></html>
+<script src="js/calc.js"></script>
+<script src="js/portal-signin.js"></script></body></html>
