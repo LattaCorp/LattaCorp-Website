@@ -14824,12 +14824,14 @@ function fdate(s) {
   return s ? pd(s).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
 }
 function acctLedger(cid, pid) {
-  var rows = [];
+  var rows = [],
+    lps = clientProps(cid),
+    sole = lps.length === 1 ? lps[0].id : null;
   invoices.forEach(function (i) {
     if (i.client_id !== cid) return;
     var zeroPaid = i.status === "paid" && Number(i.total) === 0;
     rows.push({
-      pid: i.property_id || null,
+      pid: i.property_id || sole,
       d: String(i.issue_date).slice(0, 10),
       ord: 0,
       n: i.number,
@@ -14849,7 +14851,7 @@ function acctLedger(cid, pid) {
       })
     )
       rows.push({
-        pid: i.property_id || null,
+        pid: i.property_id || sole,
         d: String(i.paid_at || i.issue_date).slice(0, 10),
         ord: 1,
         n: i.number,
@@ -14863,7 +14865,7 @@ function acctLedger(cid, pid) {
     var iv = x.invoice_id ? byId(invoices, x.invoice_id) : null;
     if (x.client_id !== cid && !(iv && iv.client_id === cid)) return;
     rows.push({
-      pid: iv ? iv.property_id || null : null,
+      pid: iv ? iv.property_id || sole : sole,
       d: String(x.paid_on).slice(0, 10),
       ord: 1,
       n: iv ? iv.number : 0,
@@ -15418,19 +15420,25 @@ function clientBillingSection(c, only) {
   }
   /* split by property when the client has more than one, or any invoice is tied to one */
   var cps = clientProps(c.id),
-    split =
+    sole = cps.length === 1 ? cps[0].id : "";
+  /* one property (their Main): everything untagged, including on-account payments, belongs to it */
+  if (sole)
+    pays.forEach(function (x) {
+      if (!x.pid) x.pid = sole;
+    });
+  var split =
       cps.length > 1 ||
       mine.some(function (i) {
-        return i.property_id;
+        return i.property_id && i.property_id !== sole;
       });
   var keys = cps.map(function (p) {
     return p.id;
   });
   mine.forEach(function (i) {
-    var k = i.property_id || "";
+    var k = i.property_id || sole;
     if (k && keys.indexOf(k) < 0) keys.push(k);
   });
-  keys.push("");
+  if (!sole) keys.push("");
   only = only && keys.indexOf(only) > -1 ? only : "";
   if (split && cps.length > 1) {
     var vf = fld(
@@ -15457,7 +15465,7 @@ function clientBillingSection(c, only) {
   }
   function invsOf(k) {
     return hist.filter(function (i) {
-      return (i.property_id || "") === k;
+      return (i.property_id || sole) === k;
     });
   }
   function paysOf(k, onacct) {
