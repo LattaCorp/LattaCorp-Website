@@ -36,8 +36,27 @@ async function saveLead(env, kind, lang, fields, photoCount) {
   } catch (e) { console.log("lead save error"); return false; }
 }
 
+// Cloudflare Turnstile ("not a robot" check). Only runs once the secret TURNSTILE_SECRET_KEY is set in Cloudflare.
+// A message that fails the check is rejected. If Cloudflare's check itself can't be reached, the message is let through
+// (the hidden spam trap still applies), so a Cloudflare hiccup never loses a real customer's request.
+async function passesTurnstile(env, token, ip) {
+  if (!env.TURNSTILE_SECRET_KEY) return true;
+  if (!token) return false;
+  try {
+    const form = new FormData();
+    form.append("secret", env.TURNSTILE_SECRET_KEY);
+    form.append("response", String(token).slice(0, 2048));
+    if (ip) form.append("remoteip", ip);
+    const res = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", { method: "POST", body: form });
+    if (!res.ok) { console.log("turnstile check unavailable", res.status); return true; }
+    const out = await res.json();
+    if (!out.success) console.log("turnstile failed", JSON.stringify(out["error-codes"] || []));
+    return Boolean(out.success);
+  } catch { console.log("turnstile check unreachable"); return true; }
+}
+
 export async function handleSubmit(request, env) {
-  // The browser sends one JSON message: { kind, lang, lc_trap_7, fields: [...], photos: [{ filename, content (base64) }] }.
+  // The browser sends one JSON message: { kind, lang, lc_trap_7, ts_token, fields: [...], photos: [{ filename, content (base64) }] }.
   // Photos are encoded to base64 in the visitor's browser so this server code stays very light.
   let data;
   try { data = await request.json(); } catch { return json({ error: "bad request" }, 400); }
@@ -48,6 +67,8 @@ export async function handleSubmit(request, env) {
 
   const kind = String(data.kind || "");
   if (!KINDS.includes(kind)) return json({ error: "bad kind" }, 400);
+
+  if (!(await passesTurnstile(env, data.ts_token, request.headers.get("CF-Connecting-IP")))) return json({ error: "verification failed" }, 403);
 
   let fields = data.fields;
   if (!Array.isArray(fields) || fields.length === 0 || fields.length > MAX_FIELDS) return json({ error: "bad fields" }, 400);
@@ -233,7 +254,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/api/health") {
       // Safe status check (shows whether the settings exist, never their values).
-      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), crmKeySet: Boolean(env.SUPABASE_SECRET_KEY), sendsTo: (env.TO_EMAIL || DEFAULT_TO) ? (env.TO_EMAIL || DEFAULT_TO).replace(/^(.).*(@.*)$/, "$1***$2") : null });
+      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), crmKeySet: Boolean(env.SUPABASE_SECRET_KEY), turnstileSet: Boolean(env.TURNSTILE_SECRET_KEY), sendsTo: (env.TO_EMAIL || DEFAULT_TO) ? (env.TO_EMAIL || DEFAULT_TO).replace(/^(.).*(@.*)$/, "$1***$2") : null });
     }
     if (url.pathname === "/api/submit") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);

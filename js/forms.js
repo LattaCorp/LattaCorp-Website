@@ -57,14 +57,52 @@ function submitForm(f,th,ev){
   var btn=f.querySelector('button[type=submit]'),old=btn?btn.textContent:"";
   if(btn){btn.disabled=true;btn.textContent=t("Sending...")}
   formError(f,false);
-  var msg={kind:FORM_KINDS[f.id]||"Form",lang:lang,lc_trap_7:"",fields:formCollect(f),photos:[]};
-  Promise.all(formPhotos(f).map(function(x){return shrinkImage(x).then(function(y){return fileToBase64(y).then(function(b){return {filename:y.name||"photo.jpg",content:b}})})})).then(function(photos){
+  var msg={kind:FORM_KINDS[f.id]||"Form",lang:lang,lc_trap_7:(f.querySelector("[name=lc_trap_7]")||{}).value||"",fields:formCollect(f),photos:[]};
+  tsToken(f).then(function(tok){msg.ts_token=tok;return Promise.all(formPhotos(f).map(function(x){return shrinkImage(x).then(function(y){return fileToBase64(y).then(function(b){return {filename:y.name||"photo.jpg",content:b}})})})).then(function(photos){
     msg.photos=photos;
     return fetch("/api/submit",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(msg)});
-  }).then(function(r){
+  })}).then(function(r){
     if(!r.ok)return r.text().then(function(tx){var e=new Error("send failed");e.ref=r.status+" "+tx.replace(/[\r\n]+/g," ").slice(0,80);throw e});
     if(f.id==="qf"){phs.forEach(function(o){URL.revokeObjectURL(o.u)});phs.length=0;renderPh()}
     formShowThanks(f,th);
-  }).catch(function(e){formError(f,true,e&&e.ref||String(e&&e.message||e))}).then(function(){if(btn){btn.disabled=false;btn.textContent=old}});
+  }).catch(function(e){formError(f,true,e&&e.ref||String(e&&e.message||e))}).then(function(){tsReset(f);if(btn){btn.disabled=false;btn.textContent=old}});
 }
 // Hidden spam trap: real people never see or fill this box; bots usually do.
+function addTrap(f){
+  if(!f||f.querySelector("[name=lc_trap_7]"))return;
+  var hp=document.createElement("input");hp.type="text";hp.name="lc_trap_7";hp.tabIndex=-1;hp.autocomplete="off";hp.setAttribute("aria-hidden","true");
+  hp.style.cssText="position:absolute;left:-9999px;width:1px;height:1px";f.appendChild(hp);
+}
+["qf","cf","ctf","hf"].forEach(function(id){addTrap(document.getElementById(id))});
+
+// Cloudflare Turnstile: Cloudflare's "not a robot" check. Usually invisible; it only shows a checkbox if a visitor looks suspicious.
+// It is OFF until the site key from Cloudflare (Turnstile > the LattaCorp widget) is put here. The matching secret key
+// goes in Cloudflare as TURNSTILE_SECRET_KEY; src/worker.js then rejects form messages that fail the check.
+var TURNSTILE_SITEKEY="";
+var tsReady=null;
+function tsOn(){return !!TURNSTILE_SITEKEY&&FORM_LIVE}
+function tsLoad(){
+  if(!tsOn())return Promise.resolve(false);
+  if(!tsReady)tsReady=new Promise(function(res){
+    window.lcTsLoaded=function(){res(true)};
+    var s=document.createElement("script");s.src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=lcTsLoaded";s.async=true;s.defer=true;
+    s.onerror=function(){res(false)};document.head.appendChild(s);
+  });
+  return tsReady;
+}
+function tsAttach(f){
+  if(!tsOn()||!f||f._tsBox)return;
+  var box=document.createElement("div");box.className="tsbox";f._tsBox=box;
+  var b=f.querySelector("button[type=submit]");if(b)b.parentNode.insertBefore(box,b);else f.appendChild(box);
+  tsLoad().then(function(ok){if(ok&&window.turnstile)f._ts=window.turnstile.render(box,{sitekey:TURNSTILE_SITEKEY,appearance:"interaction-only",language:lang==="es"?"es":"en"})});
+}
+// Resolves with the check's token (or "" when Turnstile is off or could not load; the server decides what to do then).
+function tsToken(f){
+  if(!tsOn())return Promise.resolve("");
+  return tsLoad().then(function(ok){
+    if(!ok||!window.turnstile||f._ts===undefined)return "";
+    return new Promise(function(res){var n=0;(function w(){var t=window.turnstile.getResponse(f._ts);if(t||n++>40)return res(t||"");setTimeout(w,250)})()});
+  });
+}
+function tsReset(f){try{if(f&&f._ts!==undefined&&window.turnstile)window.turnstile.reset(f._ts)}catch(e){}}
+["qf","cf","ctf","hf"].forEach(function(id){tsAttach(document.getElementById(id))});

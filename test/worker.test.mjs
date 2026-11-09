@@ -36,6 +36,24 @@ r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
 globalThis.fetch = async (url) => String(url).includes("/rest/v1/leads") ? new Response("bad", { status: 500 }) : new Response("{}", { status: 200 });
 r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
 
+
+// ---- Turnstile ("not a robot" check) ----
+{
+  const envT = { ...env, TURNSTILE_SECRET_KEY: "ts_secret" };
+  let verdict = true, checked = null, verifyStatus = 200;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes("turnstile/v0/siteverify")) { checked = Object.fromEntries(opts.body); if (verifyStatus !== 200) return new Response("down", { status: verifyStatus }); return new Response(JSON.stringify({ success: verdict }), { status: 200 }); }
+    if (String(url).includes("/rest/v1/leads")) return new Response("", { status: 201 });
+    sent = { body: JSON.parse(opts.body) }; return new Response("{}", { status: 200 });
+  };
+  const mkT = (tok) => new Request("https://x.test/api/submit", { method: "POST", headers: { "content-type": "application/json", "CF-Connecting-IP": "1.2.3.4" },
+    body: JSON.stringify({ kind: "Contact message", lang: "en", lc_trap_7: "", ts_token: tok, fields: [{ label: "Full name", value: "A" }], photos: [] }) });
+  sent = null; r = await worker.fetch(mkT("good"), envT); assert.equal(r.status, 200); assert.equal(checked.secret, "ts_secret"); assert.equal(checked.response, "good"); assert.equal(checked.remoteip, "1.2.3.4"); assert(sent);
+  sent = null; verdict = false; r = await worker.fetch(mkT("bad"), envT); assert.equal(r.status, 403); assert.equal(sent, null);
+  sent = null; r = await worker.fetch(mkT(""), envT); assert.equal(r.status, 403); assert.equal(sent, null);
+  sent = null; verifyStatus = 500; r = await worker.fetch(mkT("x"), envT); assert.equal(r.status, 200, "check down: let it through");
+  verifyStatus = 200; verdict = false; checked = null; sent = null; r = await worker.fetch(mkT(""), env); assert.equal(r.status, 200, "no secret set: check is off"); assert.equal(checked, null);
+}
 // ---- crew login endpoint ----
 const CID = "11111111-1111-4111-8111-111111111111", UID = "22222222-2222-4222-8222-222222222222";
 let calls = [], crewRow = { id: CID, user_id: null }, ownerToken = "good-owner", staffEmails = ["owner@example.com"];

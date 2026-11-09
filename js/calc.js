@@ -134,6 +134,7 @@
       var hp = document.createElement("input"); hp.type = "text"; hp.tabIndex = -1; hp.autocomplete = "off"; hp.setAttribute("aria-hidden", "true"); hp.style.cssText = "position:absolute;left:-9999px;width:1px;height:1px"; f.appendChild(hp);
       var err = ce("p", "pc-err"); err.setAttribute("role", "alert"); err.style.display = "none"; f.appendChild(err);
       var b = ce("button", "btn", X.send); b.type = "submit"; f.appendChild(b);
+      if (window.tsAttach) setTimeout(function () { window.tsAttach(f); }, 0); // Cloudflare "not a robot" check, once the form is on the page
       f.addEventListener("submit", function (e) {
         e.preventDefault();
         for (var k in ins) if (!ins[k].value.trim() || !ins[k].checkValidity()) { ins[k].focus(); ins[k].reportValidity && ins[k].reportValidity(); return; }
@@ -143,9 +144,11 @@
           { label: "Calculator details", value: desc }, { label: "Note", value: "Customer signed up at the Instant Quote Calculator price. Price is subject to change after property review." }];
         var done = function () { root.textContent = ""; var t = ce("div", "pc-thanks"); t.setAttribute("role", "status"); t.appendChild(ce("h3", null, X.ok)); t.appendChild(ce("p", null, X.ok2)); root.appendChild(t); t.scrollIntoView({ block: "center" }); };
         if (window.FORM_LIVE === false) { done(); return; }
-        fetch("/api/submit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "Instant quote signup", lang: window.lang === "es" ? "es" : "en", lc_trap_7: hp.value, fields: fields, photos: [] }) })
+        (window.tsToken ? window.tsToken(f) : Promise.resolve("")).then(function (tok) {
+          return fetch("/api/submit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ kind: "Instant quote signup", lang: window.lang === "es" ? "es" : "en", lc_trap_7: hp.value, ts_token: tok, fields: fields, photos: [] }) });
+        })
           .then(function (r) { if (!r.ok) throw 0; done(); })
-          .catch(function () { err.textContent = X.err; err.style.display = "block"; b.disabled = false; b.textContent = X.send; });
+          .catch(function () { if (window.tsReset) window.tsReset(f); err.textContent = X.err; err.style.display = "block"; b.disabled = false; b.textContent = X.send; });
       });
       return f;
     }
