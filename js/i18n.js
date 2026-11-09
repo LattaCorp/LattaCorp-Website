@@ -45,6 +45,7 @@ var ES={
 "Client Portal": "Portal de clientes",
 "Coming Soon!": "¡Próximamente!",
 "NEW!": "¡NUEVO!",
+"Staff login": "Acceso del personal",
 "Sign in to your account": "Entre a su cuenta",
 "Enter the email we have on file. We'll send you a sign-in code. No password needed.": "Escriba el correo que tenemos en su cuenta. Le enviaremos un código de acceso. No necesita contraseña.",
 "Send my code": "Enviar mi código",

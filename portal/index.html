@@ -72,6 +72,7 @@ label.f textarea{min-height:120px;resize:vertical}
 .acctsel{max-width:40vw;padding:8px 10px;border:0;border-radius:8px;background:#fff;font-weight:600;font-size:.9rem}
 .staffbar{position:sticky;top:var(--hdr);z-index:25;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 16px;background:#fdf5e6;border-bottom:1px solid #f0dfb8;color:#6b4a0e}
 .staffbar input,.staffbar select{padding:8px 10px;border:1px solid #e3cf9f;border-radius:8px;background:#fff;font-size:.92rem}
+.staffbar .tocrm{margin-left:auto;color:#6b4a0e;font-weight:700;font-size:.9rem;white-space:nowrap}
 .staffbar #staffq{flex:1 1 140px;min-width:0}.staffbar select{flex:2 1 220px;min-width:0;font-weight:600}
 .combo{display:none;position:relative;flex:1;max-width:560px}
 .combo input{width:100%;font-weight:600;padding-right:34px!important;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b4a0e' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 11px center}
@@ -215,6 +216,7 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
     <input id="staffq" type="search" placeholder="Find a client" data-ph="Find a client" aria-label="Find a client">
     <select id="staffsel" aria-label="Client"></select>
     <div class="combo"><input id="staffcombo" type="text" role="combobox" aria-expanded="false" aria-controls="stafflist" aria-autocomplete="list" autocomplete="off" placeholder="Find a client" data-ph="Find a client" aria-label="Client"><ul id="stafflist" role="listbox" class="hide"></ul></div>
+    <a class="tocrm" href="/crm/" data-t="Open the CRM">Open the CRM</a>
   </div>
   <nav class="tabs" aria-label="Portal">
     <button type="button" data-v="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg><span data-t="Home">Home</span></button>
@@ -234,6 +236,6 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../crm/config.js"></script>
 <script src="guides.js?v=2"></script>
-<script src="portal.js?v=10"></script>
+<script src="portal.js?v=11"></script>
 </body>
 </html>

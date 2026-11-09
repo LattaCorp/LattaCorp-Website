@@ -38,7 +38,7 @@
     "Info": "Información", "Guides and tips from LattaCorp. More lawn-care guides are on the way.": "Guías y consejos de LattaCorp. Pronto habrá más guías sobre el cuidado del césped.",
     "You're already using the portal as an app on this device.": "Ya está usando el portal como app en este dispositivo.", "Install the app now": "Instalar la app ahora", "This device": "Este dispositivo",
     "Client Portal": "Portal de Clientes", "Back to website": "Volver al sitio web", "Website": "Sitio web", "No matches": "Sin resultados",
-    "Staff view": "Vista del personal", "accounts": "cuentas", "archived": "archivado", "Find a client": "Buscar cliente", "What the client sees": "Lo que ve el cliente",
+    "Staff view": "Vista del personal", "Open the CRM": "Abrir el CRM", "accounts": "cuentas", "archived": "archivado", "Find a client": "Buscar cliente", "What the client sees": "Lo que ve el cliente",
     "Staff view: sending is turned off here so nothing goes out in the client's name. Their form looks like this for them, with their properties and phone filled in.": "Vista del personal: el envío está desactivado para que nada salga a nombre del cliente. Así ve el cliente su formulario.",
     "Can't find it? Check your Spam or Junk folder. It comes from website@lattacorpfl.com.": "¿No lo encuentra? Revise su carpeta de Spam o Correo no deseado. Llega de website@lattacorpfl.com.",
     "Too many codes were requested for this email. Please use the newest code we sent, or try again in": "Se pidieron demasiados códigos para este correo. Use el código más reciente que le enviamos, o intente de nuevo en",
