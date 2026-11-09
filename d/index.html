@@ -123,7 +123,7 @@ var T={
   accepted:"Accepted",declined:"Declined",expired:"This estimate has expired. Please contact us for an updated one.",
   thanksA:"Thank you! Your acceptance was received. We'll be in touch soon.",thanksD:"Thanks for letting us know. Your response was received.",by:"by",on:"on",
   confirmD:"Decline this estimate?",
-  acct:"Account",invdate:"Invoice date",duedate:"Due date",period:"Service period",summary:"Account Summary",prev:"Previous Balance",pastdue:"past due",thisinv:"This invoice",paidthis:"Payments on this invoice",credit:"Credit on account",totaldue:"Total amount due",invtotal:"Invoice total",
+  acct:"Account",invdate:"Invoice date",duedate:"Due date",period:"Service period",summary:"Invoice Summary",prev:"Previous Balance",pastdue:"past due",thisinv:"This invoice",paidthis:"Payments on this invoice",credit:"Credit on account",totaldue:"Total amount due",invtotal:"Invoice total",
   forprop:"For this property only",lateNow:"Past-due amounts are due now.",dueby:"Please pay by",paidup:"Nothing is due. Thank you!",accepts:"We accept",incl:"Please include invoice {n} with your payment.",
   cinv:"Invoice Number",cacct:"Account Number",pbeg:"Period Beginning",pend:"Period Ending",idate:"Invoice Date",pdue:"Payment Due",
   payments:"Payments",overdue:"Amount Overdue",curr:"Current Charges",tad:"Total Amount Due",totals:"Totals",activity:"Account Activity",location:"Location",keep:"Please keep this invoice for your records"},
@@ -135,7 +135,7 @@ var T={
   accepted:"Aceptado",declined:"Rechazado",expired:"Este presupuesto venció. Contáctenos para uno actualizado.",
   thanksA:"¡Gracias! Recibimos su aceptación. Nos comunicaremos pronto.",thanksD:"Gracias por avisarnos. Recibimos su respuesta.",by:"por",on:"el",
   confirmD:"¿Rechazar este presupuesto?",
-  acct:"Cuenta",invdate:"Fecha de factura",duedate:"Fecha de vencimiento",period:"Período de servicio",summary:"Resumen de Cuenta",prev:"Saldo Anterior",pastdue:"atrasado",thisinv:"Esta factura",paidthis:"Pagos a esta factura",credit:"Crédito en la cuenta",totaldue:"Total a pagar",invtotal:"Total de la factura",
+  acct:"Cuenta",invdate:"Fecha de factura",duedate:"Fecha de vencimiento",period:"Período de servicio",summary:"Resumen de Factura",prev:"Saldo Anterior",pastdue:"atrasado",thisinv:"Esta factura",paidthis:"Pagos a esta factura",credit:"Crédito en la cuenta",totaldue:"Total a pagar",invtotal:"Total de la factura",
   forprop:"Solo para esta propiedad",lateNow:"Los montos atrasados se deben pagar ahora.",dueby:"Por favor pague antes del",paidup:"No hay nada pendiente. ¡Gracias!",accepts:"Aceptamos",incl:"Incluya la factura {n} con su pago.",
   cinv:"Número de factura",cacct:"Número de cuenta",pbeg:"Inicio del período",pend:"Fin del período",idate:"Fecha de factura",pdue:"Fecha de pago",
   payments:"Pagos",overdue:"Monto atrasado",curr:"Cargos actuales",tad:"Total a pagar",totals:"Totales",activity:"Actividad de la cuenta",location:"Ubicación",keep:"Conserve esta factura para sus registros"}
@@ -176,7 +176,7 @@ function drawInvoice(){
     +'<div class="bt"><span>'+t("billto")+"</span><b>"+esc(c.name||"")+"</b>"+(c.company?"<div>"+esc(c.company)+"</div>":"")
     +(d.reference?"<div>"+t("ref")+": "+esc(d.reference)+"</div>":"")+"</div></div><div class=\"inner\">";
   // the boxed row of invoice facts
-  var cells=[[t("cinv"),n],[t("cacct"),c.account_no?String(c.account_no):"—"],[t("idate"),dn(d.issue_date)],[t("pdue"),dn(d.due_date)]];
+  var cells=[[t("cinv"),n],[t("cacct"),c.account_no?String(c.account_no):"—"],[t("pbeg"),dn(d.period_start)],[t("pend"),dn(d.period_end)],[t("idate"),dn(d.issue_date)],[t("pdue"),dn(d.due_date)]];
   h+='<table class="grid"><thead><tr>'+cells.map(function(x){return"<th>"+x[0]+"</th>"}).join("")+"</tr></thead><tbody><tr>"+cells.map(function(x){return'<td data-k="'+esc(x[0])+'">'+esc(x[1])+"</td>"}).join("")+"</tr></tbody></table>";
   // bill to + account summary
   var sum="";
