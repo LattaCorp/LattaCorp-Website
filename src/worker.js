@@ -352,7 +352,12 @@ export async function handlePortalCode(request, env) {
   const rl = await sbRest(env, `portal_signins?select=created_at&email=eq.${encodeURIComponent(email)}&created_at=gte.${since}&order=created_at.desc&limit=10`);
   if (rl.ok) {
     const rows = await rl.json();
-    if (rows.length >= 5 || (rows[0] && Date.now() - Date.parse(rows[0].created_at) < 45000)) return json({ ok: true });
+    // Say so (it doesn't reveal whether the email is a customer: the same limit applies to every email).
+    if (rows[0] && Date.now() - Date.parse(rows[0].created_at) < 45000) return json({ ok: true, wait: "seconds" });
+    if (rows.length >= 5) {
+      const mins = Math.max(1, Math.ceil((Date.parse(rows[rows.length - 1].created_at) + 3600 * 1000 - Date.now()) / 60000));
+      return json({ ok: true, wait: "minutes", minutes: mins });
+    }
   }
   let sent = false;
   const al = await sbRest(env, "rpc/portal_email_allowed", { method: "POST", body: JSON.stringify({ e: email }) });

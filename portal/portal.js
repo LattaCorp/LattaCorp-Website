@@ -35,6 +35,8 @@
     "That code didn't work. Check it, or send a new code.": "Ese código no funcionó. Revíselo o pida uno nuevo.",
     "Something went wrong. Please try again, or call or text 407-470-5309.": "Algo salió mal. Intente de nuevo, o llame o envíe un texto al 407-470-5309.",
     "We sent a new code.": "Le enviamos un código nuevo.",
+    "Too many codes were requested for this email. Please use the newest code we sent, or try again in": "Se pidieron demasiados códigos para este correo. Use el código más reciente que le enviamos, o intente de nuevo en",
+    "minutes": "minutos", "We just sent a code. Please wait a minute before asking for another.": "Acabamos de enviarle un código. Espere un minuto antes de pedir otro.",
     "This email isn't linked to an account yet. Call or text 407-470-5309 and we'll set it up.": "Este correo aún no está vinculado a una cuenta. Llame o envíe un texto al 407-470-5309 y lo configuramos.",
     "Hi": "Hola", "You're all set": "Todo está al día", "Your account is up to date.": "Su cuenta está al día.",
     "Payment due": "Pago pendiente", "Past due": "Pago atrasado", "Service paused": "Servicio en pausa",
@@ -116,7 +118,14 @@
   function requestCode(email) {
     return tsToken().then(function (tok) {
       return fetch("/api/portal/code", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ email: email, lang: lang, ts_token: tok }) });
-    }).then(function (r) { try { if (ts.id !== undefined) window.turnstile.reset(ts.id); } catch (e) {} if (!r.ok) throw new Error(String(r.status)); });
+    }).then(function (r) {
+      try { if (ts.id !== undefined) window.turnstile.reset(ts.id); } catch (e) {}
+      if (!r.ok) throw new Error(String(r.status));
+      return r.json().catch(function () { return {}; });
+    }).then(function (j) {
+      if (j && j.wait === "minutes") { var e = new Error("limit"); e.msg = t("Too many codes were requested for this email. Please use the newest code we sent, or try again in") + " " + j.minutes + " " + t("minutes") + "."; throw e; }
+      if (j && j.wait === "seconds") { var e2 = new Error("limit"); e2.msg = t("We just sent a code. Please wait a minute before asking for another."); throw e2; }
+    });
   }
   function showSignin(msg) {
     $("app").classList.add("hide"); $("signin").classList.remove("hide");
@@ -132,7 +141,7 @@
     requestCode(email).then(function () {
       store("lc-portal-email", email); $("sentto").textContent = email;
       $("emailform").classList.add("hide"); $("codeform").classList.remove("hide"); showErr("codeerr", ""); $("sicode").value = ""; $("sicode").focus();
-    }).catch(function () { showErr("sierr", t("Something went wrong. Please try again, or call or text 407-470-5309.")); })
+    }).catch(function (er) { showErr("sierr", (er && er.msg) || t("Something went wrong. Please try again, or call or text 407-470-5309.")); })
       .then(function () { b.disabled = false; b.textContent = t("Send my code"); });
   });
   $("sicode").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 8); if (this.value.length === 8) $("codeform").requestSubmit(); });
@@ -151,7 +160,7 @@
   });
   $("resend").addEventListener("click", function () {
     requestCode(store("lc-portal-email") || "").then(function () { showErr("codeerr", ""); var p = $("codeerr"); p.textContent = t("We sent a new code."); p.classList.remove("hide"); p.className = "ok"; setTimeout(function () { p.className = "err hide"; }, 4000); })
-      .catch(function () { showErr("codeerr", t("Something went wrong. Please try again, or call or text 407-470-5309.")); });
+      .catch(function (er) { showErr("codeerr", (er && er.msg) || t("Something went wrong. Please try again, or call or text 407-470-5309.")); });
   });
   $("otheremail").addEventListener("click", function () { store("lc-portal-email", null); $("siemail").value = ""; showSignin(); $("siemail").focus(); });
 
