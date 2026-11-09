@@ -5346,17 +5346,19 @@ function personBio(host, p) {
   ss.input.autocomplete = "off";
   ss.input.inputMode = "numeric";
   ss.input.placeholder = "###-##-####";
-  var sh = el("label");
-  sh.style.cssText =
-    "display:flex;gap:6px;align-items:center;font-weight:600;font-size:.85rem;margin:-4px 0 8px";
-  var shc = document.createElement("input");
-  shc.type = "checkbox";
-  shc.style.width = "auto";
-  sh.appendChild(shc);
-  sh.appendChild(document.createTextNode("Show number"));
-  shc.addEventListener("change", function () {
-    ss.input.type = shc.checked ? "text" : "password";
+  /* The number stays hidden (dots) until Show is pressed; it hides again on Hide or when the screen closes. */
+  var sh = el("div");
+  sh.style.cssText = "display:flex;gap:8px;align-items:flex-end;margin-bottom:8px";
+  ss.style.flex = "1";
+  ss.style.marginBottom = "0";
+  var shb = btn("Show", "btn alt sm", function () {
+    var showing = ss.input.type === "password";
+    ss.input.type = showing ? "text" : "password";
+    shb.textContent = showing ? "Hide" : "Show";
   });
+  shb.style.marginBottom = "2px";
+  sh.appendChild(ss);
+  sh.appendChild(shb);
   ss.input.addEventListener("blur", function () {
     ss.input.value = fmtSsn(ss.input.value);
   });
@@ -5371,7 +5373,6 @@ function personBio(host, p) {
     g.appendChild(x);
   });
   host.appendChild(g);
-  host.appendChild(ss);
   host.appendChild(sh);
   var g2 = el("div", "grid2");
   [en, ep, jt, sts, sd, ed].forEach(function (x) {

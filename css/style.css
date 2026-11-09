@@ -586,3 +586,8 @@ footer .brand.fbrand{grid-template-columns:minmax(0,1fr);width:100%;justify-item
 footer .brand.fbrand img.wword{width:100%;max-width:280px;min-width:170px}
 }
 @media (min-width:901px) and (max-width:1300px){footer .fwrap{grid-template-columns:minmax(330px,1fr) minmax(0,2fr) 190px!important}footer .fleft{padding-left:78px}footer .brand.fbrand img.wword{max-width:230px}}
+
+/* Contact page: Check our socials! (under the service-area map) */
+.socbox{margin-top:22px;padding-top:18px;border-top:1px solid var(--line)}.socbox h2{font-size:1.3rem;margin:0 0 10px}
+.iglink{display:inline-flex;align-items:center;gap:12px;padding:10px 22px 10px 16px;border:1px solid var(--line)!important;border-radius:14px;font-weight:700;color:var(--forest);text-decoration:none}
+.iglink:hover{background:var(--mint)}.iglink svg{flex:none}.igtext{display:flex;flex-direction:column;line-height:1.25}.ighandle{font-weight:400;font-size:.9rem;color:var(--muted)}
