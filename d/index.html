@@ -42,10 +42,23 @@ tfoot td{border-bottom:0;padding-top:14px;font-size:1.1rem}tfoot td.r b:last-chi
 .go{background:var(--forest);color:#fff;border:0;border-radius:8px;padding:12px 20px;font:700 1rem system-ui,sans-serif;cursor:pointer}.go:disabled{opacity:.6}
 .no{background:none;border:0;color:var(--red);font:600 .9rem system-ui,sans-serif;text-decoration:underline;cursor:pointer;padding:8px}
 .err{color:var(--red);font-size:.9rem;margin-top:8px;min-height:1.2em}
+.two{display:grid;grid-template-columns:1fr 330px;gap:20px;align-items:start;margin:0 0 20px}.two .bill{margin:0}
+.bill .ln{font-size:.9rem;margin-top:3px}.bill .ln span{color:var(--muted)}
+.sum{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#fff}
+.sum h2{margin:0;background:var(--mint);border-bottom:1px solid var(--line);padding:9px 14px;font-size:.72rem;letter-spacing:.08em;text-transform:uppercase;color:var(--forest);font-weight:800}
+.sum .r2{display:flex;justify-content:space-between;gap:12px;padding:7px 14px;font-size:.93rem}.sum .r2 b{font-weight:700;white-space:nowrap}
+.sum .late{color:var(--red);font-size:.8rem;font-weight:700;padding:0 14px 4px;margin-top:-4px}
+.sum .tot{display:flex;justify-content:space-between;align-items:baseline;gap:12px;background:var(--forest);color:#fff;padding:12px 14px;margin-top:6px}
+.sum .tot span{font-weight:700;font-size:.95rem}.sum .tot b{font-size:1.45rem;font-weight:800;white-space:nowrap}
+.sum .note{font-size:.8rem;color:var(--muted);padding:8px 14px 10px}.sum .note.bad{color:var(--red);font-weight:700}
+tfoot td.lbl{color:var(--muted);font-size:.95rem}
+.pay .acc{font-weight:700;margin:2px 0 6px}
 .foot{text-align:center;color:var(--leaf);margin-top:24px;font-size:1rem;font-weight:700;font-family:"Playfair Display",Georgia,serif}
+.bar[hidden]{display:none}
+body.embed{background:transparent}body.embed #paper{margin:0 auto 16px}
 .state{max-width:560px;margin:60px auto;padding:0 20px;text-align:center;color:var(--muted)}
-@media(max-width:700px){#paper{margin:8px 0 0;border-radius:0;box-shadow:none}.ihead{padding:18px 16px}.body{padding:18px 16px 24px}.facts{grid-template-columns:1fr 1fr}.it{font-size:1.5rem;text-align:left}.bar{margin-top:8px}}
-@media print{body{background:#fff}.bar,.accept,noscript{display:none!important}#paper{box-shadow:none;margin:0;max-width:none;border-radius:0}@page{margin:14mm}}
+@media(max-width:700px){.two{grid-template-columns:1fr}#paper{margin:8px 0 0;border-radius:0;box-shadow:none}.ihead{padding:18px 16px}.body{padding:18px 16px 24px}.facts{grid-template-columns:1fr 1fr}.it{font-size:1.5rem;text-align:left}.bar{margin-top:8px}}
+@media print{body{background:#fff}.two{grid-template-columns:1fr 300px}.bar,.accept,noscript{display:none!important}#paper{box-shadow:none;margin:0;max-width:none;border-radius:0}@page{margin:14mm}}
 </style>
 </head>
 <body>
@@ -66,7 +79,9 @@ var T={
   needname:"Please type your name to accept.",sending:"Sending…",failed:"Sorry, that didn't go through. Please try again, or contact us.",
   accepted:"Accepted",declined:"Declined",expired:"This estimate has expired. Please contact us for an updated one.",
   thanksA:"Thank you! Your acceptance was received. We'll be in touch soon.",thanksD:"Thanks for letting us know. Your response was received.",by:"by",on:"on",
-  confirmD:"Decline this estimate?"},
+  confirmD:"Decline this estimate?",
+  acct:"Account",invdate:"Invoice date",duedate:"Due date",period:"Service period",summary:"Account summary",prev:"Previous balance",pastdue:"past due",thisinv:"This invoice",paidthis:"Payments on this invoice",credit:"Credit on account",totaldue:"Total amount due",invtotal:"Invoice total",
+  forprop:"For this property only",lateNow:"Past-due amounts are due now.",dueby:"Please pay by",paidup:"Nothing is due. Thank you!",accepts:"We accept",incl:"Please include invoice {n} with your payment."},
  es:{load:"Cargando…",nf:"No pudimos encontrar esta página. Puede que el enlace esté incompleto. Contáctenos y le enviaremos uno nuevo.",err:"Algo salió mal al cargar esta página. Inténtelo de nuevo en un momento.",
   print:"Imprimir / Guardar PDF",inv:"FACTURA",est:"PRESUPUESTO",invoice:"Factura",estimate:"Presupuesto",issued:"Emitida",due:"Vence",amtdue:"Monto a pagar",total:"Total",validuntil:"Válido hasta",billto:"Facturar a",prepfor:"Preparado para",
   ref:"Ref",addr:"Dirección del servicio",addrs:"Direcciones del servicio",date:"Fecha",service:"Servicio",desc:"Descripción",amount:"Monto",paid:"PAGADA",void:"ANULADA",pay:"Cómo pagar",
@@ -74,9 +89,13 @@ var T={
   needname:"Escriba su nombre para aceptar.",sending:"Enviando…",failed:"Lo sentimos, no se pudo enviar. Inténtelo de nuevo o contáctenos.",
   accepted:"Aceptado",declined:"Rechazado",expired:"Este presupuesto venció. Contáctenos para uno actualizado.",
   thanksA:"¡Gracias! Recibimos su aceptación. Nos comunicaremos pronto.",thanksD:"Gracias por avisarnos. Recibimos su respuesta.",by:"por",on:"el",
-  confirmD:"¿Rechazar este presupuesto?"}
+  confirmD:"¿Rechazar este presupuesto?",
+  acct:"Cuenta",invdate:"Fecha de factura",duedate:"Fecha de vencimiento",period:"Período de servicio",summary:"Resumen de cuenta",prev:"Saldo anterior",pastdue:"atrasado",thisinv:"Esta factura",paidthis:"Pagos a esta factura",credit:"Crédito en la cuenta",totaldue:"Total a pagar",invtotal:"Total de la factura",
+  forprop:"Solo para esta propiedad",lateNow:"Los montos atrasados se deben pagar ahora.",dueby:"Por favor pague antes del",paidup:"No hay nada pendiente. ¡Gracias!",accepts:"Aceptamos",incl:"Incluya la factura {n} con su pago."}
 };
+var qp=new URLSearchParams(location.search),embed=qp.get("embed")==="1";if(embed)document.body.classList.add("embed");
 var lang="en";try{var sv=localStorage.getItem("lc_doc_lang");if(sv==="en"||sv==="es")lang=sv;else if(/^es/i.test(navigator.language||""))lang="es"}catch(e){if(/^es/i.test(navigator.language||""))lang="es"}
+if(qp.get("lang")==="en"||qp.get("lang")==="es")lang=qp.get("lang");
 var data=null,root=document.getElementById("root"),cfg=window.CRM_CONFIG;
 function t(k){return T[lang][k]||T.en[k]||k}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
@@ -91,21 +110,41 @@ function rpc(name,args){
   return fetch(cfg.url+"/rest/v1/rpc/"+name,{method:"POST",headers:{"apikey":cfg.key,"Authorization":"Bearer "+cfg.key,"Content-Type":"application/json"},body:JSON.stringify(args)}).then(function(r){if(!r.ok)throw new Error("http "+r.status);return r.json()})}
 function head(b,title){
   return'<div class="ihead"><div class="ibrand"><div class="lg"><img src="../images/logo-tree-header.png" alt=""></div><div><div class="bn">'+esc(b.name||"Latta Corp")+'</div><div class="sm">'+[b.address,b.phone,b.email].filter(Boolean).map(esc).join("<br>")+'</div></div></div><div class="it">'+esc(title)+"</div></div>"}
-function lines(items,withDate){
-  return items.map(function(it){return"<tr>"+(withDate?'<td class="d">'+esc(it.date?dt(it.date):"")+"</td>":"")+"<td>"+esc(it.description)+(it.address?'<div class="sm">'+esc(it.address)+"</div>":"")+'</td><td class="r">'+esc(money(it.amount))+"</td></tr>"}).join("")}
+function lines(items,withDate,showAddr){
+  return items.map(function(it){return"<tr>"+(withDate?'<td class="d">'+esc(it.date?dt(it.date):"")+"</td>":"")+"<td>"+esc(it.description)+(it.address&&showAddr!==false?'<div class="sm">'+esc(it.address)+"</div>":"")+'</td><td class="r">'+esc(money(it.amount))+"</td></tr>"}).join("")}
 function who(c){return"<b>"+esc(c.name||"")+"</b>"+(c.company?"<div>"+esc(c.company)+"</div>":"")}
 
+// the usual payment words in Spanish (the list itself is typed in Foreman's Billing settings)
+var PAY_ES={"cash":"Efectivo","check":"Cheque","checks":"Cheques","credit/debit card":"Tarjeta de crédito/débito","credit card":"Tarjeta de crédito","debit card":"Tarjeta de débito","automated payments":"Pagos automáticos","automatic payments":"Pagos automáticos","bank transfer":"Transferencia bancaria"};
+function payWords(list){if(lang!=="es")return list;return list.split(",").map(function(w){var k=w.trim(),v=PAY_ES[k.toLowerCase()];return v||k}).join(", ")}
+function sumRow(k,v,neg){return'<div class="r2"><span>'+k+"</span><b>"+(neg?"−":"")+esc(money(v))+"</b></div>"}
 function drawInvoice(){
-  var d=data.doc,b=data.business,c=data.client,items=data.items||[],addrs=[];
+  var d=data.doc,b=data.business,c=data.client,items=data.items||[],s=data.summary||null,addrs=[];
   items.forEach(function(it){if(it.address&&addrs.indexOf(it.address)<0)addrs.push(it.address)});
+  if(!addrs.length&&d.property_address)addrs.push(d.property_address);
   var stamp=d.status==="paid"?'<div class="stamp">'+t("paid")+" "+esc(d.paid_at?dts(d.paid_at):"")+(d.paid_method?" · "+esc(d.paid_method):"")+"</div>":d.status==="void"?'<div class="stamp bad">'+t("void")+"</div>":"";
-  var open=d.status==="open";
-  var h=head(b,t("inv"))+'<div class="body"><div class="facts"><div class="fact"><div class="k">'+t("invoice")+'</div><div class="v">'+esc(num(d.number,"LC-"))+'</div></div><div class="fact"><div class="k">'+t("issued")+'</div><div class="v">'+esc(dt(d.issue_date))+'</div></div><div class="fact"><div class="k">'+t("due")+'</div><div class="v">'+esc(dt(d.due_date))+'</div></div><div class="fact due"><div class="k">'+(open?t("amtdue"):t("total"))+'</div><div class="v">'+esc(money(d.total))+"</div></div></div>"
-   +'<div class="bill"><div class="k">'+t("billto")+"</div>"+who(c)+(d.reference?'<div class="sm">'+t("ref")+": "+esc(d.reference)+"</div>":"")+(addrs.length?'<div class="sm">'+(addrs.length>1?t("addrs"):t("addr"))+": "+addrs.map(esc).join("; ")+"</div>":"")+"</div>"
-   +'<table><thead><tr><th>'+t("date")+"</th><th>"+t("service")+'</th><th class="r">'+t("amount")+"</th></tr></thead><tbody>"+lines(items,true)+'</tbody><tfoot><tr><td></td><td class="r"><b>'+t("total")+'</b></td><td class="r"><b>'+esc(money(d.total))+"</b></td></tr></tfoot></table>"+stamp
-   +(open?'<div class="pay"><b>'+t("pay")+"</b><div>"+(b.zelle?"Zelle: "+esc(b.zelle)+"<br>":"")+esc(b.payment_note||"")+"</div></div>":"")
+  var open=d.status==="open",n=num(d.number,"LC-");
+  var fact=function(k,v,cls){return'<div class="fact'+(cls?" "+cls:"")+'"><div class="k">'+k+'</div><div class="v">'+esc(v)+"</div></div>"};
+  var facts='<div class="facts">'+fact(t("invoice"),n)+fact(t("acct"),c.account_no?String(c.account_no):"—")+fact(t("invdate"),dt(d.issue_date))+fact(t("duedate"),dt(d.due_date))+"</div>";
+  var bill='<div class="bill"><div class="k">'+t("billto")+"</div>"+who(c)
+    +(addrs.length?'<div class="ln"><span>'+(addrs.length>1?t("addrs"):t("addr"))+":</span> "+addrs.map(esc).join("; ")+"</div>":"")
+    +(d.period_start&&d.period_end?'<div class="ln"><span>'+t("period")+":</span> "+esc(dt(d.period_start))+" – "+esc(dt(d.period_end))+"</div>":"")
+    +(d.reference?'<div class="ln"><span>'+t("ref")+":</span> "+esc(d.reference)+"</div>":"")+"</div>";
+  var sum="";
+  if(s&&d.status!=="void"){
+    sum='<div class="sum"><h2>'+t("summary")+"</h2>"+sumRow(t("prev"),s.previous)
+      +(Number(s.previous_past_due)>0?'<div class="late">'+esc(money(s.previous_past_due))+" "+t("pastdue")+"</div>":"")
+      +sumRow(t("thisinv"),s.this_total)
+      +(Number(s.this_paid)>0?sumRow(t("paidthis"),s.this_paid,true):"")
+      +(Number(s.credit)>0?sumRow(t("credit"),s.credit,true):"")
+      +'<div class="tot"><span>'+t("totaldue")+"</span><b>"+esc(money(s.total_due))+"</b></div>"
+      +(Number(s.total_due)<=0?'<div class="note">'+t("paidup")+"</div>":Number(s.previous_past_due)>0||(Number(s.this_balance)>0&&s.today&&d.due_date<s.today)?'<div class="note bad">'+t("lateNow")+"</div>":'<div class="note">'+t("dueby")+" "+esc(dt(d.due_date))+"</div>")
+      +(s.by_property?'<div class="note">'+t("forprop")+"</div>":"")+"</div>"}
+  var h=head(b,t("inv"))+'<div class="body">'+facts+'<div class="two">'+bill+sum+"</div>"
+   +'<table><thead><tr><th>'+t("date")+"</th><th>"+t("service")+'</th><th class="r">'+t("amount")+"</th></tr></thead><tbody>"+lines(items,true,addrs.length>1)+'</tbody><tfoot><tr><td></td><td class="r lbl">'+t("invtotal")+'</td><td class="r"><b>'+esc(money(d.total))+"</b></td></tr></tfoot></table>"+stamp
+   +(open||(s&&Number(s.total_due)>0)?'<div class="pay"><b>'+t("pay")+"</b>"+(b.accepts?'<div class="acc">'+t("accepts")+": "+esc(payWords(b.accepts))+"</div>":"")+"<div>"+(b.zelle?"Zelle: "+esc(b.zelle)+"<br>":"")+(b.payment_note?esc(b.payment_note)+"<br>":"")+esc(t("incl").replace("{n}",n))+"</div></div>":"")
    +'<div class="foot">'+esc(b.footer||"")+"</div></div>";
-  document.title=t("invoice")+" "+num(d.number,"LC-")+" · "+(b.name||"Latta Corp");
+  document.title=t("invoice")+" "+n+" · "+(b.name||"Latta Corp");
   return h}
 
 function drawEstimate(){
@@ -136,7 +175,7 @@ function respond(decision){
   },function(){y.disabled=n.disabled=false;err.textContent=t("failed")})}
 
 function draw(){
-  var bar=document.getElementById("bar");bar.hidden=false;
+  var bar=document.getElementById("bar");bar.hidden=embed;
   document.getElementById("en").className=lang==="en"?"on":"";document.getElementById("es").className=lang==="es"?"on":"";document.getElementById("pr").textContent=t("print");
   document.documentElement.lang=lang;
   root.innerHTML='<div id="paper">'+(data.kind==="invoice"?drawInvoice():drawEstimate())+"</div>";

@@ -186,5 +186,7 @@ $("invclose").addEventListener("click", function () {
   hideInvoice();
 });
 $("invprint").addEventListener("click", function () {
-  window.print();
+  var f = $("invframe");
+  if (f && f.contentWindow) f.contentWindow.print();
+  else window.print();
 });

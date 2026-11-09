@@ -654,7 +654,9 @@ $("invclose").addEventListener("click", function () {
   hideInvoice();
 });
 $("invprint").addEventListener("click", function () {
-  window.print();
+  var f = $("invframe");
+  if (f && f.contentWindow) f.contentWindow.print();
+  else window.print();
 });
 
 /* ======================= crm/src/04-leads.js ======================= */
@@ -1081,7 +1083,7 @@ function renderClients() {
       })
       .join(" ");
     return (
-      [c.name, c.nickname, c.last_name, c.company, c.email, c.phone, c.phone2, c.notes, addr, ccText(c.id)]
+      [c.name, c.nickname, c.last_name, c.account_no ? String(c.account_no) : "", c.company, c.email, c.phone, c.phone2, c.notes, addr, ccText(c.id)]
         .join(" ")
         .toLowerCase()
         .indexOf(query) > -1
@@ -1137,7 +1139,8 @@ function openClient(id) {
     el(
       "div",
       "note",
-      (c.nickname ? 'Goes by "' + c.nickname + '" · ' : "") +
+      (c.account_no ? "Account " + c.account_no + " · " : "") +
+        (c.nickname ? 'Goes by "' + c.nickname + '" · ' : "") +
         tlabel(c.type) +
         " · added " +
         new Date(c.created_at).toLocaleDateString() +
@@ -1589,6 +1592,13 @@ function openClientForm(c) {
   var em = fld("Email", "email", c && c.email),
     ty = fld("Type", "select", c ? c.type : "residential", TYPES);
   var nt = fld("Notes", "textarea", c && c.notes);
+  var acn = fld(
+    "Account number (shows on invoices and in the portal; leave blank on a new client to get the next number)",
+    "number",
+    c && c.account_no
+  );
+  acn.input.step = "1";
+  acn.input.inputMode = "numeric";
   var bp = fld("Invoices for multiple properties", "select", c && c.bill_by_property ? "1" : "0", [
     ["0", "One combined invoice for all properties"],
     ["1", "Separate invoice for each property"]
@@ -1603,6 +1613,7 @@ function openClientForm(c) {
   g.appendChild(em);
   g.appendChild(ty);
   p.appendChild(g);
+  if (!c || "account_no" in c) p.appendChild(acn);
   p.appendChild(bp);
   p.appendChild(nt);
   function hint() {
@@ -1649,6 +1660,25 @@ function openClientForm(c) {
       }),
       wantBp = bp.input.value === "1";
     if (bpOk || wantBp) row.bill_by_property = wantBp;
+    var acRaw = acn.input.value.trim();
+    if (acRaw !== "") {
+      var acNum = parseInt(acRaw, 10);
+      if (isNaN(acNum) || acNum < 1 || String(acNum) !== acRaw) {
+        alert("The account number must be a whole number, like 1043.");
+        return;
+      }
+      var taken = clients.filter(function (x) {
+        return x.account_no === acNum && (!c || x.id !== c.id);
+      })[0];
+      if (taken) {
+        alert("Account number " + acNum + " already belongs to " + taken.name + ".");
+        return;
+      }
+      row.account_no = acNum;
+    } else if (c && c.account_no) {
+      alert("Every client needs an account number. Type one in, or keep " + c.account_no + ".");
+      return;
+    }
     save.disabled = true;
     if (c) {
       sb.from("clients")
@@ -2144,6 +2174,7 @@ function openImport() {
         [
           "client",
           c.name,
+          c.account_no ? "account " + c.account_no : "",
           c.company,
           c.phone,
           c.phone2,
@@ -14344,8 +14375,11 @@ function invMessage(inv, c) {
   );
 }
 
-/* ---- printable invoice (works as a PDF too) ---- */
+/* ---- printable invoice (works as a PDF too) ----
+   Invoices with a private link show the exact page the client sees (d/index.html), with the account summary, so
+   staff and clients always see the same invoice. Older invoices without a link use the simple layout below. */
 function showInvoice(inv, items) {
+  if (inv.share_token) return showDocFrame(docUrl(inv.share_token, true) + "&embed=1&lang=en");
   var c = byId(clients, inv.client_id) || {},
     paper = $("invpaper"),
     addrs = [];
@@ -14425,7 +14459,35 @@ function showInvoice(inv, items) {
   document.body.classList.add("printing");
   v.scrollTop = 0;
 }
+function showDocFrame(url) {
+  var paper = $("invpaper");
+  paper.innerHTML = "";
+  paper.classList.add("framed");
+  var f = document.createElement("iframe");
+  f.id = "invframe";
+  f.title = "Invoice";
+  f.src = url;
+  // grow the frame to fit the invoice so the page scrolls as one
+  var fit = function () {
+    try {
+      f.style.height = f.contentDocument.documentElement.scrollHeight + "px";
+    } catch (e) {}
+  };
+  f.addEventListener("load", function () {
+    fit();
+    setTimeout(fit, 400);
+    setTimeout(fit, 1200);
+  });
+  paper.appendChild(f);
+  var v = $("invview");
+  v.hidden = false;
+  document.body.classList.add("printing");
+  v.scrollTop = 0;
+}
 function hideInvoice() {
+  var paper = $("invpaper");
+  paper.classList.remove("framed");
+  if ($("invframe")) paper.innerHTML = "";
   $("invview").hidden = true;
   document.body.classList.remove("printing");
 }
@@ -14609,6 +14671,11 @@ function openBizSettings() {
       "Zelle info (for example: the phone number or email you receive Zelle on)",
       "text",
       bizv("zelle", "")
+    ),
+    accepts: fld(
+      "We accept (payment methods listed on every invoice, separated by commas)",
+      "text",
+      bizv("accepts", "Zelle, Cash, Check, Credit/Debit Card, Automated Payments")
     ),
     payment_note: fld("Other payment note", "text", bizv("payment_note", "")),
     terms_days: fld(

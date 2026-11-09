@@ -876,8 +876,11 @@ function invMessage(inv, c) {
   );
 }
 
-/* ---- printable invoice (works as a PDF too) ---- */
+/* ---- printable invoice (works as a PDF too) ----
+   Invoices with a private link show the exact page the client sees (d/index.html), with the account summary, so
+   staff and clients always see the same invoice. Older invoices without a link use the simple layout below. */
 function showInvoice(inv, items) {
+  if (inv.share_token) return showDocFrame(docUrl(inv.share_token, true) + "&embed=1&lang=en");
   var c = byId(clients, inv.client_id) || {},
     paper = $("invpaper"),
     addrs = [];
@@ -957,7 +960,35 @@ function showInvoice(inv, items) {
   document.body.classList.add("printing");
   v.scrollTop = 0;
 }
+function showDocFrame(url) {
+  var paper = $("invpaper");
+  paper.innerHTML = "";
+  paper.classList.add("framed");
+  var f = document.createElement("iframe");
+  f.id = "invframe";
+  f.title = "Invoice";
+  f.src = url;
+  // grow the frame to fit the invoice so the page scrolls as one
+  var fit = function () {
+    try {
+      f.style.height = f.contentDocument.documentElement.scrollHeight + "px";
+    } catch (e) {}
+  };
+  f.addEventListener("load", function () {
+    fit();
+    setTimeout(fit, 400);
+    setTimeout(fit, 1200);
+  });
+  paper.appendChild(f);
+  var v = $("invview");
+  v.hidden = false;
+  document.body.classList.add("printing");
+  v.scrollTop = 0;
+}
 function hideInvoice() {
+  var paper = $("invpaper");
+  paper.classList.remove("framed");
+  if ($("invframe")) paper.innerHTML = "";
   $("invview").hidden = true;
   document.body.classList.remove("printing");
 }
@@ -1141,6 +1172,11 @@ function openBizSettings() {
       "Zelle info (for example: the phone number or email you receive Zelle on)",
       "text",
       bizv("zelle", "")
+    ),
+    accepts: fld(
+      "We accept (payment methods listed on every invoice, separated by commas)",
+      "text",
+      bizv("accepts", "Zelle, Cash, Check, Credit/Debit Card, Automated Payments")
     ),
     payment_note: fld("Other payment note", "text", bizv("payment_note", "")),
     terms_days: fld(

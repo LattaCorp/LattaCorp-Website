@@ -24,7 +24,7 @@
   var qs = new URLSearchParams(location.search);
   var lang = qs.get("lang") === "es" ? "es" : store("lc-portal-lang") || ((navigator.language || "").slice(0, 2) === "es" ? "es" : "en");
   var ES = {
-    "Paid up": "Al día", "Amount due": "Monto pendiente", "Nothing due": "Nada pendiente", "Last invoice": "Última factura",
+    "Account number": "Número de cuenta", "Paid up": "Al día", "Amount due": "Monto pendiente", "Nothing due": "Nada pendiente", "Last invoice": "Última factura",
     "See invoices": "Ver facturas", "Total past due": "Total atrasado", "Total amount due": "Total pendiente", "For all": "Para las",
     "properties": "propiedades", "Each property is billed on its own; see the amounts below.": "Cada propiedad se factura por separado; vea los montos abajo.",
     "Your properties": "Sus propiedades", "Total balance due": "Saldo total pendiente", "Show invoices for": "Mostrar facturas de",
@@ -623,6 +623,7 @@
     var c = data.client;
     var a = panel(host, t("Your account"));
     a.appendChild(el("p", null, c.name + (c.company && c.company !== c.name ? " (" + c.company + ")" : "")));
+    if (c.account_no) a.appendChild(el("p", "muted", t("Account number") + ": " + c.account_no));
     var ci = panel(host, t("Contact info")), cl = el("ul", "list");
     [[t("Phone"), c.phone], [t("Phone") + " 2", c.phone2], [t("Email"), c.email]].forEach(function (x) { if (x[1]) li(cl, { title: x[1], sub: x[0] }); });
     ci.appendChild(cl);
