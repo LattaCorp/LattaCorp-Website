@@ -141,9 +141,9 @@
     var email = store("lc-portal-email") || $("siemail").value.trim().toLowerCase(), code = $("sicode").value.trim();
     if (code.length < 6) { showErr("codeerr", t("That code didn't work. Check it, or send a new code.")); return; }
     var b = $("verifybtn"); b.disabled = true; b.textContent = t("Checking...");
-    sb.auth.verifyOtp({ email: email, token: code, type: "email" }).then(function (r) {
-      return r.error ? sb.auth.verifyOtp({ email: email, token: code, type: "magiclink" }) : r;
-    }).then(function (r) {
+    // Supabase makes the code as a "recovery" code for people who already have a sign-in, and an "email" code
+    // for first-timers, so try the kinds in that order until one matches.
+    verifyAny({ email: email, token: code }, ["recovery", "email", "magiclink"]).then(function (r) {
       if (r.error) { showErr("codeerr", t("That code didn't work. Check it, or send a new code.")); return; }
       boot();
     }).catch(function () { showErr("codeerr", t("Something went wrong. Please try again, or call or text 407-470-5309.")); })
@@ -155,11 +155,22 @@
   });
   $("otheremail").addEventListener("click", function () { store("lc-portal-email", null); $("siemail").value = ""; showSignin(); $("siemail").focus(); });
 
+  function verifyAny(params, types) {
+    var i = 0, last = null;
+    function next() {
+      if (i >= types.length) return Promise.resolve(last || { error: { message: "invalid" } });
+      var p = Object.assign({ type: types[i++] }, params);
+      return sb.auth.verifyOtp(p).then(function (r) { last = r; return r.error ? next() : r; });
+    }
+    return next();
+  }
+
   /* ---------- account data ---------- */
   var accounts = [], curId = null, data = null, view = "home", photoUrls = {}, flash = "";
   function boot() {
     var th = qs.get("th");
-    var first = th ? sb.auth.verifyOtp({ token_hash: th, type: qs.get("ty") || "magiclink" }).then(function (r) {
+    var tys = [qs.get("ty") || "magiclink"].concat(["recovery", "email", "magiclink"].filter(function (x) { return x !== qs.get("ty"); }));
+    var first = th ? verifyAny({ token_hash: th }, tys).then(function (r) {
       history.replaceState(null, "", location.pathname + (lang === "es" ? "?lang=es" : ""));
       qs = new URLSearchParams(""); return r;
     }) : Promise.resolve(null);
