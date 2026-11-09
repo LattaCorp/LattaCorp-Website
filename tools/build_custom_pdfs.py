@@ -52,7 +52,7 @@ DOCS = {
     },
     "custom-estimate.pdf": {
         "name": "Estimate / Quote",
-        "title": "E S T I M A T E  /  Q U O T E", "title_size": 24, "header": "outline",
+        "title": "E S T I M A T E  /  Q U O T E", "title_size": 24,
         "boxes": [("Estimate Number", 1.0), ("Account Number", 1.0), ("Estimate Date", 1.0),
                   ("Valid Until", 1.0), ("Proposed Start", 1.0), ("Prepared By", 1.0)],
         "section": "Proposed Work", "section_note": "Prices are good through the Valid Until date",
