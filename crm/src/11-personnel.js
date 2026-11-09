@@ -382,18 +382,27 @@ function personBio(host, p) {
   ss.input.autocomplete = "off";
   ss.input.inputMode = "numeric";
   ss.input.placeholder = "###-##-####";
-  /* The number stays hidden (dots) until Show is pressed; it hides again on Hide or when the screen closes. */
-  var sh = el("div");
-  sh.style.cssText = "display:flex;gap:8px;align-items:flex-end;margin-bottom:8px";
-  ss.style.flex = "1";
-  ss.style.marginBottom = "0";
-  var shb = btn("Show", "btn alt sm", function () {
-    var showing = ss.input.type === "password";
-    ss.input.type = showing ? "text" : "password";
-    shb.textContent = showing ? "Hide" : "Show";
+  /* The number stays hidden (dots) until the eye "Show" inside the box is pressed; it hides again on Hide
+     or when the screen is reopened. */
+  var EYE =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  var EYE_OFF =
+    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+  var sh = el("div", "pwwrap");
+  ss.input.parentNode.insertBefore(sh, ss.input);
+  sh.appendChild(ss.input);
+  var shb = btn("", "eyebtn");
+  function drawEye() {
+    var hidden = ss.input.type === "password";
+    shb.innerHTML = (hidden ? EYE : EYE_OFF) + "<span>" + (hidden ? "Show" : "Hide") + "</span>";
+    shb.setAttribute("aria-label", hidden ? "Show Social Security number" : "Hide Social Security number");
+  }
+  shb.addEventListener("click", function (e) {
+    e.preventDefault();
+    ss.input.type = ss.input.type === "password" ? "text" : "password";
+    drawEye();
   });
-  shb.style.marginBottom = "2px";
-  sh.appendChild(ss);
+  drawEye();
   sh.appendChild(shb);
   ss.input.addEventListener("blur", function () {
     ss.input.value = fmtSsn(ss.input.value);
@@ -409,7 +418,7 @@ function personBio(host, p) {
     g.appendChild(x);
   });
   host.appendChild(g);
-  host.appendChild(sh);
+  host.appendChild(ss);
   var g2 = el("div", "grid2");
   [en, ep, jt, sts, sd, ed].forEach(function (x) {
     g2.appendChild(x);
