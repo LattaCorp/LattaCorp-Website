@@ -175,7 +175,7 @@ function drawInvoice(){
   var h='<div class="cl"><div class="top"><div class="lg"><img src="../images/logo-tree-header.png" alt="'+esc(b.name||"Latta Corp")+'"></div>'
     +'<div class="mid2"><div class="w">'+t("inv")+"</div>"
     +(addrs.length?'<div class="sa"><span>'+(addrs.length>1?t("addrs"):t("addr"))+"</span>"+addrs.map(esc).join("<br>")+"</div>":"")+"</div>"
-    +'<div class="bt">'+(s&&d.status!=="void"?"<span>"+t("tad")+"</span><b class=\"big\">"+esc(money(s.total_due))+"</b><div>"+t("pdue")+": "+esc(dn(d.due_date))+"</div>":"")+"</div></div><div class=\"inner\">";
+    +'<div class="bt"></div></div><div class="inner">';
   // the boxed row of invoice facts
   var cells=[[t("cinv"),n],[t("cacct"),c.account_no?String(c.account_no):"—"],[t("pbeg"),dn(d.period_start)],[t("pend"),dn(d.period_end)],[t("idate"),dn(d.issue_date)],[t("pdue"),dn(d.due_date)]];
   h+='<table class="grid"><thead><tr>'+cells.map(function(x){return"<th>"+x[0]+"</th>"}).join("")+"</tr></thead><tbody><tr>"+cells.map(function(x){return'<td data-k="'+esc(x[0])+'">'+esc(x[1])+"</td>"}).join("")+"</tr></tbody></table>";
