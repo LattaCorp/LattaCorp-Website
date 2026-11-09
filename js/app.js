@@ -20,7 +20,7 @@ function li(a){return"<ul>"+a.map(function(x){return"<li>"+esc(x)+"</li>"}).join
 var tail=(k==="hoa"||k==="property-managers")?' <a href="#/community">Service Requests</a>.':' <a href="tel:4074705309">407-470-5309</a>.';
 var h='<div class="svcbox"><h2>'+esc(v.bt)+'</h2><p>'+esc(v.bp)+'</p>'+li(v.bl)+'<p class="res">'+esc(HRES)+'</p><p>'+esc(v.br)+tail+'</p></div>'
 +'<h2>'+esc(v.wt)+'</h2>'+li(v.wl)+'<h2>'+esc(v.jt)+'</h2>'+li(v.jl)+'<h2>'+esc(v.pt)+'</h2><p>'+esc(v.pp)+(v.pl?' <a href="#/services">See our maintenance plans</a>.':'')+'</p><h2>Coverage</h2><p>'+esc(v.cv||HCOV)+'</p>'
-+'<div class="cta"><a class="btn alt" href="tel:4074705309">Call or text 407-470-5309</a><a class="btn alt" href="#/portfolio">See our work</a></div><div class="pnote"><b>Client Portal</b> <span class="soon">Coming Soon!</span><p>Track your requests online. <a href="#/portal">Learn more</a></p></div>';
++'<div class="cta"><a class="btn alt" href="tel:4074705309">Call or text 407-470-5309</a><a class="btn alt" href="#/portfolio">See our work</a></div><div class="pnote"><b>Client Portal</b> <span class="soon">NEW!</span><p>See your visits, invoices, and requests online. <a href="/portal/">Sign in</a></p></div>';
 document.getElementById("hdt").innerHTML=h;
 var sel=document.querySelector("#hf select");if(sel&&!sel.dataset.manual){[].forEach.call(sel.options,function(o){if(o.text===v.r)sel.value=o.value||o.text})}
 if(lang==="es"){walkText()}document.title=t(v.t)+" | Latta Corp"}
