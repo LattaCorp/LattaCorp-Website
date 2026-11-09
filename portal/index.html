@@ -47,7 +47,7 @@ label.f textarea{min-height:120px;resize:vertical}
 .sibrand img{width:46px;height:auto}
 .sibrand b{display:block;font-family:var(--serif);font-size:1.12rem;color:var(--forest);line-height:1.2}
 .sibrand span{font-size:.85rem;color:var(--muted)}
-.codein{letter-spacing:.5em;text-align:center;font-size:1.5rem!important;font-family:var(--sans);font-weight:700}
+.codein{letter-spacing:.35em;text-align:center;font-size:1.5rem!important;font-family:var(--sans);font-weight:700}
 .sifoot{margin-top:18px;font-size:.88rem;color:var(--muted);text-align:center}
 .tsbox{margin:0 0 12px}.tsbox:empty{margin:0}
 
@@ -140,7 +140,7 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
     <div class="sibrand"><img src="../images/logo-tree-header.png" alt=""><div><b>Latta Corp of Central Florida</b><span data-t="Client portal">Client portal</span></div></div>
     <form id="emailform" novalidate>
       <h1 id="sih" data-t="Sign in to your account">Sign in to your account</h1>
-      <p class="muted" data-t="Enter the email we have on file. We'll send you a 6-digit code. No password needed.">Enter the email we have on file. We'll send you a 6-digit code. No password needed.</p>
+      <p class="muted" data-t="Enter the email we have on file. We'll send you a sign-in code. No password needed.">Enter the email we have on file. We'll send you a sign-in code. No password needed.</p>
       <label class="f"><span data-t="Email">Email</span><input id="siemail" type="email" autocomplete="email" inputmode="email" required></label>
       <div class="tsbox" id="sits"></div>
       <p class="err hide" id="sierr" role="alert"></p>
@@ -149,7 +149,7 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
     <form id="codeform" class="hide" novalidate>
       <h1 data-t="Check your email">Check your email</h1>
       <p class="muted"><span data-t="If this email is on file with us, a code is on its way to">If this email is on file with us, a code is on its way to</span> <b id="sentto"></b>.</p>
-      <label class="f"><span data-t="6-digit code">6-digit code</span><input id="sicode" class="codein" inputmode="numeric" autocomplete="one-time-code" maxlength="6" pattern="[0-9]*" required></label>
+      <label class="f"><span data-t="Sign-in code">Sign-in code</span><input id="sicode" class="codein" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]*" required></label>
       <p class="err hide" id="codeerr" role="alert"></p>
       <button class="btn block" type="submit" id="verifybtn" data-t="Sign in">Sign in</button>
       <p class="sifoot"><button type="button" class="linkbtn" id="resend" data-t="Send a new code">Send a new code</button> · <button type="button" class="linkbtn" id="otheremail" data-t="Use a different email">Use a different email</button></p>
@@ -182,6 +182,6 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../crm/config.js"></script>
-<script src="portal.js?v=1"></script>
+<script src="portal.js?v=2"></script>
 </body>
 </html>

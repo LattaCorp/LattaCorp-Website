@@ -298,7 +298,7 @@ export async function handleTeam(request, env) {
 }
 
 // ============================ Client portal (lattacorpfl.com/portal/) ============================
-// Clients sign in with a 6-digit code emailed to them. A code is only sent to an email that belongs to a client
+// Clients sign in with a one-time code emailed to them. A code is only sent to an email that belongs to a client
 // or to an Other contact with "Portal access" ticked in the CRM; every visitor gets the same "check your email" reply,
 // so nobody can find out who is a customer. What a signed-in client can see is decided inside the database (Stage 23).
 const PORTAL_URL = "https://lattacorpfl.com/portal/";

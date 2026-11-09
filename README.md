@@ -77,7 +77,7 @@ Code style: formatted with Prettier (settings in `crm/src/.prettierrc`).
 - Check status at `/api/health` (shows `crmKeySet: true` when the secret is set).
 
 ## Client portal (at `/portal/`)
-- Clients sign in with a 6-digit code emailed to them (no passwords). The server (`src/worker.js`, `/api/portal/code`) only sends a
+- Clients sign in with a one-time code emailed to them (no passwords; the code length is set in Supabase). The server (`src/worker.js`, `/api/portal/code`) only sends a
   code to the main email on a client, or to an Other contact with **Portal access** ticked in Foreman. Codes come from
   `website@lattacorpfl.com` through Resend, so the Resend domain must stay verified.
 - What a client can see is decided in the database (`supabase/stages/stage23_client_portal.sql`): the lookups

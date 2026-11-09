@@ -1,5 +1,5 @@
 /* LattaCorp client portal (lattacorpfl.com/portal/).
-   Sign in: the server emails a 6-digit code (src/worker.js, /api/portal/code); the code is checked by Supabase here.
+   Sign in: the server emails a one-time code (6 or 8 digits, set in Supabase) (src/worker.js, /api/portal/code); the code is checked by Supabase here.
    Data: everything comes from the database lookups portal_accounts() and portal_account(id) (supabase/stages/stage23),
    which only ever return the signed-in person's own account(s). This page never reads CRM tables directly.
    Sections: Home, Schedule, Billing, Requests, Photos, Account. English and Spanish. */
@@ -25,10 +25,10 @@
   var lang = qs.get("lang") === "es" ? "es" : store("lc-portal-lang") || ((navigator.language || "").slice(0, 2) === "es" ? "es" : "en");
   var ES = {
     "Client portal": "Portal de clientes", "Sign in to your account": "Entre a su cuenta",
-    "Enter the email we have on file. We'll send you a 6-digit code. No password needed.": "Escriba el correo que tenemos en su cuenta. Le enviaremos un código de 6 dígitos. No necesita contraseña.",
+    "Enter the email we have on file. We'll send you a sign-in code. No password needed.": "Escriba el correo que tenemos en su cuenta. Le enviaremos un código de acceso. No necesita contraseña.",
     "Email": "Correo electrónico", "Send my code": "Enviar mi código", "Check your email": "Revise su correo",
     "If this email is on file with us, a code is on its way to": "Si este correo está en nuestros registros, le enviamos un código a",
-    "6-digit code": "Código de 6 dígitos", "Sign in": "Entrar", "Send a new code": "Enviar otro código", "Use a different email": "Usar otro correo",
+    "Sign-in code": "Código de acceso", "Sign in": "Entrar", "Send a new code": "Enviar otro código", "Use a different email": "Usar otro correo",
     "No code, or not on file yet? Call or text": "¿No le llegó el código o aún no está registrado? Llame o envíe un texto al",
     "Home": "Inicio", "Schedule": "Calendario", "Billing": "Facturación", "Requests": "Solicitudes", "Photos": "Fotos", "Account": "Cuenta", "More": "Más",
     "Enter a valid email.": "Escriba un correo válido.", "Sending...": "Enviando...", "Checking...": "Verificando...",
@@ -135,11 +135,11 @@
     }).catch(function () { showErr("sierr", t("Something went wrong. Please try again, or call or text 407-470-5309.")); })
       .then(function () { b.disabled = false; b.textContent = t("Send my code"); });
   });
-  $("sicode").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 6); if (this.value.length === 6) $("codeform").requestSubmit(); });
+  $("sicode").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 8); if (this.value.length === 8) $("codeform").requestSubmit(); });
   $("codeform").addEventListener("submit", function (e) {
     e.preventDefault();
     var email = store("lc-portal-email") || $("siemail").value.trim().toLowerCase(), code = $("sicode").value.trim();
-    if (code.length !== 6) return;
+    if (code.length < 6) { showErr("codeerr", t("That code didn't work. Check it, or send a new code.")); return; }
     var b = $("verifybtn"); b.disabled = true; b.textContent = t("Checking...");
     sb.auth.verifyOtp({ email: email, token: code, type: "email" }).then(function (r) {
       return r.error ? sb.auth.verifyOtp({ email: email, token: code, type: "magiclink" }) : r;
