@@ -56,7 +56,7 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 /* Invoice, classic layout (boxed tables like the GroundsKeeper statements, in LattaCorp green) */
 .cl{padding:0 0 26px;font-size:14px;color:#1d2a20}.cl>.inner{padding:20px 34px 0}
 .cl .top{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap;background:var(--forest);color:#fff;padding:22px 34px}
-.cl .top .wm{height:58px;width:auto;display:block;margin-top:4px}
+.cl .top .wm{height:46px;width:auto;display:block;margin-top:2px}
 .cl .ttl2 .sa{margin-top:10px;font-size:.88rem;color:#e3f1e0;line-height:1.4}.cl .ttl2 .sa span{display:block;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#b9d8b6;margin-bottom:1px}
 .cl .biz{display:flex;gap:14px;align-items:center}.cl .biz .lg{background:#fff;border-radius:12px;padding:6px 8px;display:flex}.cl .biz img{height:62px;width:auto}
 .cl .biz .bn{font-family:Georgia,"Times New Roman",serif;font-size:1.3rem;font-weight:700;color:#fff;line-height:1.15}
@@ -66,7 +66,7 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 .cl .grid th,.cl .grid td,.cl .asum th,.cl .asum td,.cl .led th,.cl .led td{border:1px solid #8fb08f}
 .cl th{background:var(--forest);color:#fff;font-size:.74rem;font-weight:700;letter-spacing:.02em;text-transform:none;padding:5px 6px;text-align:center;border-radius:0!important}
 .cl .grid{margin:0 0 16px}.cl .grid td{text-align:center;padding:6px;font-weight:600;background:#fff!important}
-.cl .billrow{margin-bottom:16px}.cl .sumwrap{display:flex;justify-content:flex-end;margin-top:14px}.cl .asum{width:340px;max-width:100%}
+.cl .billrow{margin-bottom:16px}.cl .sumwrap{display:flex;justify-content:space-between;align-items:flex-start;gap:24px;margin-top:14px}.cl .asum{width:340px;max-width:100%}
 .cl .to .k{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 .cl .to .nm{font-size:1.08rem;font-weight:700}.cl .to div{line-height:1.45}.cl .to .sv{margin-top:8px;font-size:.88rem}.cl .to .sv span{color:var(--muted)}
 .cl .asum th{font-size:.82rem;text-align:left;padding:6px 8px}.cl .asum th.r{text-align:right}
@@ -80,11 +80,10 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 .cl .led td.d{white-space:nowrap;width:92px;text-align:center}.cl .led td.a{white-space:nowrap;text-align:right;width:96px}.cl .led td.l{width:32%}
 .cl .led tr.pad td{height:24px}.cl .led .lm{display:none;font-size:.8rem;color:var(--muted)}.cl .led tfoot td.d,.cl .led tfoot td.l{border-right:0}
 .cl .led tfoot td{border:1px solid #8fb08f;background:#eef6ec;font-weight:700;padding:6px 7px;font-size:.95rem}
-.cl .bot{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-top:22px;padding-top:14px;border-top:3px solid var(--forest)}
-.cl .thx{font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:700;color:#0f3a1b;font-size:1.2rem;line-height:1.3;max-width:420px;-webkit-text-stroke:.35px #0f3a1b}
-.cl .ct{text-align:right;font-size:.86rem;line-height:1.45;color:#26412c}.cl .ct b{display:block;color:var(--forest);font-size:.95rem}
+.cl .thx{text-align:center;margin-top:20px;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:700;color:#0f3a1b;font-size:1.2rem;line-height:1.3;-webkit-text-stroke:.35px #0f3a1b}
+.cl .ct{font-size:.9rem;line-height:1.5;color:#26412c;padding-top:4px}.cl .ct b{display:block;color:var(--forest);font-size:.95rem}
 .cl .stamp{margin-top:12px}
-@media(max-width:700px){.cl>.inner{padding:16px 12px 0}.cl .top{padding:18px 14px}.cl .top .wm{height:44px}.cl .ttl2{text-align:left}.cl .asum{width:100%}.cl .bot{flex-direction:column;align-items:flex-start}.cl .ct{text-align:left}
+@media(max-width:700px){.cl>.inner{padding:16px 12px 0}.cl .top{padding:18px 14px}.cl .top .wm{height:36px}.cl .ttl2{text-align:left}.cl .asum{width:100%}.cl .sumwrap{flex-direction:column-reverse;gap:16px}
  .cl .grid thead{display:none}.cl .grid tr{display:grid;grid-template-columns:1fr 1fr}.cl .grid td{display:flex;flex-direction:column;text-align:left;font-size:.95rem}
  .cl .grid td::before{content:attr(data-k);font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
  .cl .led td.l,.cl .led th.l{display:none}.cl .led .lm{display:block}.cl .sect{flex-wrap:wrap;gap:2px 10px}}
@@ -163,7 +162,7 @@ function drawInvoice(){
   var n=num(d.number,"LC-"),open=d.status==="open";
   var stamp=d.status==="paid"?'<div class="stamp">'+t("paid")+" "+esc(d.paid_at?dts(d.paid_at):"")+(d.paid_method?" · "+esc(d.paid_method):"")+"</div>":d.status==="void"?'<div class="stamp bad">'+t("void")+"</div>":"";
   // top: business on the left, INVOICE and what we accept on the right
-  var h='<div class="cl"><div class="top"><img class="wm" src="../images/logo-wordmark-footer.svg" alt="'+esc(b.name||"Latta Corp")+'">'
+  var h='<div class="cl"><div class="top"><img class="wm" src="../images/logo-wordmark-header.svg" alt="'+esc(b.name||"Latta Corp")+'">'
     +'<div class="ttl2"><div class="w">'+t("inv")+"</div>"+(addrs.length?'<div class="sa"><span>'+(addrs.length>1?t("addrs"):t("addr"))+"</span>"+addrs.map(esc).join("<br>")+"</div>":"")+"</div></div><div class=\"inner\">";
   // the boxed row of invoice facts
   var cells=[[t("cinv"),n],[t("cacct"),c.account_no?String(c.account_no):"—"],[t("pbeg"),dn(d.period_start)],[t("pend"),dn(d.period_end)],[t("idate"),dn(d.issue_date)],[t("pdue"),dn(d.due_date)]];
@@ -190,8 +189,10 @@ function drawInvoice(){
   for(var i=items.length;i<6;i++)rows+='<tr class="pad"><td class="d"></td><td class="l"></td><td></td><td class="a"></td></tr>';
   h+='<div class="sect"><b>'+t("activity")+"</b><span>"+t("keep")+"</span></div>"
     +'<table class="led"><thead><tr><th>'+t("date")+'</th><th class="l">'+t("location")+"</th><th>"+t("desc")+"</th><th>"+t("amount")+"</th></tr></thead><tbody>"+rows
-    +"</tbody></table>"+(sum?'<div class="sumwrap">'+sum+"</div>":"")+stamp;
-  h+='<div class="bot"><div class="thx">'+esc(b.footer||"")+'</div><div class="ct"><b>'+esc(b.name||"Latta Corp")+"</b>"+[b.address,b.phone,b.email].filter(Boolean).map(function(x){return"<div>"+esc(x)+"</div>"}).join("")+"</div></div></div></div>";
+    +"</tbody></table>";
+  var ct='<div class="ct"><b>'+esc(b.name||"Latta Corp")+"</b>"+[b.address,b.phone,b.email].filter(Boolean).map(function(x){return"<div>"+esc(x)+"</div>"}).join("")+"</div>";
+  h+='<div class="sumwrap">'+ct+(sum||"")+"</div>"+stamp;
+  h+=(b.footer?'<div class="thx">'+esc(b.footer)+"</div>":"")+"</div></div>";
   document.title=t("invoice")+" "+n+" · "+(b.name||"Latta Corp");
   return h}
 
