@@ -19,7 +19,7 @@ const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replac
 const json = (obj, status = 200) => new Response(JSON.stringify(obj), { status, headers: { "content-type": "application/json" } });
 
 // Saves the submission as a lead in the CRM database. Never throws; returns true if saved.
-async function saveLead(env, kind, lang, fields, photoCount) {
+async function saveLead(env, kind, lang, fields, photoCount, clientId) {
   if (!env.SUPABASE_SECRET_KEY) return false;
   const pick = (re) => (fields.find((f) => re.test(f.label)) || {}).value || "";
   const row = {
@@ -28,6 +28,7 @@ async function saveLead(env, kind, lang, fields, photoCount) {
     address: (pick(/address/i) || pick(/community/i)).slice(0, 300), service: pick(/^service(s)?\b|which services/i).slice(0, 300),
     fields, photo_count: photoCount,
   };
+  if (clientId) row.client_id = clientId;
   try {
     const res = await fetch(`${env.SUPABASE_URL || DEFAULT_SUPABASE_URL}/rest/v1/leads`, {
       method: "POST",
@@ -37,6 +38,25 @@ async function saveLead(env, kind, lang, fields, photoCount) {
     if (!res.ok) console.log("lead save failed", res.status, (await res.text()).slice(0, 200));
     return res.ok;
   } catch (e) { console.log("lead save error"); return false; }
+}
+
+// Sends one email through Resend. If Resend refuses our own sender address (for example the domain isn't verified
+// yet), it is sent again from Resend's shared address so it still arrives (that address can only reach our own inbox).
+async function sendViaResend(env, payload) {
+  const send = (body) => fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  try {
+    let res = await send(payload);
+    if (!res.ok && payload.from !== FALLBACK_FROM && (res.status === 403 || res.status === 422)) {
+      console.log("sender refused, retrying from the fallback address", res.status, (await res.text()).slice(0, 200));
+      res = await send({ ...payload, from: FALLBACK_FROM });
+    }
+    if (!res.ok) console.log("email not sent", res.status);
+    return res.ok;
+  } catch { return false; }
 }
 
 // Email subject by form, so the inbox can be scanned at a glance:
@@ -51,7 +71,7 @@ function emailSubject(kind, fields, lang) {
   let where = "";
   if (kind === "Service request") {
     const home = get(/home address/i), com = get(/^community$/i);
-    where = home && com ? `${home} (${com})` : home || com;
+    where = home && com ? `${home} (${com})` : home || com || get(/address/i);
   } else if (kind === "Proposal request") {
     where = [get(/community or property name/i), get(/property address/i)].filter(Boolean).join(", ");
   } else if (kind !== "Contact message") {
@@ -60,7 +80,8 @@ function emailSubject(kind, fields, lang) {
   let word = SUBJECT_WORD[kind] || kind;
   if (kind === "Instant quote signup") { const p = get(/instant quote price/i).replace(/\s*per visit/i, "/visit"); if (p) word += " " + p; }
   const parts = [word, name.slice(0, 60), where.slice(0, 90)].filter(Boolean);
-  return (parts.join(" – ") + (String(lang || "") === "es" ? " (Spanish)" : "")).replace(/[\r\n]/g, " ").slice(0, 200);
+  const portal = get(/^sent from$/i) === "Client portal" ? " · Portal" : "";
+  return (parts.join(" – ") + portal + (String(lang || "") === "es" ? " (Spanish)" : "")).replace(/[\r\n]/g, " ").slice(0, 200);
 }
 
 // Cloudflare Turnstile ("not a robot" check). Only runs once the secret TURNSTILE_SECRET_KEY is set in Cloudflare.
@@ -135,23 +156,7 @@ export async function handleSubmit(request, env) {
   if (attachments.length) payload.attachments = attachments;
 
   // Save to the CRM and send the email at the same time. The visitor sees success if at least one of them worked.
-  const send = (body) => fetch("https://api.resend.com/emails", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  const sendEmail = async () => {
-    try {
-      let res = await send(payload);
-      // If Resend refuses our own sender address (for example the domain isn't verified yet), send it from Resend's
-      // shared address instead so the email still arrives.
-      if (!res.ok && payload.from !== FALLBACK_FROM && (res.status === 403 || res.status === 422)) {
-        console.log("sender refused, retrying from the fallback address", res.status, (await res.text()).slice(0, 200));
-        res = await send({ ...payload, from: FALLBACK_FROM });
-      }
-      return res.ok;
-    } catch { return false; }
-  };
+  const sendEmail = () => sendViaResend(env, payload);
   const [emailed, saved] = await Promise.all([sendEmail(), saveLead(env, kind, data.lang, fields, attachments.length)]);
   if (!emailed && !saved) return json({ error: "email failed" }, 502);
   return json({ ok: true });
@@ -283,6 +288,164 @@ export async function handleTeam(request, env) {
   return json({ error: "bad action" }, 400);
 }
 
+// ============================ Client portal (lattacorpfl.com/portal/) ============================
+// Clients sign in with a 6-digit code emailed to them. A code is only sent to an email that belongs to a client
+// or to an Other contact with "Portal access" ticked in the CRM; every visitor gets the same "check your email" reply,
+// so nobody can find out who is a customer. What a signed-in client can see is decided inside the database (Stage 23).
+const PORTAL_URL = "https://lattacorpfl.com/portal/";
+const SITE = "https://lattacorpfl.com";
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const sbRest = (env, path, init = {}) => fetch(`${baseUrl(env)}/rest/v1/${path}`, {
+  ...init, headers: { apikey: env.SUPABASE_SECRET_KEY, Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}`, "content-type": "application/json", ...(init.headers || {}) },
+});
+const bearer = (request) => (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
+
+// Branded email (logo, green header, one big button). Used for sign-in codes and invitations.
+function portalEmail({ heading, lines, code, button, link, small }) {
+  const p = (t) => `<p style="margin:0 0 14px;font-size:16px;line-height:1.55;color:#1c2a20">${t}</p>`;
+  return `<!doctype html><html><body style="margin:0;padding:0;background:#f3f7f1">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f7f1;padding:28px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e4ece1;font-family:Georgia,'Times New Roman',serif">
+<tr><td style="background:#1b552b;padding:20px 24px" align="left">
+<img src="${SITE}/images/logo-tree-header.png" width="40" height="37" alt="" style="vertical-align:middle;border:0">
+<span style="vertical-align:middle;color:#ffffff;font-size:19px;font-weight:600;margin-left:10px">Latta Corp of Central Florida</span></td></tr>
+<tr><td style="padding:28px 28px 8px">
+<h1 style="margin:0 0 16px;font-size:22px;color:#1b552b;font-weight:600">${heading}</h1>
+${lines.map(p).join("")}
+${code ? `<div style="margin:6px 0 20px;padding:16px;text-align:center;background:#eff8ec;border-radius:10px;font-family:Arial,sans-serif;font-size:32px;letter-spacing:8px;font-weight:700;color:#1b552b">${esc(code)}</div>` : ""}
+${button ? `<p style="margin:0 0 22px"><a href="${link}" style="display:inline-block;background:#1b552b;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;font-weight:700;font-size:16px;padding:13px 26px;border-radius:6px">${button}</a></p>` : ""}
+${small ? `<p style="margin:0 0 18px;font-size:13px;line-height:1.5;color:#58675c">${small}</p>` : ""}
+</td></tr>
+<tr><td style="padding:16px 28px 22px;border-top:1px solid #e4ece1;font-family:Arial,sans-serif;font-size:13px;color:#58675c">
+Latta Corp of Central Florida · Kissimmee, FL · <a href="tel:4074705309" style="color:#1b552b">407-470-5309</a> · <a href="${SITE}" style="color:#1b552b">lattacorpfl.com</a></td></tr>
+</table></td></tr></table></body></html>`;
+}
+
+export async function handlePortalCode(request, env) {
+  if (!env.SUPABASE_SECRET_KEY || !env.RESEND_API_KEY) return json({ error: "The portal is not set up on the server." }, 500);
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const email = String((d && d.email) || "").trim().toLowerCase().slice(0, 200);
+  const es = String((d && d.lang) || "") === "es";
+  if (!EMAIL_RE.test(email)) return json({ error: "bad email" }, 400);
+  if (!(await passesTurnstile(env, d.ts_token, request.headers.get("CF-Connecting-IP")))) return json({ error: "verification failed" }, 403);
+
+  // At most one code every 45 seconds and 5 an hour per email, so nobody can flood an inbox.
+  const since = new Date(Date.now() - 3600 * 1000).toISOString();
+  const rl = await sbRest(env, `portal_signins?select=created_at&email=eq.${encodeURIComponent(email)}&created_at=gte.${since}&order=created_at.desc&limit=10`);
+  if (rl.ok) {
+    const rows = await rl.json();
+    if (rows.length >= 5 || (rows[0] && Date.now() - Date.parse(rows[0].created_at) < 45000)) return json({ ok: true });
+  }
+  let sent = false;
+  const al = await sbRest(env, "rpc/portal_email_allowed", { method: "POST", body: JSON.stringify({ e: email }) });
+  if (al.ok && (await al.json()) === true) {
+    // Make sure this person has a sign-in (created the first time; "already exists" is fine), then make a one-time code.
+    try { await fetch(`${baseUrl(env)}/auth/v1/admin/users`, { method: "POST", headers: adminHeaders(env), body: JSON.stringify({ email, email_confirm: true }) }); } catch {}
+    const gl = await fetch(`${baseUrl(env)}/auth/v1/admin/generate_link`, { method: "POST", headers: adminHeaders(env), body: JSON.stringify({ type: "magiclink", email }) });
+    if (gl.ok) {
+      const g = await gl.json(), pr = g.properties || g;
+      const code = String(pr.email_otp || ""), th = String(pr.hashed_token || "");
+      if (code && th) {
+        const link = `${PORTAL_URL}?th=${encodeURIComponent(th)}&ty=${encodeURIComponent(pr.verification_type || "magiclink")}${es ? "&lang=es" : ""}`;
+        sent = await sendViaResend(env, {
+          from: env.FROM_EMAIL || FALLBACK_FROM, to: [email],
+          subject: es ? `Su código de acceso de LattaCorp: ${code}` : `Your LattaCorp sign-in code: ${code}`,
+          html: portalEmail(es ? {
+            heading: "Su código de acceso", lines: ["Use este código para entrar a su cuenta de cliente de LattaCorp. Vence en 1 hora."], code,
+            button: "O entre con un toque", link,
+            small: "Si usted no pidió este código, puede ignorar este correo. Nadie puede entrar a su cuenta sin él.",
+          } : {
+            heading: "Your sign-in code", lines: ["Use this code to sign in to your LattaCorp client account. It expires in 1 hour."], code,
+            button: "Or sign in with one tap", link,
+            small: "If you didn't ask for this code, you can ignore this email. No one can get into your account without it.",
+          }),
+        });
+      }
+    } else console.log("portal code: could not make a code", gl.status, await errText(gl));
+  }
+  await sbRest(env, "portal_signins", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ email, sent }) });
+  return json({ ok: true });
+}
+
+// The signed-in client's own account, asked of the database AS the client (so the database decides access).
+async function portalAccountAs(env, token, cid) {
+  if (!token || !UUID.test(String(cid || ""))) return null;
+  const r = await fetch(`${baseUrl(env)}/rest/v1/rpc/portal_account`, {
+    method: "POST", headers: { apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ cid }),
+  });
+  return r.ok ? r.json() : null;
+}
+
+// A service request or quote request sent from inside the portal: saved to CRM Leads (linked to the client) and emailed.
+export async function handlePortalRequest(request, env) {
+  if (!env.SUPABASE_SECRET_KEY) return json({ error: "not set up" }, 500);
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const token = bearer(request);
+  const acct = await portalAccountAs(env, token, d && d.client_id);
+  if (!acct) return json({ error: "Not allowed." }, 403);
+  const email = await callerEmail(request, env);
+  const isQuote = String(d.kind) === "quote";
+  const kind = isQuote ? "Quote request" : "Service request";
+  const details = String(d.details || "").trim().slice(0, 3000);
+  if (!details) return json({ error: "Please describe what you need." }, 400);
+  const fields = [
+    { label: "Full name", value: String((acct.me && acct.me.name) || acct.client.name || "") },
+    { label: "Account", value: String(acct.client.name || "") },
+    { label: "Email", value: email },
+    { label: "Phone", value: String(d.phone || acct.client.phone || "").slice(0, 60) },
+    { label: "Service address", value: String(d.address || "").slice(0, 300) },
+    { label: isQuote ? "Work wanted" : "Details", value: details },
+    { label: "Sent from", value: "Client portal" },
+  ].filter((f) => f.value);
+  const rows = fields.map((f) => `<tr><td style="padding:6px 12px 6px 0;vertical-align:top;color:#555"><b>${esc(f.label)}</b></td><td style="padding:6px 0;white-space:pre-wrap">${esc(f.value)}</td></tr>`).join("");
+  const payload = {
+    from: env.FROM_EMAIL || FALLBACK_FROM, to: [env.TO_EMAIL || DEFAULT_TO],
+    subject: emailSubject(kind, fields, d.lang),
+    html: `<div style="font-family:Arial,sans-serif;font-size:15px"><h2 style="color:#1b552b;margin:0 0 12px">${esc(kind)} (client portal)</h2><table>${rows}</table></div>`,
+  };
+  if (EMAIL_RE.test(email)) payload.reply_to = email;
+  const [emailed, saved] = await Promise.all([sendViaResend(env, payload), saveLead(env, kind, d.lang, fields, 0, acct.client.id)]);
+  if (!emailed && !saved) return json({ error: "Could not send. Please call or text 407-470-5309." }, 502);
+  return json({ ok: true });
+}
+
+// "Invite to portal" from the CRM (staff only): emails a welcome message with the portal link.
+export async function handlePortalInvite(request, env) {
+  if (!env.SUPABASE_SECRET_KEY || !env.RESEND_API_KEY) return json({ error: "The portal is not set up on the server." }, 500);
+  const staffEmail = await callerEmail(request, env);
+  if (!staffEmail || !(await emailOnStaff(env, staffEmail))) return json({ error: "Not allowed." }, 403);
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const cid = String((d && d.client_id) || ""), to = String((d && d.email) || "").trim().toLowerCase();
+  if (!UUID.test(cid) || !EMAIL_RE.test(to)) return json({ error: "Pick a client and an email." }, 400);
+  const al = await sbRest(env, "rpc/portal_email_allowed", { method: "POST", body: JSON.stringify({ e: to }) });
+  if (!al.ok || (await al.json()) !== true) return json({ error: "That email doesn't have portal access yet. Turn on portal access for it first." }, 400);
+  const es = String(d.lang || "") === "es";
+  const name = String(d.name || "").trim().split(/\s+/)[0] || "";
+  const ok = await sendViaResend(env, {
+    from: env.FROM_EMAIL || FALLBACK_FROM, to: [to], reply_to: "Support@lattacorpfl.com",
+    subject: es ? "Su portal de cliente de LattaCorp está listo" : "Your LattaCorp client portal is ready",
+    html: portalEmail(es ? {
+      heading: `Bienvenido${name ? ", " + esc(name) : ""}`,
+      lines: ["Ahora puede ver su cuenta con LattaCorp en línea, cuando quiera:",
+        "• Sus próximas visitas y las ya realizadas<br>• Facturas, pagos y estados de cuenta para imprimir<br>• Fotos de su propiedad<br>• Pedir servicio o una cotización",
+        `Para entrar, abra el portal y escriba este correo (${esc(to)}). Le enviaremos un código de un solo uso. No necesita contraseña.`],
+      button: "Abrir mi portal", link: PORTAL_URL + "?lang=es",
+      small: "¿Preguntas? Llame o envíe un texto al 407-470-5309.",
+    } : {
+      heading: `Welcome${name ? ", " + esc(name) : ""}`,
+      lines: ["You can now view your LattaCorp account online, any time:",
+        "• Upcoming and past visits<br>• Invoices, payments and printable statements<br>• Photos of your property<br>• Request service or a quote",
+        `To sign in, open the portal and enter this email (${esc(to)}). We'll send you a one-time code. No password needed.`],
+      button: "Open my portal", link: PORTAL_URL,
+      small: "Questions? Call or text 407-470-5309.",
+    }),
+  });
+  if (!ok) return json({ error: "The email could not be sent." }, 502);
+  await sbRest(env, `clients?id=eq.${cid}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ portal_invited_at: new Date().toISOString() }) });
+  return json({ ok: true });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -301,6 +464,12 @@ export default {
     if (url.pathname === "/api/team") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handleTeam(request, env);
+    }
+    if (url.pathname === "/api/portal/code" || url.pathname === "/api/portal/request" || url.pathname === "/api/portal/invite") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      if (url.pathname === "/api/portal/code") return handlePortalCode(request, env);
+      if (url.pathname === "/api/portal/request") return handlePortalRequest(request, env);
+      return handlePortalInvite(request, env);
     }
     return env.ASSETS.fetch(request);
   },

@@ -80,6 +80,55 @@ r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
   refuse = true; b = await send("Contact message", [{ label: "Full name", value: "Kim" }]);
   assert.equal(b.length, 2, "retried"); assert.equal(b[1].from, "Latta Corp Website <onboarding@resend.dev>");
 }
+
+// ---- client portal ----
+{
+  const envP = { ...env, FROM_EMAIL: "Latta Corp Website <website@lattacorpfl.com>" };
+  let calls = [], allowed = true, recent = [], staff = true, acctOk = true;
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = String(url); const body = opts.body ? (() => { try { return JSON.parse(opts.body); } catch { return opts.body; } })() : null;
+    calls.push({ u, body, headers: opts.headers || {} });
+    if (u.includes("/rest/v1/portal_signins?select")) return new Response(JSON.stringify(recent), { status: 200 });
+    if (u.includes("/rest/v1/portal_signins")) return new Response("", { status: 201 });
+    if (u.includes("rpc/portal_email_allowed")) return new Response(JSON.stringify(allowed), { status: 200 });
+    if (u.includes("/auth/v1/admin/users")) return new Response("{}", { status: 422 });
+    if (u.includes("/auth/v1/admin/generate_link")) return new Response(JSON.stringify({ properties: { email_otp: "482913", hashed_token: "abc123", verification_type: "magiclink" } }), { status: 200 });
+    if (u.includes("/auth/v1/user")) return new Response(JSON.stringify({ email: "pat@example.com" }), { status: 200 });
+    if (u.includes("/rest/v1/staff")) return new Response(JSON.stringify(staff ? [{ email: "pat@example.com", role: "office" }] : []), { status: 200 });
+    if (u.includes("rpc/portal_account")) return acctOk ? new Response(JSON.stringify({ client: { id: "11111111-1111-4111-8111-111111111111", name: "Oak Grove HOA", phone: "407" }, me: { name: "Pat Lee" } }), { status: 200 }) : new Response("{}", { status: 400 });
+    if (u.includes("/rest/v1/leads")) return new Response("", { status: 201 });
+    if (u.includes("/rest/v1/clients")) return new Response(null, { status: 204 });
+    if (u.includes("api.resend.com")) return new Response("{}", { status: 200 });
+    return new Response("{}", { status: 404 });
+  };
+  const post = (path, b, auth) => worker.fetch(new Request("https://x.test" + path, { method: "POST", headers: { "content-type": "application/json", ...(auth ? { authorization: "Bearer usertoken" } : {}) }, body: JSON.stringify(b) }), envP);
+  // known email: code is made and emailed to that person, from our domain, with the code in the subject
+  calls = []; r = await post("/api/portal/code", { email: "Jane@Example.com", lang: "en" });
+  assert.equal(r.status, 200);
+  let mail = calls.find((c) => c.u.includes("api.resend.com"));
+  assert(mail, "code emailed"); assert.deepEqual(mail.body.to, ["jane@example.com"]); assert(mail.body.subject.includes("482913"));
+  assert.equal(mail.body.from, "Latta Corp Website <website@lattacorpfl.com>"); assert(mail.body.html.includes("portal/?th=abc123"));
+  assert(calls.find((c) => c.u.includes("/rest/v1/portal_signins") && c.body && c.body.sent === true), "logged");
+  // unknown email: same answer, but nothing is created or sent
+  calls = []; allowed = false; r = await post("/api/portal/code", { email: "stranger@example.com" });
+  assert.equal(r.status, 200); assert(!calls.some((c) => c.u.includes("generate_link") || c.u.includes("resend")), "nothing sent to strangers");
+  // too soon after the last code: no new email
+  allowed = true; recent = [{ created_at: new Date().toISOString() }]; calls = []; r = await post("/api/portal/code", { email: "jane@example.com" });
+  assert.equal(r.status, 200); assert(!calls.some((c) => c.u.includes("resend")), "rate limited"); recent = [];
+  r = await post("/api/portal/code", { email: "not-an-email" }); assert.equal(r.status, 400);
+  // portal request: only for an account the signed-in person can see; saved to Leads linked to the client
+  calls = []; r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "quote", details: "Mulch the front beds", address: "9 Palm Dr" }, true);
+  assert.equal(r.status, 200);
+  const lead = calls.find((c) => c.u.includes("/rest/v1/leads")); assert.equal(lead.body.client_id, "11111111-1111-4111-8111-111111111111"); assert.equal(lead.body.kind, "Quote request");
+  mail = calls.find((c) => c.u.includes("api.resend.com")); assert.equal(mail.body.subject, "Quote – Pat Lee – 9 Palm Dr · Portal"); assert.equal(mail.body.reply_to, "pat@example.com");
+  const asUser = calls.find((c) => c.u.includes("rpc/portal_account")); assert.equal(asUser.headers.Authorization, "Bearer usertoken", "asked as the client, not with the secret key");
+  acctOk = false; r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "service", details: "x" }, true); assert.equal(r.status, 403); acctOk = true;
+  // invite: staff only
+  calls = []; r = await post("/api/portal/invite", { client_id: "11111111-1111-4111-8111-111111111111", email: "jane@example.com", name: "Jane Doe" }, true);
+  assert.equal(r.status, 200); mail = calls.find((c) => c.u.includes("api.resend.com")); assert.deepEqual(mail.body.to, ["jane@example.com"]); assert(mail.body.html.includes("Welcome, Jane"));
+  assert(calls.find((c) => c.u.includes("/rest/v1/clients?id=eq.") && c.body.portal_invited_at), "invite date saved");
+  staff = false; r = await post("/api/portal/invite", { client_id: "11111111-1111-4111-8111-111111111111", email: "jane@example.com" }, true); assert.equal(r.status, 403); staff = true;
+}
 // ---- crew login endpoint ----
 const CID = "11111111-1111-4111-8111-111111111111", UID = "22222222-2222-4222-8222-222222222222";
 let calls = [], crewRow = { id: CID, user_id: null }, ownerToken = "good-owner", staffEmails = ["owner@example.com"];

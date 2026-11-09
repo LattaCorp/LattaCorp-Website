@@ -70,11 +70,22 @@ Code style: formatted with Prettier (settings in `crm/src/.prettierrc`).
 
 ### Database (Supabase project `lvaofwtfxwlqwvzesckt`)
 - Every table has a plain-English label in Supabase's Table Editor saying which part it belongs to, for example "CRM › Billing".
-- `supabase/stages/` holds each database change in the order it was made (Stage 0 to Stage 22). New changes get the next stage number.
+- `supabase/stages/` holds each database change in the order it was made (Stage 0 to Stage 23). New changes get the next stage number.
 - `supabase/full_setup.sql` is all the stages in one file, for rebuilding the database from scratch. The live database is already set up.
 - Website forms save a lead to the database AND email it. The server code needs the secret `SUPABASE_SECRET_KEY` in Cloudflare (Settings > Variables and Secrets > Secret). Never put the secret key in GitHub.
 - Staff sign in with email and password (users in Supabase > Authentication > Users; public sign-ups off). Only emails in the `staff` table can see CRM data; Personnel is owners only.
 - Check status at `/api/health` (shows `crmKeySet: true` when the secret is set).
+
+## Client portal (at `/portal/`)
+- Clients sign in with a 6-digit code emailed to them (no passwords). The server (`src/worker.js`, `/api/portal/code`) only sends a
+  code to the main email on a client, or to an Other contact with **Portal access** ticked in Foreman. Codes come from
+  `website@lattacorpfl.com` through Resend, so the Resend domain must stay verified.
+- What a client can see is decided in the database (`supabase/stages/stage23_client_portal.sql`): the lookups
+  `portal_accounts()` and `portal_account(id)` return only that person's own account(s). CRM tables stay staff-only.
+- Page files: `portal/index.html` (layout and styles) and `portal/portal.js` (sign-in, Home, Schedule, Billing, Requests,
+  Photos, Account; English and Spanish). Requests from the portal arrive in CRM Leads and by email, marked "· Portal".
+- In Foreman, each client page has a **Client portal** box: account status, who can sign in, and **Send invite**.
+- Turnstile: when the site key is set in `js/forms.js`, also set it in `portal/portal.js` (`TURNSTILE_SITEKEY`).
 
 ## Search-engine pages (SEO)
 

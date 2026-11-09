@@ -190,6 +190,13 @@ function renderClients() {
     var right = el("div");
     right.style.textAlign = "right";
     right.appendChild(el("span", "chip " + c.type, tlabel(c.type)));
+    if (!c.archived) {
+      var ast = acctStatus(c);
+      if (ast.key === "past_due" || ast.key === "due") {
+        right.appendChild(el("br"));
+        right.appendChild(acctChip(c)).style.marginTop = "4px";
+      }
+    }
     b.appendChild(left);
     b.appendChild(right);
     b.addEventListener("click", function () {
@@ -256,6 +263,7 @@ function openClient(id) {
   );
   p.appendChild(acts);
   p.appendChild(clientContactsSection(c));
+  p.appendChild(clientPortalSection(c));
   /* properties */
   var sec = el("div", "sec"),
     h = el("h3", null, "Properties"),
@@ -379,6 +387,7 @@ function drawCC(c, holder) {
   cs.forEach(function (x) {
     var card = el("div", "pcard");
     card.appendChild(el("b", null, (x.name || "(no name)") + (x.role ? " · " + x.role : "")));
+    if (x.portal_access) card.appendChild(el("span", "chip won", "Portal access")).style.marginLeft = "8px";
     var info = [x.phone, x.email].filter(Boolean).join(" · ");
     if (info) card.appendChild(el("div", "note", info));
     if (x.notes) card.appendChild(el("div", "note", x.notes));
@@ -416,6 +425,7 @@ function drawCC(c, holder) {
               return z.id !== x.id;
             });
             drawCC(c, holder);
+            if (portalBoxRedraw) portalBoxRedraw();
           });
       })
     );
@@ -446,6 +456,21 @@ function ccForm(c, x, holder) {
   box.appendChild(g);
   var nt = fld("Notes (best time to call, what to contact them about...)", "text", x ? x.notes : "");
   box.appendChild(nt);
+  /* client portal: this person may sign in to see this account (needs an email) */
+  var pa = null;
+  if (c.portal_access !== undefined) {
+    var pl = el("label");
+    pl.style.cssText = "display:flex;gap:8px;align-items:center;margin:0 0 10px;font-weight:600";
+    pa = document.createElement("input");
+    pa.type = "checkbox";
+    pa.style.width = "auto";
+    pa.checked = !!(x && x.portal_access);
+    pl.appendChild(pa);
+    pl.appendChild(
+      document.createTextNode("Portal access (can sign in to see this account, including billing)")
+    );
+    box.appendChild(pl);
+  }
   var a = el("div", "acts");
   var save = btn("Save contact", "btn sm", function () {
     if (!nm.input.value.trim() && !ph.input.value.trim() && !em.input.value.trim()) {
@@ -459,6 +484,13 @@ function ccForm(c, x, holder) {
       email: em.input.value.trim(),
       notes: nt.input.value.trim()
     };
+    if (pa) {
+      if (pa.checked && !row.email) {
+        alert("Portal access needs an email for this contact.");
+        return;
+      }
+      row.portal_access = pa.checked;
+    }
     save.disabled = true;
     var q = x
       ? sb.from("client_contacts").update(row).eq("id", x.id).select().single()
@@ -476,6 +508,7 @@ function ccForm(c, x, holder) {
       if (x) Object.assign(x, r.data);
       else ccontacts.push(r.data);
       drawCC(c, holder);
+      if (portalBoxRedraw) portalBoxRedraw();
     });
   });
   a.appendChild(save);
