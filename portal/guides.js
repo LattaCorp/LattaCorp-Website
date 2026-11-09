@@ -76,5 +76,44 @@ window.PORTAL_GUIDES = [
         }
       }
     ]
+  },
+  {
+    id: "autopay",
+    topic: { en: "Billing and payments", es: "Facturación y pagos" },
+    title: { en: "Automatic payment concerns", es: "Dudas sobre pagos automáticos" },
+    intro: {
+      en: "How automatic payments and invoices work with LattaCorp.",
+      es: "Cómo funcionan los pagos automáticos y las facturas con LattaCorp."
+    },
+    sections: [
+      {
+        heading: { en: "We never charge without your approval", es: "Nunca cobramos sin su aprobación" },
+        text: {
+          en: "We do not charge automatic payments without your prior approval.",
+          es: "No cobramos pagos automáticos sin su aprobación previa."
+        }
+      },
+      {
+        heading: { en: "See a charge you don't recognize?", es: "¿Ve un cargo que no reconoce?" },
+        text: {
+          en: "Let us know immediately. Call or text 407-470-5309, or email Support@lattacorpfl.com.",
+          es: "Avísenos de inmediato. Llame o envíe un texto al 407-470-5309, o escriba a Support@lattacorpfl.com."
+        }
+      },
+      {
+        heading: { en: "Setting up automatic payments", es: "Cómo activar los pagos automáticos" },
+        text: {
+          en: "Automatic payments and invoicing are available on request. Just ask us and we'll set it up for you.",
+          es: "Los pagos y facturas automáticos están disponibles a pedido. Solo pídanoslo y lo configuramos."
+        }
+      },
+      {
+        heading: { en: "When invoices are sent", es: "Cuándo enviamos las facturas" },
+        text: {
+          en: "Invoices are sent at the beginning of every month.",
+          es: "Enviamos las facturas al comienzo de cada mes."
+        }
+      }
+    ]
   }
 ];

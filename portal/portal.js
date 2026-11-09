@@ -585,6 +585,19 @@
   }
   function isApp() { return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; }
   function L(o) { return o ? (lang === "es" && o.es ? o.es : o.en) : ""; }
+  // Guide text: phone numbers and emails become tap-to-call / tap-to-email links (kept on one line).
+  function linkify(node, text) {
+    var re = /(\d{3}-\d{3}-\d{4})|([^\s@]+@[^\s@]+\.[a-z]{2,})/gi, last = 0, m;
+    text = String(text || "");
+    while ((m = re.exec(text))) {
+      node.appendChild(document.createTextNode(text.slice(last, m.index)));
+      var a = el("a", null, m[0].replace(/[.,]$/, "")); a.style.whiteSpace = "nowrap";
+      a.href = m[1] ? "tel:" + m[1].replace(/-/g, "") : "mailto:" + a.textContent;
+      node.appendChild(a); last = m.index + a.textContent.length; re.lastIndex = last;
+    }
+    node.appendChild(document.createTextNode(text.slice(last)));
+    return node;
+  }
   function info(host) {
     var p = panel(host, t("Info"));
     p.appendChild(el("p", "muted", t("Guides and tips from LattaCorp. More lawn-care guides are on the way.")));
@@ -608,8 +621,8 @@
         var sec = el("div", "gsec" + (sc.device && sc.device === dev ? " mine" : ""));
         var h3 = el("h3", null, L(sc.heading)); if (sc.device === dev) h3.appendChild(pill(t("This device")));
         sec.appendChild(h3);
-        if (sc.steps) { var ol = el("ol"); L(sc.steps).forEach(function (x) { ol.appendChild(el("li", null, x)); }); sec.appendChild(ol); }
-        if (sc.text) sec.appendChild(el("p", null, L(sc.text)));
+        if (sc.steps) { var ol = el("ol"); L(sc.steps).forEach(function (x) { ol.appendChild(linkify(el("li"), x)); }); sec.appendChild(ol); }
+        if (sc.text) sec.appendChild(linkify(el("p"), L(sc.text)));
         body.appendChild(sec);
       });
       host.appendChild(d);
