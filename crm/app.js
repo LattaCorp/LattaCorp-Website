@@ -16411,6 +16411,13 @@ function openEstimate(id) {
             (e.response_note ? '. Note: "' + e.response_note + '"' : "")
         );
         ans.style.fontWeight = "700";
+        if (e.status === "accepted" && /^data:image\/png;base64,/.test(e.response_signature || "")) {
+          var sg = document.createElement("img");
+          sg.src = e.response_signature;
+          sg.alt = "Client signature";
+          sg.style.cssText = "display:block;height:60px;width:auto;margin-top:8px;border-bottom:1.5px solid #1d2a20";
+          ans.appendChild(sg);
+        }
         body.appendChild(ans);
       }
       var ttl = fld("Title", "text", e.title || ""),
