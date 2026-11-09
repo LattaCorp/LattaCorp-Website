@@ -490,9 +490,68 @@ var ICONS = {
   photos:
     '<svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 8"/></svg>'
 };
+ICONS.more =
+  '<svg viewBox="0 0 24 24"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>';
+var NAV_MAIN = ["schedule", "clients", "jobs", "billing"];
+var NAV_LABELS = {
+  leads: "Leads",
+  clients: "Clients",
+  jobs: "Jobs",
+  schedule: "Schedule",
+  todo: "To-Do",
+  billing: "Billing",
+  expenses: "Expenses",
+  reports: "Reports",
+  photos: "Photos",
+  inventory: "Inventory",
+  personnel: "Personnel",
+  team: "Team"
+};
+function navLabel(v) {
+  return NAV_LABELS[v] || "More";
+}
+function closeMoreSheet() {
+  var s = document.getElementById("moresheet");
+  if (s) s.remove();
+}
+function openMoreSheet(items) {
+  if (document.getElementById("moresheet")) return closeMoreSheet();
+  var sh = el("div");
+  sh.id = "moresheet";
+  sh.addEventListener("click", function (e) {
+    if (e.target === sh) closeMoreSheet();
+  });
+  var box = el("div", "msbox");
+  box.setAttribute("role", "menu");
+  box.appendChild(el("div", "mshd", "All sections"));
+  var g = el("div", "msgrid");
+  items.forEach(function (v) {
+    var b = el("button", v[0] === view ? "on" : "");
+    b.type = "button";
+    b.setAttribute("role", "menuitem");
+    b.innerHTML = ICONS[v[0]];
+    b.appendChild(el("span", null, v[1]));
+    if (v[2]) b.appendChild(el("span", "badge", String(v[2])));
+    b.addEventListener("click", function () {
+      view = v[0];
+      render();
+      window.scrollTo(0, 0);
+    });
+    g.appendChild(b);
+  });
+  box.appendChild(g);
+  sh.appendChild(box);
+  document.body.appendChild(sh);
+}
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape") closeMoreSheet();
+});
 function render() {
-  var nav = $("side");
+  var nav = $("side"),
+    moreItems = [],
+    moreBadge = 0;
   nav.textContent = "";
+  closeMoreSheet();
   $("app").classList.toggle("wide", view === "reports" || view === "inventory" || view === "expenses");
   var tdy = today(),
     stops = visits.filter(function (v) {
@@ -538,8 +597,24 @@ function render() {
       b.appendChild(el("span", null, v[1]));
       if (v[2]) b.appendChild(el("span", "badge", String(v[2])));
       b.setAttribute("aria-current", v[0] === view ? "page" : "false");
+      if (NAV_MAIN.indexOf(v[0]) >= 0) b.classList.add("pri");
+      else {
+        moreBadge += v[2] || 0;
+        moreItems.push(v);
+      }
       nav.appendChild(b);
     });
+  /* Phones: the bottom bar keeps the four everyday sections and puts the rest under More. */
+  var mb = el("button", "more" + (NAV_MAIN.indexOf(view) < 0 ? " on" : ""));
+  mb.type = "button";
+  mb.innerHTML = ICONS.more;
+  mb.appendChild(el("span", null, NAV_MAIN.indexOf(view) < 0 ? navLabel(view) : "More"));
+  if (moreBadge) mb.appendChild(el("span", "badge", String(moreBadge)));
+  mb.setAttribute("aria-haspopup", "true");
+  mb.addEventListener("click", function () {
+    openMoreSheet(moreItems);
+  });
+  nav.appendChild(mb);
   $("topbtns").textContent = "";
   if (view === "leads") renderLeads();
   else if (view === "clients") renderClients();
@@ -14824,14 +14899,12 @@ function fdate(s) {
   return s ? pd(s).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
 }
 function acctLedger(cid, pid) {
-  var rows = [],
-    lps = clientProps(cid),
-    sole = lps.length === 1 ? lps[0].id : null;
+  var rows = [];
   invoices.forEach(function (i) {
     if (i.client_id !== cid) return;
     var zeroPaid = i.status === "paid" && Number(i.total) === 0;
     rows.push({
-      pid: i.property_id || sole,
+      pid: i.property_id || null,
       d: String(i.issue_date).slice(0, 10),
       ord: 0,
       n: i.number,
@@ -14851,7 +14924,7 @@ function acctLedger(cid, pid) {
       })
     )
       rows.push({
-        pid: i.property_id || sole,
+        pid: i.property_id || null,
         d: String(i.paid_at || i.issue_date).slice(0, 10),
         ord: 1,
         n: i.number,
@@ -14865,7 +14938,7 @@ function acctLedger(cid, pid) {
     var iv = x.invoice_id ? byId(invoices, x.invoice_id) : null;
     if (x.client_id !== cid && !(iv && iv.client_id === cid)) return;
     rows.push({
-      pid: iv ? iv.property_id || sole : sole,
+      pid: iv ? iv.property_id || null : null,
       d: String(x.paid_on).slice(0, 10),
       ord: 1,
       n: iv ? iv.number : 0,
@@ -15420,25 +15493,19 @@ function clientBillingSection(c, only) {
   }
   /* split by property when the client has more than one, or any invoice is tied to one */
   var cps = clientProps(c.id),
-    sole = cps.length === 1 ? cps[0].id : "";
-  /* one property (their Main): everything untagged, including on-account payments, belongs to it */
-  if (sole)
-    pays.forEach(function (x) {
-      if (!x.pid) x.pid = sole;
-    });
-  var split =
+    split =
       cps.length > 1 ||
       mine.some(function (i) {
-        return i.property_id && i.property_id !== sole;
+        return i.property_id;
       });
   var keys = cps.map(function (p) {
     return p.id;
   });
   mine.forEach(function (i) {
-    var k = i.property_id || sole;
+    var k = i.property_id || "";
     if (k && keys.indexOf(k) < 0) keys.push(k);
   });
-  if (!sole) keys.push("");
+  keys.push("");
   only = only && keys.indexOf(only) > -1 ? only : "";
   if (split && cps.length > 1) {
     var vf = fld(
@@ -15465,7 +15532,7 @@ function clientBillingSection(c, only) {
   }
   function invsOf(k) {
     return hist.filter(function (i) {
-      return (i.property_id || sole) === k;
+      return (i.property_id || "") === k;
     });
   }
   function paysOf(k, onacct) {
