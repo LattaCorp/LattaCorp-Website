@@ -64,7 +64,9 @@ function lpBusiness() {
   };
 }
 function lpClient(c) {
-  return c ? { name: c.name, company: c.company || "", account_no: c.account_no || null } : { name: "" };
+  return c
+    ? { name: c.name, company: c.company || "", account_no: c.account_no || null, phone: c.phone || "", email: c.email || "" }
+    : { name: "" };
 }
 function lpMainAddress(cid) {
   var ps = clientProps(cid);
