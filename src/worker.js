@@ -10,10 +10,10 @@ const DEFAULT_TO = "lattacorpofcentralfl@gmail.com";
 const FALLBACK_FROM = "Latta Corp Website <onboarding@resend.dev>";
 // Emails to CUSTOMERS come from two automated addresses (not monitored); replies are routed to Support@:
 //   website@  -> account emails: sign-in codes, portal invitations
-//   payments@ -> billing emails: invoices, reminders, receipts (used when automatic billing emails are added)
+//   billing@  -> billing emails: invoices, reminders, receipts (used when automatic billing emails are added)
 // Form notifications to the business still come from FROM_EMAIL. Support@ is the one address people talk to.
 const AUTO_FROM = "Latta Corp of Central Florida <website@lattacorpfl.com>";
-const BILLING_FROM = "Latta Corp Billing <payments@lattacorpfl.com>";
+const BILLING_FROM = "Latta Corp Billing <billing@lattacorpfl.com>";
 const SUPPORT_EMAIL = "Support@lattacorpfl.com";
 // Marks a message as automatic, so mail programs don't send vacation auto-replies to it.
 const AUTO_HEADERS = { "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All" };
