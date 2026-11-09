@@ -52,12 +52,12 @@ DOCS = {
     },
     "custom-estimate.pdf": {
         "name": "Estimate / Quote",
-        "title": "E S T I M A T E  /  Q U O T E", "title_size": 24,
+        "title": "E S T I M A T E  /  Q U O T E", "title_size": 24, "header": "outline",
         "boxes": [("Estimate Number", 1.0), ("Account Number", 1.0), ("Estimate Date", 1.0),
                   ("Valid Until", 1.0), ("Proposed Start", 1.0), ("Prepared By", 1.0)],
         "section": "Proposed Work", "section_note": "Prices are good through the Valid Until date",
         "columns": [("Qty", 44, 1), ("Location", 140, 0), ("Description", None, 0), ("Amount", 84, 2)],
-        "lines": 14,
+        "lines": 12,
         "summary_title": "Estimate Summary",
         "summary": [("Estimate Date", "Summary Estimate Date", "copy:Estimate Date"),
                     ("Valid Until", "Summary Valid Until", "copy:Valid Until"),
@@ -105,17 +105,26 @@ def build_base(doc):
     # ---- green header: tree logo, INVOICE, service address ----
     top = H - M
     hh = 84
-    c.setFillColor(FOREST)
-    c.roundRect(X0, top - hh, X1 - X0, hh, 6, stroke=0, fill=1)
-    c.setFillColor(white)
-    c.roundRect(X0 + 16, top - hh + 16, 54, 52, 8, stroke=0, fill=1)
+    inv = doc.get("header") == "outline"  # white header inside a thick green border, green text
+    if inv:
+        bw = 7
+        c.setFillColor(FOREST)
+        c.roundRect(X0, top - hh, X1 - X0, hh, 6, stroke=0, fill=1)
+        c.setFillColor(white)
+        c.roundRect(X0 + bw, top - hh + bw, X1 - X0 - 2 * bw, hh - 2 * bw, 2, stroke=0, fill=1)
+    else:
+        c.setFillColor(FOREST)
+        c.roundRect(X0, top - hh, X1 - X0, hh, 6, stroke=0, fill=1)
+        c.setFillColor(white)
+        c.roundRect(X0 + 16, top - hh + 16, 54, 52, 8, stroke=0, fill=1)
     c.drawImage(TREE, X0 + 21, top - hh + 20, width=44, height=44 * 168 / 181, mask="auto")
+    c.setFillColor(FOREST if inv else white)
     c.setFont("Times-Bold", doc["title_size"])
     c.drawCentredString(W / 2, top - 40, doc["title"])
     c.setFont("Helvetica-Bold", 6.5)
-    c.setFillColor(HexColor("#b9d8b6"))
+    c.setFillColor(MUTED if inv else HexColor("#b9d8b6"))
     c.drawCentredString(W / 2, top - 55, "SERVICE ADDRESS")
-    field(c, "Service Address", W / 2 - 150, top - 76, 300, 16, size=10, color=white, align=1)
+    field(c, "Service Address", W / 2 - 150, top - 76, 300, 16, size=10, color=FOREST if inv else white, align=1)
 
     # ---- row of boxes ----
     y = top - hh - 14
@@ -243,26 +252,29 @@ def build_base(doc):
 
     foot_y = bottom - 30
     if doc["approve"]:
-        # approval line: the client signs and returns it
-        ay = bottom - 22
+        # approval: the client signs and returns it (tall lines so there's room to write)
+        ay = bottom - 24
         c.setFillColor(FOREST)
-        c.setFont("Helvetica-Bold", 8.5)
+        c.setFont("Helvetica-Bold", 9)
         c.drawString(X0, ay, "To approve this estimate, sign and return:")
         c.setStrokeColor(INK)
-        c.setLineWidth(0.6)
-        parts = [("Signature", 180), ("Printed name", 150), ("Date", 70)]
-        ay -= 20
-        x = X0
-        for lab, wdt in parts:
+        c.setLineWidth(0.7)
+
+        def sline(lab, x, wdt, y, fname=None):
             c.setFillColor(MUTED)
-            c.setFont("Helvetica", 7.5)
-            c.drawString(x, ay, lab)
-            lx0 = x + c.stringWidth(lab, "Helvetica", 7.5) + 4
-            c.line(lx0, ay - 2, lx0 + wdt - 4, ay - 2)
-            if lab != "Signature":
-                field(c, "Approved " + lab, lx0, ay - 1, wdt - 4, 12, size=9)
-            x = lx0 + wdt + 8
-        foot_y = bottom - 66
+            c.setFont("Helvetica", 8)
+            c.drawString(x, y, lab)
+            lx0 = x + c.stringWidth(lab, "Helvetica", 8) + 6
+            c.line(lx0, y - 3, x + wdt, y - 3)
+            if fname:
+                field(c, fname, lx0, y - 1, x + wdt - lx0, 20, size=11)
+
+        ay -= 34
+        sline("Signature", X0, X1 - X0, ay)
+        ay -= 32
+        sline("Printed name", X0, 330, ay, "Approved Printed name")
+        sline("Date", X0 + 350, X1 - X0 - 350, ay, "Approved Date")
+        foot_y = ay - 30
 
     # thank-you line
     c.setFillColor(DEEP)

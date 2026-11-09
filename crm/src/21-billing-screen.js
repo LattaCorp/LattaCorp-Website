@@ -1180,7 +1180,7 @@ function customInvoiceLink(cls) {
 }
 function customEstimateLink(cls) {
   return customDocLink(
-    "New Estimate/Quote",
+    "+ New Estimate/Quote",
     "custom-estimate.pdf",
     cls,
     "Fill-in-the-blanks estimate/quote PDF. Not saved in Foreman."
