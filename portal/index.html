@@ -60,16 +60,19 @@ label.f textarea{min-height:120px;resize:vertical}
 :root{--hdr:64px}
 .top{position:sticky;top:0;z-index:30;background:var(--forest);color:#fff;padding:env(safe-area-inset-top,0px) 12px 0 0;min-height:var(--hdr);display:flex;align-items:center;gap:8px;box-shadow:0 2px 10px rgba(0,0,0,.18)}
 .brandbar{display:flex;align-items:center;text-decoration:none;align-self:stretch;min-width:0}
-.brandbar .box{width:58px;align-self:stretch;display:grid;place-items:center;border-right:2px solid rgba(255,255,255,.7);margin-right:12px;flex:none}
-.brandbar .tree{height:34px;width:auto;display:block;filter:drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff)}
-.brandbar .bname{display:flex;align-items:baseline;gap:10px;min-width:0}
-.brandbar .fm{font-family:var(--serif);font-weight:700;font-size:1.2rem;line-height:1.1;color:#fff;white-space:nowrap}
-.brandbar .by{display:none;align-items:center;gap:7px;color:#d9ecd8;font-size:.95rem;white-space:nowrap}.brandbar .by img{height:17px;width:auto}
+.brandbar .box{width:66px;align-self:stretch;display:grid;place-items:center;border-right:2px solid rgba(255,255,255,.7);margin-right:12px;flex:none}
+.brandbar .tree{height:38px;width:auto;display:block;filter:drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff)}
+/* Same title style as the CRM's "Foreman by LattaCorp": stacked on phones, side by side on computers */
+.brandbar .bname{display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+.brandbar .fm{font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:1.7rem;line-height:1;color:#fff;letter-spacing:.01em;white-space:nowrap}
+.brandbar .by{display:flex;align-items:center;gap:4px;color:#d9ecd8;font-size:.7rem;font-weight:600;white-space:nowrap}.brandbar .by img{height:12px;width:auto;display:block;position:relative;top:1px}
 .top .grow{flex:1}
 .hb{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:8px;padding:8px 11px;font-weight:650;font-size:.86rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
 .hb:hover{background:rgba(255,255,255,.27)}.hb svg{width:16px;height:16px;flex:none}
 .hb .long{display:none}.hb .house{display:none}
-.acctsel{max-width:40vw;padding:8px 10px;border:0;border-radius:8px;background:#fff;font-weight:600;font-size:.9rem}
+.acctsel{max-width:40vw;padding:8px 10px;border:0;border-radius:8px;background:#fff;color:#1f2a22;font-weight:600;font-size:.9rem}
+/* Phones and tablets: a client with more than one account gets the account picker on its own row, so the title keeps its room */
+@media(max-width:899px){.top{flex-wrap:wrap}.top .brandbar{min-height:64px}.acctsel{order:5;flex:1 0 calc(100% - 24px);max-width:none;margin:0 0 10px 12px}}
 .staffbar{position:sticky;top:var(--hdr);z-index:25;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 16px;background:#fdf5e6;border-bottom:1px solid #f0dfb8;color:#6b4a0e}
 .staffbar input,.staffbar select{padding:8px 10px;border:1px solid #e3cf9f;border-radius:8px;background:#fff;font-size:.92rem}
 .staffbar .tocrm{margin-left:auto;color:#6b4a0e;font-weight:700;font-size:.9rem;white-space:nowrap}
@@ -87,11 +90,11 @@ nav.tabs button[aria-current=page]{color:var(--forest)}
 nav.tabs button[aria-current=page] svg{stroke-width:2.4}
 main.view{max-width:760px;margin:0 auto;padding:18px 16px calc(var(--tabh) + 34px + env(safe-area-inset-bottom,0px))}
 .brandbar .bname{overflow:hidden}.brandbar .fm{overflow:hidden;text-overflow:ellipsis}
-@media(max-width:439px){.hb .short{display:none}.hb .chev{display:none}.hb .house{display:block}.hb.site{padding:8px 9px}.brandbar .fm{font-size:1.08rem}}
+@media(max-width:439px){.hb .short{display:none}.hb .chev{display:none}.hb .house{display:block}.hb.site{padding:8px 9px}.brandbar .fm{font-size:1.3rem}}
 @media(min-width:600px){.hb .long{display:inline}.hb .short{display:none}}
 @media(min-width:900px){
   :root{--hdr:76px}
-  .brandbar .box{width:88px;margin-right:18px}.brandbar .tree{height:50px}.brandbar .fm{font-size:1.9rem}.brandbar .by{display:flex}
+  .brandbar .box{width:88px;margin-right:18px}.brandbar .tree{height:50px}.brandbar .bname{flex-direction:row;align-items:baseline;gap:12px}.brandbar .fm{font-size:2.6rem}.brandbar .by{font-size:.95rem;gap:7px}.brandbar .by img{height:20px;top:2px}
   .top{padding-right:16px;gap:10px}
   nav.tabs{top:var(--hdr);bottom:0;right:auto;width:224px;flex-direction:column;border-top:0;border-right:1px solid var(--line);padding:14px 10px;gap:6px}
   nav.tabs button{flex:0 0 auto;height:auto;flex-direction:row;justify-content:flex-start;gap:14px;padding:14px;border-radius:10px;border-left:5px solid transparent;font-size:1.05rem;font-weight:700;color:var(--forest)}
