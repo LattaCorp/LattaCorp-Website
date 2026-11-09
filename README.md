@@ -87,6 +87,7 @@ Code style: formatted with Prettier (settings in `crm/src/.prettierrc`).
 - In Foreman, each client page has a **Client portal** box: account status, who can sign in, **Send invite**, and **See their portal**.
 - Staff view (Stage 24): anyone on the Team list can sign in to the portal with their own email and switch between every client's account to see exactly what that client sees. Sending requests is turned off in staff view.
 - Info tab: guides live in `portal/guides.js` (English and Spanish). To add one (grass types, lawn damage...), copy a block there.
+- Properties (Stage 25): when a client has 2 or more billed properties (an HOA or management company), Home shows one box per property with its own amount due, under the total. Billing can show one property at a time, and the statement can be printed for one property or all. Property records with the same address count as one; a property with no invoices, visits or active job (like a billing office address) is left out.
 - The website's Client Portal page (`#/portal`) has its own sign-in card (`js/portal-signin.js`). It sends the same code, signs in with the same saved session (`lc-portal-auth`), then opens `/portal/`.
 - Turnstile: when the site key is set in `js/forms.js` (which also covers the sign-in card), also set it in `portal/portal.js` (`TURNSTILE_SITEKEY`).
 

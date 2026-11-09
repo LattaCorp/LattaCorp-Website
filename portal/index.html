@@ -139,6 +139,21 @@ nav.tabs .wide{display:none}
 .date{flex:0 0 52px;text-align:center;border-radius:10px;background:var(--mint);padding:6px 0;line-height:1.1}
 .date b{display:block;font-family:var(--serif);font-size:1.25rem;color:var(--forest)}
 .date span{font-size:.72rem;color:var(--muted);font-weight:700}
+/* One box per property (HOAs and managers with several properties billed separately) */
+.propgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px}
+.propbox{display:flex;flex-direction:column;align-items:stretch;text-align:left;font:inherit;color:inherit;background:#fff;border:1px solid var(--line);border-left:5px solid var(--leaf,#3f8f4f);border-radius:12px;padding:14px 14px 12px;cursor:pointer;gap:2px}
+.propbox:hover{box-shadow:0 4px 14px rgba(27,85,43,.12)}.propbox:focus-visible{outline:3px solid var(--forest);outline-offset:2px}
+.propbox.due{border-left-color:#c58a1d}.propbox.past_due{border-left-color:var(--brick)}
+.propbox .stop{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:6px}
+.propbox .snm b{display:block;font-weight:700;color:var(--forest);font-size:1.02rem;line-height:1.25}
+.propbox .snm span{display:block;color:var(--muted);font-size:.82rem;overflow-wrap:anywhere}
+.propbox .samt{font-family:var(--serif);font-size:1.6rem;font-weight:700;line-height:1.1;color:var(--forest)}
+.propbox.past_due .samt{color:var(--brick)}.propbox.due .samt{color:#8a5a12}
+.propbox .slab{font-size:.8rem;color:var(--muted);margin-bottom:6px}
+.propbox .smeta{font-size:.84rem;color:var(--ink,#1f2a22)}
+.propbox .sgo{margin-top:8px;font-weight:700;color:var(--forest);font-size:.88rem}
+.sitebal{margin-top:12px}.list li.tap{cursor:pointer}.list li.tap:hover .main b{text-decoration:underline}
+.sitepick select{width:100%}.sitepick{scroll-margin-top:calc(var(--hdr) + 12px)}
 .pill{display:inline-block;font-size:.76rem;font-weight:700;padding:3px 9px;border-radius:999px;background:var(--mint);color:var(--forest);white-space:nowrap}
 .pill.due{background:var(--amberbg);color:var(--amber)}.pill.past_due{background:var(--brickbg);color:var(--brick)}
 .pill.gray{background:var(--stonebg);color:var(--stone)}
@@ -239,6 +254,6 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../crm/config.js"></script>
 <script src="guides.js?v=2"></script>
-<script src="portal.js?v=11"></script>
+<script src="portal.js?v=12"></script>
 </body>
 </html>

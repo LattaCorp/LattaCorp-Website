@@ -24,6 +24,12 @@
   var qs = new URLSearchParams(location.search);
   var lang = qs.get("lang") === "es" ? "es" : store("lc-portal-lang") || ((navigator.language || "").slice(0, 2) === "es" ? "es" : "en");
   var ES = {
+    "Paid up": "Al día", "Amount due": "Monto pendiente", "Nothing due": "Nada pendiente", "Last invoice": "Última factura",
+    "See invoices": "Ver facturas", "Total past due": "Total atrasado", "Total amount due": "Total pendiente", "For all": "Para las",
+    "properties": "propiedades", "Each property is billed on its own; see the amounts below.": "Cada propiedad se factura por separado; vea los montos abajo.",
+    "Your properties": "Sus propiedades", "Total balance due": "Saldo total pendiente", "Show invoices for": "Mostrar facturas de",
+    "All properties": "Todas las propiedades", "Balance for": "Saldo de", "For": "Para",
+    "Pick All properties above for one statement covering everything.": "Elija Todas las propiedades arriba para un estado de cuenta con todo.",
     "Client portal": "Portal de clientes", "Sign in to your account": "Entre a su cuenta",
     "Enter the email we have on file. We'll send you a sign-in code. No password needed.": "Escriba el correo que tenemos en su cuenta. Le enviaremos un código de acceso. No necesita contraseña.",
     "Email": "Correo electrónico", "Send my code": "Enviar mi código", "Check your email": "Revise su correo",
@@ -183,7 +189,7 @@
   }
 
   /* ---------- account data ---------- */
-  var accounts = [], curId = null, data = null, view = "home", photoUrls = {}, flash = "", isStaff = false;
+  var accounts = [], curId = null, data = null, view = "home", photoUrls = {}, flash = "", isStaff = false, siteKey = "";
   function boot() {
     var th = qs.get("th");
     var tys = [qs.get("ty") || "magiclink"].concat(["recovery", "email", "magiclink"].filter(function (x) { return x !== qs.get("ty"); }));
@@ -237,11 +243,12 @@
   }
 
   /* Computers: one box to type a name and pick from the list that drops down under it. */
-  var combo = $("staffcombo"), clist = $("stafflist"), cIdx = -1, cItems = [];
+  var combo = $("staffcombo"), clist = $("stafflist"), cIdx = -1, cItems = [], typed = false;
   function comboLabel(a) { return a.name + (a.company && a.company !== a.name ? " (" + a.company + ")" : ""); }
   function comboOpen(open) { clist.classList.toggle("hide", !open); combo.setAttribute("aria-expanded", open ? "true" : "false"); }
   function comboDraw() {
-    var q = combo.value.toLowerCase().trim();
+    // Until something is typed the box still shows the current client's name, so list everyone.
+    var q = typed ? combo.value.toLowerCase().trim() : "";
     cItems = accounts.filter(function (a) { return !q || comboLabel(a).toLowerCase().indexOf(q) > -1; });
     clist.textContent = "";
     if (!cItems.length) { clist.appendChild(el("li", "none", t("No matches"))); cIdx = -1; return; }
@@ -258,8 +265,8 @@
     else combo.removeAttribute("aria-activedescendant");
   }
   function comboChoose(a) { comboOpen(false); combo.blur(); combo.value = a.name; pickAccount(a.id); }
-  combo.addEventListener("focus", function () { combo.select(); cIdx = -1; comboDraw(); comboOpen(true); });
-  combo.addEventListener("input", function () { cIdx = 0; comboDraw(); comboOpen(true); });
+  combo.addEventListener("focus", function () { typed = false; combo.select(); cIdx = -1; comboDraw(); comboOpen(true); });
+  combo.addEventListener("input", function () { typed = true; cIdx = 0; comboDraw(); comboOpen(true); });
   combo.addEventListener("blur", function () { comboOpen(false); drawStaffBar(); });
   combo.addEventListener("keydown", function (e) {
     if (e.key === "ArrowDown") { e.preventDefault(); cIdx = Math.min(cItems.length - 1, cIdx + 1); comboDraw(); comboOpen(true); }
@@ -273,6 +280,7 @@
   function loadAccount() {
     return sb.rpc("portal_account", { cid: curId }).then(function (r) {
       if (r.error || !r.data) throw r.error || new Error("no data");
+      if (!data || data.client.id !== r.data.client.id) siteKey = "";
       data = r.data; store("lc-portal-acct", curId); show(view);
     });
   }
@@ -296,6 +304,32 @@
     if (opts.right) i.appendChild(opts.right); list.appendChild(i); return i;
   }
   function pill(text, cls) { return el("span", "pill" + (cls ? " " + cls : ""), text); }
+  /* Properties billed separately (an HOA or management company with several). Only used when there are 2 or more. */
+  function sites() { var x = data.sites || []; return x.length > 1 ? x : []; }
+  function siteOf(key) { return sites().filter(function (x) { return x.key === key; })[0]; }
+  function sitePill(x) { return Number(x.past_due) > 0 ? pill(t("Past due"), "past_due") : Number(x.balance) > 0 ? pill(t("Due"), "due") : pill(t("Paid up")); }
+  function siteCards(host, onPick) {
+    var g = el("div", "propgrid");
+    sites().forEach(function (x) {
+      var c = el("button", "propbox" + (Number(x.past_due) > 0 ? " past_due" : Number(x.balance) > 0 ? " due" : "")); c.type = "button";
+      var top = el("div", "stop"), nm = el("div", "snm");
+      nm.appendChild(el("b", null, x.name));
+      if (x.address && x.address !== x.name) nm.appendChild(el("span", null, x.address));
+      top.appendChild(nm); top.appendChild(sitePill(x)); c.appendChild(top);
+      c.appendChild(el("div", "samt", money(x.balance)));
+      c.appendChild(el("div", "slab", Number(x.past_due) > 0 ? t("Past due") : Number(x.balance) > 0 ? t("Amount due") : t("Nothing due")));
+      var meta = [];
+      if (x.next_due && Number(x.balance) > 0) meta.push(t("Due by") + " " + fdate(x.next_due));
+      if (x.next_visit) meta.push(t("Next visit") + ": " + fdate(x.next_visit, { month: "short", day: "numeric" }));
+      if (x.last_invoice) meta.push(t("Last invoice") + " " + invNum(x.last_invoice.number) + " · " + fdate(x.last_invoice.date));
+      meta.forEach(function (m) { c.appendChild(el("div", "smeta", m)); });
+      c.appendChild(el("div", "sgo", t("See invoices") + " ›"));
+      c.onclick = function () { onPick(x); };
+      g.appendChild(c);
+    });
+    host.appendChild(g);
+  }
+  function toPick() { var e = document.querySelector(".sitepick"); if (e) e.scrollIntoView({ block: "start" }); }
   function invPill(s) { return s === "past_due" ? pill(t("Past due"), "past_due") : s === "due" ? pill(t("Due"), "due") : s === "void" ? pill(t("Void"), "gray") : pill(t("Paid")); }
   function docLink(tok, label) { var a = el("a", "btn alt", label || t("View")); a.href = "../d/?t=" + encodeURIComponent(tok); a.target = "_blank"; a.rel = "noopener"; a.style.minHeight = "38px"; a.style.padding = "0 14px"; return a; }
 
@@ -305,13 +339,14 @@
     var band = el("section", "band " + st);
     band.appendChild(el("p", "who", isStaff ? t("What the client sees") + ": " + c.name
       : t("Hi") + ", " + (firstName(data.me && data.me.name) || firstName(c.nickname || c.name)) + (accounts.length > 1 ? " · " + c.name : "")));
+    var many = sites().length;
     if (st === "past_due") {
-      band.appendChild(el("h1", null, t("Past due")));
+      band.appendChild(el("h1", null, t(many ? "Total past due" : "Past due")));
       band.appendChild(el("div", "amt", money(s.balance)));
       band.appendChild(el("p", null, (s.past_due_since ? t("Overdue since") + " " + fdate(s.past_due_since) + ". " : "") + t("Please pay as soon as you can to keep your service on schedule.")));
     } else if (st === "due") {
       var nextDue = (data.invoices || []).filter(function (i) { return i.status === "due" && i.due_date; }).map(function (i) { return i.due_date; }).sort()[0];
-      band.appendChild(el("h1", null, t("Payment due")));
+      band.appendChild(el("h1", null, t(many ? "Total amount due" : "Payment due")));
       band.appendChild(el("div", "amt", money(s.balance)));
       if (nextDue) band.appendChild(el("p", null, t("Due by") + " " + fdate(nextDue) + "."));
     } else if (st === "paused") {
@@ -324,7 +359,13 @@
     var acts = el("div", "acts");
     if (Number(s.balance) > 0) { var pb = el("button", "btn", t("How to pay")); pb.type = "button"; pb.onclick = function () { show("billing"); }; acts.appendChild(pb); }
     var rb = el("button", "btn ghost", t("Request service")); rb.type = "button"; rb.onclick = function () { show("requests"); }; acts.appendChild(rb);
+    if (many && Number(s.balance) > 0) band.appendChild(el("p", "small", t("For all") + " " + many + " " + t("properties") + ". " + t("Each property is billed on its own; see the amounts below.")));
     band.appendChild(acts); host.appendChild(band);
+
+    if (many) {
+      var sp = panel(host, t("Your properties"));
+      siteCards(sp, function (x) { siteKey = x.key; show("billing"); toPick(); });
+    }
 
     var nv = panel(host, t("Next visit"));
     if (s.next_visit) { var l = el("ul", "list"); li(l, { date: s.next_visit.date, title: s.next_visit.service || "", sub: fdate(s.next_visit.date, { weekday: "long", month: "long", day: "numeric" }) + (s.next_visit.address ? " · " + s.next_visit.address : "") }); nv.appendChild(l); }
@@ -381,11 +422,23 @@
   function billing(host) {
     var s = data.summary, b = data.business || {};
     var top = panel(host);
-    var r = el("div", "row"); r.appendChild(el("h2", null, t("Balance due")));
+    var many = sites().length;
+    var r = el("div", "row"); r.appendChild(el("h2", null, t(many ? "Total balance due" : "Balance due")));
     r.appendChild(s.status === "past_due" ? pill(t("Past due"), "past_due") : Number(s.balance) > 0 ? pill(t("Due"), "due") : pill(t("Paid")));
     top.appendChild(r);
     var big = el("div", null, money(s.balance)); big.style.cssText = "font-family:var(--serif);font-size:2.2rem;font-weight:700;color:var(--forest);line-height:1.1"; top.appendChild(big);
     if (Number(s.credit) > 0) top.appendChild(el("p", "muted small", t("Credit on account") + ": " + money(s.credit)));
+    if (many) {
+      var bl = el("ul", "list sitebal");
+      sites().forEach(function (x) {
+        var rt = el("div"); rt.style.textAlign = "right"; rt.appendChild(el("div", "amt", money(x.balance))); rt.appendChild(sitePill(x));
+        var item = li(bl, { title: x.name, sub: x.address && x.address !== x.name ? x.address : "", right: rt });
+        item.classList.add("tap"); item.tabIndex = 0; item.setAttribute("role", "button");
+        var pick = function () { siteKey = x.key; show("billing"); toPick(); };
+        item.onclick = pick; item.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); pick(); } };
+      });
+      top.appendChild(bl);
+    }
 
     var pay = el("div", "paybox"); pay.appendChild(el("h3", null, t("How to pay")));
     if (b.zelle) { var z = el("p"); z.appendChild(el("b", null, t("Pay with Zelle") + ": ")); z.appendChild(document.createTextNode(b.zelle)); pay.appendChild(z); pay.appendChild(el("p", "small muted", t("Please include your invoice number in the Zelle note."))); }
@@ -393,13 +446,30 @@
     pay.appendChild(el("p", "small muted", t("Online card and bank payments are coming soon.")));
     host.appendChild(pay);
 
-    var invs = data.invoices || [], open = invs.filter(function (i) { return i.status === "due" || i.status === "past_due"; });
+    // With several properties, the lists below can show one property at a time.
+    var cur = siteOf(siteKey); if (!cur) siteKey = "";
+    if (many) {
+      var fp = el("div", "panel sitepick"), fl = el("label", "f"), fs = el("select");
+      fl.appendChild(el("span", null, t("Show invoices for")));
+      var oa = el("option", null, t("All properties")); oa.value = ""; fs.appendChild(oa);
+      sites().forEach(function (x) { var o = el("option", null, x.name + " · " + money(x.balance)); o.value = x.key; if (x.key === siteKey) o.selected = true; fs.appendChild(o); });
+      fs.onchange = function () { siteKey = fs.value; show("billing"); };
+      fl.appendChild(fs); fp.appendChild(fl);
+      if (cur) {
+        var cs = el("div", "row"); cs.style.marginTop = "10px";
+        var cb = el("div"); cb.appendChild(el("b", null, t("Balance for") + " " + cur.name + ": " + money(cur.balance)));
+        cs.appendChild(cb); cs.appendChild(sitePill(cur)); fp.appendChild(cs);
+      }
+      host.appendChild(fp);
+    }
+    var inSite = function (x) { return !siteKey || x.site === siteKey; };
+    var invs = (data.invoices || []).filter(inSite), open = invs.filter(function (i) { return i.status === "due" || i.status === "past_due"; });
     if (open.length) {
       var op = panel(host, t("Open invoices")), ol = el("ul", "list");
       open.forEach(function (i) {
         var rt = el("div"); rt.style.cssText = "display:flex;gap:10px;align-items:center";
         var a = el("div"); a.style.textAlign = "right"; a.appendChild(el("div", "amt", money(i.balance))); a.appendChild(invPill(i.status)); rt.appendChild(a); rt.appendChild(docLink(i.token));
-        li(ol, { title: t("Invoice") + " " + invNum(i.number), sub: fdate(i.issue_date) + (i.due_date ? " · " + t("Due by") + " " + fdate(i.due_date) : ""), right: rt });
+        li(ol, { title: t("Invoice") + " " + invNum(i.number), sub: fdate(i.issue_date) + (i.due_date ? " · " + t("Due by") + " " + fdate(i.due_date) : "") + (many && !siteKey && siteOf(i.site) ? " · " + siteOf(i.site).name : ""), right: rt });
       });
       op.appendChild(ol);
     }
@@ -411,7 +481,8 @@
       seg.appendChild(bt);
     });
     stp.appendChild(seg);
-    var pr = el("button", "btn alt", t("Print statement")); pr.type = "button"; pr.onclick = function () { printStatement(range); }; stp.appendChild(pr);
+    if (cur) stp.appendChild(el("p", "small muted", t("For") + " " + cur.name + ". " + t("Pick All properties above for one statement covering everything.")));
+    var pr = el("button", "btn alt", t("Print statement")); pr.type = "button"; pr.onclick = function () { printStatement(range, siteKey); }; stp.appendChild(pr);
 
     var all = panel(host, t("All invoices"));
     if (!invs.length) all.appendChild(el("p", "muted", t("No invoices yet.")));
@@ -422,14 +493,14 @@
         invs.slice(0, n).forEach(function (i) {
           var rt = el("div"); rt.style.cssText = "display:flex;gap:10px;align-items:center";
           var a = el("div"); a.style.textAlign = "right"; a.appendChild(el("div", "amt", money(i.total))); a.appendChild(invPill(i.status)); rt.appendChild(a); rt.appendChild(docLink(i.token));
-          li(al, { title: t("Invoice") + " " + invNum(i.number), sub: fdate(i.issue_date) + (i.address ? " · " + i.address : ""), right: rt });
+          li(al, { title: t("Invoice") + " " + invNum(i.number), sub: fdate(i.issue_date) + (siteKey ? "" : i.address ? " · " + (siteOf(i.site) ? siteOf(i.site).name : i.address) : ""), right: rt });
         });
         if (invs.length > n) { var mb = el("li"); var bt = el("button", "btn alt", t("Show more")); bt.type = "button"; bt.onclick = function () { n += 24; drawInv(); }; mb.appendChild(bt); al.appendChild(mb); }
       };
       drawInv();
     }
 
-    var pp = panel(host, t("Payments")), pays = data.payments || [];
+    var pp = panel(host, t("Payments")), pays = (data.payments || []).filter(inSite);
     if (!pays.length) pp.appendChild(el("p", "muted", t("No payments yet.")));
     else {
       var pl = el("ul", "list"); pays.slice(0, 24).forEach(function (x) {
@@ -439,14 +510,15 @@
     }
   }
 
-  function printStatement(range) {
+  function printStatement(range, key) {
+    var only = function (x) { return !key || x.site === key; }, site = siteOf(key);
     var today = pd(data.summary.today) || new Date(), y = today.getFullYear(), from = null, to = today;
     if (range === "year") from = new Date(y, 0, 1);
     else if (range === "last") { from = new Date(y - 1, 0, 1); to = new Date(y - 1, 11, 31); }
     else if (range === "12m") from = new Date(y - 1, today.getMonth(), today.getDate() + 1);
     var ev = [];
-    (data.invoices || []).forEach(function (i) { if (i.status !== "void") ev.push({ d: pd(i.issue_date), desc: t("Invoice") + " " + invNum(i.number), chg: Number(i.total) || 0, pay: 0 }); });
-    (data.payments || []).forEach(function (p) { ev.push({ d: pd(p.date), desc: t("Payment") + (p.method ? " · " + p.method : "") + (p.invoice ? " (" + invNum(p.invoice) + ")" : ""), chg: 0, pay: Number(p.amount) || 0 }); });
+    (data.invoices || []).filter(only).forEach(function (i) { if (i.status !== "void") ev.push({ d: pd(i.issue_date), desc: t("Invoice") + " " + invNum(i.number), chg: Number(i.total) || 0, pay: 0 }); });
+    (data.payments || []).filter(only).forEach(function (p) { ev.push({ d: pd(p.date), desc: t("Payment") + (p.method ? " · " + p.method : "") + (p.invoice ? " (" + invNum(p.invoice) + ")" : ""), chg: 0, pay: Number(p.amount) || 0 }); });
     ev = ev.filter(function (e) { return e.d; }).sort(function (a, b) { return a.d - b.d || b.chg - a.chg; });
     var open = 0, rows = [];
     ev.forEach(function (e) { if (from && e.d < from) open += e.chg - e.pay; else if (e.d <= to) rows.push(e); });
@@ -461,7 +533,7 @@
       "td{padding:8px;border-bottom:1px solid #e4ece1}td.n,th.n{text-align:right;white-space:nowrap}.tot td{font-weight:700;font-size:16px;border-bottom:0}.muted{color:#58675c}" +
       "@media print{body{margin:14mm}}</style></head><body>" +
       "<div class=hd><div><img src='" + location.origin + "/images/logo-tree-header.png' alt=''><span class=biz>" + esc(b.name || "Latta Corp of Central Florida") + "</span><div class=muted>" + esc(b.phone || PHONE_TXT) + " · " + esc(b.email || SUPPORT) + "</div></div>" +
-      "<div style='text-align:right'><h1>" + esc(t("Statement")) + "</h1><div>" + esc(c.name) + "</div><div class=muted>" + (from ? df(from) + " – " : "") + df(to) + "</div></div></div>" +
+      "<div style='text-align:right'><h1>" + esc(t("Statement")) + "</h1><div>" + esc(c.name) + "</div>" + (site ? "<div><b>" + esc(site.name) + "</b>" + (site.address && site.address !== site.name ? " · " + esc(site.address) : "") + "</div>" : "") + "<div class=muted>" + (from ? df(from) + " – " : "") + df(to) + "</div></div></div>" +
       "<table><thead><tr><th>" + t("Date") + "</th><th>" + t("Description") + "</th><th class=n>" + t("Charges") + "</th><th class=n>" + t("Payments") + "</th><th class=n>" + t("Balance") + "</th></tr></thead><tbody>" +
       (from ? "<tr><td></td><td>" + t("Opening balance") + "</td><td></td><td></td><td class=n>" + money(open) + "</td></tr>" : "") + tr +
       "<tr class=tot><td></td><td>" + t("Closing balance") + "</td><td></td><td></td><td class=n>" + money(bal) + "</td></tr></tbody></table>" +
