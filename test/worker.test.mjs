@@ -107,7 +107,9 @@ r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
   assert.equal(r.status, 200);
   let mail = calls.find((c) => c.u.includes("api.resend.com"));
   assert(mail, "code emailed"); assert.deepEqual(mail.body.to, ["jane@example.com"]); assert(mail.body.subject.includes("482913"));
-  assert.equal(mail.body.from, "Latta Corp Website <website@lattacorpfl.com>"); assert(mail.body.html.includes("portal/?th=abc123"));
+  assert.equal(mail.body.from, "Latta Corp of Central Florida <website@lattacorpfl.com>"); assert(mail.body.html.includes("portal/?th=abc123"));
+  assert.equal(mail.body.reply_to, "Support@lattacorpfl.com"); assert(mail.body.html.includes("automated message")); assert(mail.body.text.includes("482913"));
+  assert.equal(mail.body.headers["Auto-Submitted"], "auto-generated");
   assert(calls.find((c) => c.u.includes("/rest/v1/portal_signins") && c.body && c.body.sent === true), "logged");
   // unknown email: same answer, but nothing is created or sent
   calls = []; allowed = false; r = await post("/api/portal/code", { email: "stranger@example.com" });
@@ -125,7 +127,7 @@ r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
   acctOk = false; r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "service", details: "x" }, true); assert.equal(r.status, 403); acctOk = true;
   // invite: staff only
   calls = []; r = await post("/api/portal/invite", { client_id: "11111111-1111-4111-8111-111111111111", email: "jane@example.com", name: "Jane Doe" }, true);
-  assert.equal(r.status, 200); mail = calls.find((c) => c.u.includes("api.resend.com")); assert.deepEqual(mail.body.to, ["jane@example.com"]); assert(mail.body.html.includes("Welcome, Jane"));
+  assert.equal(r.status, 200); mail = calls.find((c) => c.u.includes("api.resend.com")); assert.deepEqual(mail.body.to, ["jane@example.com"]); assert(mail.body.html.includes("Welcome, Jane")); assert(mail.body.from.includes("website@")); assert(mail.body.text.includes("Open my portal: https://lattacorpfl.com/portal/"));
   assert(calls.find((c) => c.u.includes("/rest/v1/clients?id=eq.") && c.body.portal_invited_at), "invite date saved");
   staff = false; r = await post("/api/portal/invite", { client_id: "11111111-1111-4111-8111-111111111111", email: "jane@example.com" }, true); assert.equal(r.status, 403); staff = true;
 }

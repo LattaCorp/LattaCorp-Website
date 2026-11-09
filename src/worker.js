@@ -8,6 +8,15 @@ const DEFAULT_TO = "lattacorpofcentralfl@gmail.com";
 // Who form emails come FROM. FROM_EMAIL (wrangler.jsonc) uses our own verified domain; this shared Resend address is
 // the backup if Resend ever refuses it.
 const FALLBACK_FROM = "Latta Corp Website <onboarding@resend.dev>";
+// Emails to CUSTOMERS come from two automated addresses (not monitored); replies are routed to Support@:
+//   website@  -> account emails: sign-in codes, portal invitations
+//   payments@ -> billing emails: invoices, reminders, receipts (used when automatic billing emails are added)
+// Form notifications to the business still come from FROM_EMAIL. Support@ is the one address people talk to.
+const AUTO_FROM = "Latta Corp of Central Florida <website@lattacorpfl.com>";
+const BILLING_FROM = "Latta Corp Billing <payments@lattacorpfl.com>";
+const SUPPORT_EMAIL = "Support@lattacorpfl.com";
+// Marks a message as automatic, so mail programs don't send vacation auto-replies to it.
+const AUTO_HEADERS = { "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All" };
 // The CRM database (Supabase). The URL is public; the secret key SUPABASE_SECRET_KEY is set in Cloudflare (Settings > Variables and Secrets).
 const DEFAULT_SUPABASE_URL = "https://lvaofwtfxwlqwvzesckt.supabase.co";
 // Public (browser-safe) key, the same one in crm/config.js. Used only to ask Supabase who a signed-in person is.
@@ -301,7 +310,7 @@ const sbRest = (env, path, init = {}) => fetch(`${baseUrl(env)}/rest/v1/${path}`
 const bearer = (request) => (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
 
 // Branded email (logo, green header, one big button). Used for sign-in codes and invitations.
-function portalEmail({ heading, lines, code, button, link, small }) {
+function portalEmail({ heading, lines, code, button, link, small, es }) {
   const p = (t) => `<p style="margin:0 0 14px;font-size:16px;line-height:1.55;color:#1c2a20">${t}</p>`;
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f3f7f1">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f7f1;padding:28px 12px"><tr><td align="center">
@@ -316,9 +325,18 @@ ${code ? `<div style="margin:6px 0 20px;padding:16px;text-align:center;backgroun
 ${button ? `<p style="margin:0 0 22px"><a href="${link}" style="display:inline-block;background:#1b552b;color:#ffffff;text-decoration:none;font-family:Arial,sans-serif;font-weight:700;font-size:16px;padding:13px 26px;border-radius:6px">${button}</a></p>` : ""}
 ${small ? `<p style="margin:0 0 18px;font-size:13px;line-height:1.5;color:#58675c">${small}</p>` : ""}
 </td></tr>
-<tr><td style="padding:16px 28px 22px;border-top:1px solid #e4ece1;font-family:Arial,sans-serif;font-size:13px;color:#58675c">
-Latta Corp of Central Florida · Kissimmee, FL · <a href="tel:4074705309" style="color:#1b552b">407-470-5309</a> · <a href="${SITE}" style="color:#1b552b">lattacorpfl.com</a></td></tr>
+<tr><td style="padding:16px 28px 22px;border-top:1px solid #e4ece1;font-family:Arial,sans-serif;font-size:13px;line-height:1.5;color:#58675c">
+${es ? "Este es un mensaje automático. Por favor no responda a este correo. ¿Preguntas? Escriba a" : "This is an automated message. Please don't reply to this email. Questions? Email"} <a href="mailto:${SUPPORT_EMAIL}" style="color:#1b552b">${SUPPORT_EMAIL}</a> ${es ? "o llame o envíe un texto al" : "or call or text"} <a href="tel:4074705309" style="color:#1b552b">407-470-5309</a>.<br>
+Latta Corp of Central Florida · Kissimmee, FL · <a href="${SITE}" style="color:#1b552b">lattacorpfl.com</a></td></tr>
 </table></td></tr></table></body></html>`;
+}
+// Plain-text twin of portalEmail (mail filters trust messages that include one).
+function portalText({ heading, lines, code, button, link, small, es }) {
+  const strip = (s) => String(s).replace(/<br>/g, "\n").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&");
+  return [strip(heading), "", ...lines.map(strip), code ? "\n" + code + "\n" : "", button ? strip(button) + ": " + link : "", small ? "\n" + strip(small) : "",
+    "\n--", es ? "Este es un mensaje automático. Por favor no responda. ¿Preguntas? " + SUPPORT_EMAIL + " o 407-470-5309."
+               : "This is an automated message. Please don't reply. Questions? " + SUPPORT_EMAIL + " or 407-470-5309.",
+    "Latta Corp of Central Florida · Kissimmee, FL · lattacorpfl.com"].filter((x) => x !== "").join("\n");
 }
 
 export async function handlePortalCode(request, env) {
@@ -347,18 +365,19 @@ export async function handlePortalCode(request, env) {
       const code = String(pr.email_otp || ""), th = String(pr.hashed_token || "");
       if (code && th) {
         const link = `${PORTAL_URL}?th=${encodeURIComponent(th)}&ty=${encodeURIComponent(pr.verification_type || "magiclink")}${es ? "&lang=es" : ""}`;
+        const m = es ? {
+          es, heading: "Su código de acceso", lines: ["Use este código para entrar a su cuenta de cliente de LattaCorp. Vence en 1 hora."], code,
+          button: "O entre con un toque", link,
+          small: "Si usted no pidió este código, puede ignorar este correo. Nadie puede entrar a su cuenta sin él.",
+        } : {
+          heading: "Your sign-in code", lines: ["Use this code to sign in to your LattaCorp client account. It expires in 1 hour."], code,
+          button: "Or sign in with one tap", link,
+          small: "If you didn't ask for this code, you can ignore this email. No one can get into your account without it.",
+        };
         sent = await sendViaResend(env, {
-          from: env.FROM_EMAIL || FALLBACK_FROM, to: [email],
+          from: AUTO_FROM, to: [email], reply_to: SUPPORT_EMAIL, headers: AUTO_HEADERS,
           subject: es ? `Su código de acceso de LattaCorp: ${code}` : `Your LattaCorp sign-in code: ${code}`,
-          html: portalEmail(es ? {
-            heading: "Su código de acceso", lines: ["Use este código para entrar a su cuenta de cliente de LattaCorp. Vence en 1 hora."], code,
-            button: "O entre con un toque", link,
-            small: "Si usted no pidió este código, puede ignorar este correo. Nadie puede entrar a su cuenta sin él.",
-          } : {
-            heading: "Your sign-in code", lines: ["Use this code to sign in to your LattaCorp client account. It expires in 1 hour."], code,
-            button: "Or sign in with one tap", link,
-            small: "If you didn't ask for this code, you can ignore this email. No one can get into your account without it.",
-          }),
+          html: portalEmail(m), text: portalText(m),
         });
       }
     } else console.log("portal code: could not make a code", gl.status, await errText(gl));
@@ -422,11 +441,8 @@ export async function handlePortalInvite(request, env) {
   if (!al.ok || (await al.json()) !== true) return json({ error: "That email doesn't have portal access yet. Turn on portal access for it first." }, 400);
   const es = String(d.lang || "") === "es";
   const name = String(d.name || "").trim().split(/\s+/)[0] || "";
-  const ok = await sendViaResend(env, {
-    from: env.FROM_EMAIL || FALLBACK_FROM, to: [to], reply_to: "Support@lattacorpfl.com",
-    subject: es ? "Su portal de cliente de LattaCorp está listo" : "Your LattaCorp client portal is ready",
-    html: portalEmail(es ? {
-      heading: `Bienvenido${name ? ", " + esc(name) : ""}`,
+  const m = es ? {
+      es, heading: `Bienvenido${name ? ", " + esc(name) : ""}`,
       lines: ["Ahora puede ver su cuenta con LattaCorp en línea, cuando quiera:",
         "• Sus próximas visitas y las ya realizadas<br>• Facturas, pagos y estados de cuenta para imprimir<br>• Fotos de su propiedad<br>• Pedir servicio o una cotización",
         `Para entrar, abra el portal y escriba este correo (${esc(to)}). Le enviaremos un código de un solo uso. No necesita contraseña.`],
@@ -439,7 +455,11 @@ export async function handlePortalInvite(request, env) {
         `To sign in, open the portal and enter this email (${esc(to)}). We'll send you a one-time code. No password needed.`],
       button: "Open my portal", link: PORTAL_URL,
       small: "Questions? Call or text 407-470-5309.",
-    }),
+    };
+  const ok = await sendViaResend(env, {
+    from: AUTO_FROM, to: [to], reply_to: SUPPORT_EMAIL, headers: AUTO_HEADERS,
+    subject: es ? "Su portal de cliente de LattaCorp está listo" : "Your LattaCorp client portal is ready",
+    html: portalEmail(m), text: portalText(m),
   });
   if (!ok) return json({ error: "The email could not be sent." }, 502);
   await sbRest(env, `clients?id=eq.${cid}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ portal_invited_at: new Date().toISOString() }) });
