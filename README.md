@@ -34,12 +34,47 @@ A plain HTML/CSS/JavaScript site. No build step: open `index.html` in a browser 
 ## Checking the form code
 `node test/worker.test.mjs` runs a quick automatic check of `src/worker.js`.
 
-## CRM (Phase 1: leads inbox)
-- Database: Supabase project `lvaofwtfxwlqwvzesckt` (leads table, staff list). Set it up once by running `supabase/schema.sql` in Supabase > SQL Editor.
+## CRM (Foreman, at `/crm/`)
+
+### Where the CRM code lives
+The CRM's code is split into one file per section in `crm/src/`. The browser loads one combined file, `crm/app.js`,
+which is **generated**: never edit it directly. After changing anything in `crm/src/`, run `node tools/build_crm.mjs`;
+it rebuilds `crm/app.js` and bumps the version numbers so phones pick up the change.
+
+| Section | File in `crm/src/` |
+|---|---|
+| Shared settings, lists and data | `00-state.js` |
+| Small tools used everywhere (buttons, fields, dates, money) | `01-helpers.js` |
+| Sign in / out, loading data from Supabase | `02-signin-and-loading.js` |
+| Side menu, tabs, pop-up side panel | `03-main-screen.js` |
+| Leads | `04-leads.js` |
+| Clients, other contacts, properties, CSV import | `05-clients.js` |
+| Search box at the top | `06-search.js` |
+| Jobs and services | `07-jobs.js` |
+| Schedule, weather delays | `08-schedule.js` |
+| Reminder messages | `09-reminders.js` |
+| Team (logins) | `10-team.js` |
+| Personnel | `11-personnel.js` |
+| To-Do | `12-todo.js` |
+| Reports and charts | `13-reports.js` |
+| Expenses (tax ledger, receipt scan) | `14-expenses.js` |
+| Tax Report | `15-tax-report.js` |
+| Photos | `16-photos.js` |
+| Crew routes and the crew screen | `17-crew.js` |
+| Billing: invoices / payments / history import / Billing tab / client page | `18-` to `22-billing-*.js` |
+| Price calculator and estimates form | `23-price-calculator.js` |
+| Inventory | `24-inventory.js` |
+
+Screens, colors and layout (CSS) are in `crm/index.html`. `crm/sw.js` keeps the app installable and opening fast.
+Code style: formatted with Prettier (settings in `crm/src/.prettierrc`).
+
+### Database (Supabase project `lvaofwtfxwlqwvzesckt`)
+- Every table has a plain-English label in Supabase's Table Editor saying which part it belongs to, for example "CRM › Billing".
+- `supabase/stages/` holds each database change in the order it was made (Stage 0 to Stage 22). New changes get the next stage number.
+- `supabase/full_setup.sql` is all the stages in one file, for rebuilding the database from scratch. The live database is already set up.
 - Website forms save a lead to the database AND email it. The server code needs the secret `SUPABASE_SECRET_KEY` in Cloudflare (Settings > Variables and Secrets > Secret). Never put the secret key in GitHub.
-- The CRM page is at `/crm/` (`crm/index.html`). Staff sign in with email and password (create users in Supabase > Authentication > Users; turn off public sign-ups). Only emails listed in the `staff` table can see leads.
+- Staff sign in with email and password (users in Supabase > Authentication > Users; public sign-ups off). Only emails in the `staff` table can see CRM data; Personnel is owners only.
 - Check status at `/api/health` (shows `crmKeySet: true` when the secret is set).
-- Photos still arrive by email only. Saving photos in the CRM is the next step.
 
 ## Search-engine pages (SEO)
 
