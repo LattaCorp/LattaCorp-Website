@@ -41,6 +41,8 @@ function renderBilling() {
       })
     );
     $("topbtns").appendChild(document.createTextNode(" "));
+    $("topbtns").appendChild(customInvoiceLink("btn alt"));
+    $("topbtns").appendChild(document.createTextNode(" "));
     $("topbtns").appendChild(
       btn("Past invoice", "btn alt", function () {
         openPastInvoice(null);
@@ -1156,6 +1158,17 @@ function clientEstimatesSection(c) {
   if (mine.length > 5)
     sec.appendChild(el("div", "note", "+ " + (mine.length - 5) + " older estimates in Billing > Estimates."));
   return sec;
+}
+
+/* ---- Custom invoice: a fill-in-the-blanks PDF in the same design (forms/custom-invoice.pdf, made by
+   tools/build_custom_invoice_pdf.py) for one-off invoices made by hand. Nothing typed into it is saved here. ---- */
+function customInvoiceLink(cls) {
+  var a = el("a", cls, "Custom invoice");
+  a.href = "/forms/custom-invoice.pdf";
+  a.target = "_blank";
+  a.rel = "noopener";
+  a.title = "Fill-in-the-blanks invoice PDF. Not saved in Foreman, so it won't show in balances or the portal.";
+  return a;
 }
 
 /* ---- billing settings ---- */

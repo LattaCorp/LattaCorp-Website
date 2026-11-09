@@ -3,5 +3,6 @@ Allow: /
 Disallow: /crm/
 Disallow: /d/
 Disallow: /api/
+Disallow: /forms/
 
 Sitemap: https://lattacorpfl.com/sitemap.xml

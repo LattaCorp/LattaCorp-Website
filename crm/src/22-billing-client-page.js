@@ -536,6 +536,7 @@ function clientBillingSection(c, only) {
       openInvoiceForm(c.id);
     })
   );
+  ab.appendChild(customInvoiceLink("btn alt sm"));
   ab.appendChild(
     btn("Record payment", "btn alt sm", function () {
       openPayment(c.id);
