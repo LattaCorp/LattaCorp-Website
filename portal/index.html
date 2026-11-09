@@ -59,6 +59,10 @@ label.f textarea{min-height:120px;resize:vertical}
 .top .brand b{font-family:var(--serif);color:var(--forest);font-size:1.02rem;white-space:nowrap}
 .top .grow{flex:1}
 .acctsel{max-width:46vw;padding:8px 10px;border:1px solid #c9d6c5;border-radius:8px;background:#fff;font-weight:600;font-size:.92rem}
+.staffbar{position:sticky;top:57px;z-index:19;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 16px;background:#fdf5e6;border-bottom:1px solid #f0dfb8;color:#6b4a0e}
+.staffbar input,.staffbar select{padding:8px 10px;border:1px solid #e3cf9f;border-radius:8px;background:#fff;font-size:.92rem}
+.staffbar input{flex:1 1 140px;min-width:0}.staffbar select{flex:2 1 220px;min-width:0;font-weight:600}
+@media(min-width:900px){.staffbar{margin-left:220px}}
 .langbtn{background:none;border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-weight:700;font-size:.82rem;color:var(--forest);cursor:pointer}
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
 nav.tabs button{flex:1;height:var(--tabh);background:none;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:.74rem;font-weight:600;color:var(--muted);cursor:pointer}
@@ -167,6 +171,11 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
     <select id="acctsel" class="acctsel hide" aria-label="Account"></select>
     <button type="button" class="langbtn" data-lang>Español</button>
   </header>
+  <div id="staffbar" class="staffbar hide" role="region" aria-label="Staff view">
+    <b data-t="Staff view">Staff view</b><span id="staffcount" class="small"></span>
+    <input id="staffq" type="search" placeholder="Find a client" data-ph="Find a client" aria-label="Find a client">
+    <select id="staffsel" aria-label="Client"></select>
+  </div>
   <nav class="tabs" aria-label="Portal">
     <button type="button" data-v="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg><span data-t="Home">Home</span></button>
     <button type="button" data-v="schedule"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg><span data-t="Schedule">Schedule</span></button>
@@ -183,6 +192,6 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../crm/config.js"></script>
-<script src="portal.js?v=5"></script>
+<script src="portal.js?v=6"></script>
 </body>
 </html>

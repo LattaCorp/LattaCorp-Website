@@ -35,6 +35,8 @@
     "That code didn't work. Check it, or send a new code.": "Ese código no funcionó. Revíselo o pida uno nuevo.",
     "Something went wrong. Please try again, or call or text 407-470-5309.": "Algo salió mal. Intente de nuevo, o llame o envíe un texto al 407-470-5309.",
     "We sent a new code.": "Le enviamos un código nuevo.",
+    "Staff view": "Vista del personal", "accounts": "cuentas", "archived": "archivado", "Find a client": "Buscar cliente", "What the client sees": "Lo que ve el cliente",
+    "Staff view: sending is turned off here so nothing goes out in the client's name. Their form looks like this for them, with their properties and phone filled in.": "Vista del personal: el envío está desactivado para que nada salga a nombre del cliente. Así ve el cliente su formulario.",
     "Can't find it? Check your Spam or Junk folder. It comes from website@lattacorpfl.com.": "¿No lo encuentra? Revise su carpeta de Spam o Correo no deseado. Llega de website@lattacorpfl.com.",
     "Too many codes were requested for this email. Please use the newest code we sent, or try again in": "Se pidieron demasiados códigos para este correo. Use el código más reciente que le enviamos, o intente de nuevo en",
     "minutes": "minutos", "We just sent a code. Please wait a minute before asking for another.": "Acabamos de enviarle un código. Espere un minuto antes de pedir otro.",
@@ -76,6 +78,7 @@
   function applyStatic() {
     document.documentElement.lang = lang;
     [].forEach.call(document.querySelectorAll("[data-t]"), function (e) { e.textContent = t(e.getAttribute("data-t")); });
+    [].forEach.call(document.querySelectorAll("[data-ph]"), function (e) { e.placeholder = t(e.getAttribute("data-ph")); });
     [].forEach.call(document.querySelectorAll("[data-lang]"), function (b) { b.textContent = lang === "es" ? "English" : "Español"; });
   }
   document.addEventListener("click", function (e) {
@@ -176,7 +179,7 @@
   }
 
   /* ---------- account data ---------- */
-  var accounts = [], curId = null, data = null, view = "home", photoUrls = {}, flash = "";
+  var accounts = [], curId = null, data = null, view = "home", photoUrls = {}, flash = "", isStaff = false;
   function boot() {
     var th = qs.get("th");
     var tys = [qs.get("ty") || "magiclink"].concat(["recovery", "email", "magiclink"].filter(function (x) { return x !== qs.get("ty"); }));
@@ -192,17 +195,36 @@
       return sb.rpc("portal_accounts").then(function (a) {
         accounts = (a && a.data) || [];
         if (!accounts.length) { sb.auth.signOut(); showSignin(t("This email isn't linked to an account yet. Call or text 407-470-5309 and we'll set it up.")); return; }
-        var saved = store("lc-portal-acct");
-        curId = accounts.some(function (x) { return x.id === saved; }) ? saved : accounts[0].id;
+        isStaff = !!accounts[0].staff;
+        var want = qs.get("acct") || store("lc-portal-acct");
+        curId = accounts.some(function (x) { return x.id === want; }) ? want : accounts[0].id;
+        if (qs.get("acct")) history.replaceState(null, "", location.pathname + (lang === "es" ? "?lang=es" : ""));
         drawAcctSel(); return loadAccount();
       });
     }).catch(function () { showSignin(t("Something went wrong. Please try again, or call or text 407-470-5309.")); });
   }
   function drawAcctSel() {
     var s = $("acctsel"); s.textContent = "";
-    s.classList.toggle("hide", accounts.length < 2);
+    s.classList.toggle("hide", accounts.length < 2 || isStaff);
     accounts.forEach(function (a) { var o = el("option", null, a.name); o.value = a.id; if (a.id === curId) o.selected = true; s.appendChild(o); });
+    drawStaffBar();
   }
+  /* Staff master view: a bar under the header to search for and switch to any client's account. */
+  function drawStaffBar() {
+    var bar = $("staffbar");
+    bar.classList.toggle("hide", !isStaff);
+    if (!isStaff) return;
+    var sel = $("staffsel"), q = ($("staffq").value || "").toLowerCase().trim();
+    sel.textContent = "";
+    var shown = accounts.filter(function (a) { return !q || (a.name + " " + (a.company || "")).toLowerCase().indexOf(q) > -1 || a.id === curId; });
+    shown.forEach(function (a) {
+      var o = el("option", null, a.name + (a.company && a.company !== a.name ? " (" + a.company + ")" : "") + (a.archived ? " · " + t("archived") : ""));
+      o.value = a.id; if (a.id === curId) o.selected = true; sel.appendChild(o);
+    });
+    $("staffcount").textContent = accounts.length + " " + t("accounts");
+  }
+  $("staffq").addEventListener("input", drawStaffBar);
+  $("staffsel").addEventListener("change", function () { curId = this.value; store("lc-portal-acct", curId); photoUrls = {}; $("view").innerHTML = ""; $("view").appendChild(el("p", "loading", t("Loading your account..."))); loadAccount(); });
   $("acctsel").addEventListener("change", function () { curId = this.value; store("lc-portal-acct", curId); photoUrls = {}; loadAccount(); });
   function loadAccount() {
     return sb.rpc("portal_account", { cid: curId }).then(function (r) {
@@ -237,7 +259,8 @@
   function home(host) {
     var s = data.summary, c = data.client, st = s.status;
     var band = el("section", "band " + st);
-    band.appendChild(el("p", "who", t("Hi") + ", " + (firstName(data.me && data.me.name) || firstName(c.nickname || c.name)) + (accounts.length > 1 ? " · " + c.name : "")));
+    band.appendChild(el("p", "who", isStaff ? t("What the client sees") + ": " + c.name
+      : t("Hi") + ", " + (firstName(data.me && data.me.name) || firstName(c.nickname || c.name)) + (accounts.length > 1 ? " · " + c.name : "")));
     if (st === "past_due") {
       band.appendChild(el("h1", null, t("Past due")));
       band.appendChild(el("div", "amt", money(s.balance)));
@@ -407,6 +430,11 @@
   /* ---------- Requests ---------- */
   var REQ_STATUS = { "new": ["Received", ""], contacted: ["In progress", "due"], quoted: ["Quote sent", "due"], won: ["Approved", ""], lost: ["Closed", "gray"] };
   function requests(host, prefill) {
+    if (isStaff) {
+      var sp = panel(host, t("Staff view"));
+      sp.appendChild(el("p", "muted", t("Staff view: sending is turned off here so nothing goes out in the client's name. Their form looks like this for them, with their properties and phone filled in.")));
+      host = el("div"); host.style.cssText = "opacity:.55;pointer-events:none"; host.setAttribute("aria-hidden", "true"); $("view").appendChild(host);
+    }
     var p = panel(host, t("New request"));
     if (flash) { var ok = el("p", "ok", t(flash)); ok.setAttribute("role", "status"); p.appendChild(ok); flash = ""; }
     var f = el("form"); f.noValidate = true; p.appendChild(f);

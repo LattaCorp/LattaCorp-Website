@@ -17804,6 +17804,19 @@ function clientPortalSection(c) {
     inv.appendChild(
       el("div", "note", "They sign in at lattacorpfl.com/portal with a one-time code sent to their email.")
     );
+    var look = el("a", "btn alt sm", "See their portal");
+    look.href = "/portal/?acct=" + encodeURIComponent(c.id);
+    look.target = "_blank";
+    look.rel = "noopener";
+    look.style.marginTop = "8px";
+    inv.appendChild(look);
+    inv.appendChild(
+      el(
+        "div",
+        "note",
+        "Opens the portal's staff view on this account. Sign in there once with your own email."
+      )
+    );
     box.appendChild(inv);
   }
   portalBoxRedraw = draw;
