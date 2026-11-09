@@ -35,6 +35,7 @@
     "That code didn't work. Check it, or send a new code.": "Ese código no funcionó. Revíselo o pida uno nuevo.",
     "Something went wrong. Please try again, or call or text 407-470-5309.": "Algo salió mal. Intente de nuevo, o llame o envíe un texto al 407-470-5309.",
     "We sent a new code.": "Le enviamos un código nuevo.",
+    "Client Portal": "Portal de Clientes", "Back to website": "Volver al sitio web", "Website": "Sitio web", "No matches": "Sin resultados",
     "Staff view": "Vista del personal", "accounts": "cuentas", "archived": "archivado", "Find a client": "Buscar cliente", "What the client sees": "Lo que ve el cliente",
     "Staff view: sending is turned off here so nothing goes out in the client's name. Their form looks like this for them, with their properties and phone filled in.": "Vista del personal: el envío está desactivado para que nada salga a nombre del cliente. Así ve el cliente su formulario.",
     "Can't find it? Check your Spam or Junk folder. It comes from website@lattacorpfl.com.": "¿No lo encuentra? Revise su carpeta de Spam o Correo no deseado. Llega de website@lattacorpfl.com.",
@@ -132,7 +133,7 @@
     });
   }
   function showSignin(msg) {
-    $("app").classList.add("hide"); $("signin").classList.remove("hide");
+    $("app").classList.add("hide"); $("signin").classList.remove("hide"); $("acctsel").classList.add("hide");
     $("emailform").classList.remove("hide"); $("codeform").classList.add("hide");
     showErr("sierr", msg || ""); tsInit();
     var last = store("lc-portal-email"); if (last && !$("siemail").value) $("siemail").value = last;
@@ -222,9 +223,49 @@
       o.value = a.id; if (a.id === curId) o.selected = true; sel.appendChild(o);
     });
     $("staffcount").textContent = accounts.length + " " + t("accounts");
+    var cur = accounts.filter(function (a) { return a.id === curId; })[0];
+    if (document.activeElement !== $("staffcombo")) $("staffcombo").value = cur ? cur.name : "";
   }
+  function pickAccount(id) {
+    if (!id || id === curId) return;
+    curId = id; store("lc-portal-acct", curId); photoUrls = {};
+    $("view").innerHTML = ""; $("view").appendChild(el("p", "loading", t("Loading your account...")));
+    drawStaffBar(); loadAccount();
+  }
+
+  /* Computers: one box to type a name and pick from the list that drops down under it. */
+  var combo = $("staffcombo"), clist = $("stafflist"), cIdx = -1, cItems = [];
+  function comboLabel(a) { return a.name + (a.company && a.company !== a.name ? " (" + a.company + ")" : ""); }
+  function comboOpen(open) { clist.classList.toggle("hide", !open); combo.setAttribute("aria-expanded", open ? "true" : "false"); }
+  function comboDraw() {
+    var q = combo.value.toLowerCase().trim();
+    cItems = accounts.filter(function (a) { return !q || comboLabel(a).toLowerCase().indexOf(q) > -1; });
+    clist.textContent = "";
+    if (!cItems.length) { clist.appendChild(el("li", "none", t("No matches"))); cIdx = -1; return; }
+    if (cIdx >= cItems.length) cIdx = cItems.length - 1;
+    cItems.forEach(function (a, k) {
+      var li = el("li", null, comboLabel(a)); li.id = "sl-" + k; li.setAttribute("role", "option");
+      li.setAttribute("aria-selected", k === cIdx ? "true" : "false");
+      if (a.archived) li.appendChild(el("small", null, t("archived")));
+      if (a.id === curId) li.style.fontWeight = "700";
+      li.addEventListener("mousedown", function (e) { e.preventDefault(); comboChoose(a); });
+      clist.appendChild(li);
+    });
+    if (cIdx > -1) { combo.setAttribute("aria-activedescendant", "sl-" + cIdx); var on = $("sl-" + cIdx); if (on) on.scrollIntoView({ block: "nearest" }); }
+    else combo.removeAttribute("aria-activedescendant");
+  }
+  function comboChoose(a) { comboOpen(false); combo.blur(); combo.value = a.name; pickAccount(a.id); }
+  combo.addEventListener("focus", function () { combo.select(); cIdx = -1; comboDraw(); comboOpen(true); });
+  combo.addEventListener("input", function () { cIdx = 0; comboDraw(); comboOpen(true); });
+  combo.addEventListener("blur", function () { comboOpen(false); drawStaffBar(); });
+  combo.addEventListener("keydown", function (e) {
+    if (e.key === "ArrowDown") { e.preventDefault(); cIdx = Math.min(cItems.length - 1, cIdx + 1); comboDraw(); comboOpen(true); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); cIdx = Math.max(0, cIdx - 1); comboDraw(); }
+    else if (e.key === "Enter") { e.preventDefault(); if (cItems[cIdx < 0 ? 0 : cIdx]) comboChoose(cItems[cIdx < 0 ? 0 : cIdx]); }
+    else if (e.key === "Escape") { comboOpen(false); combo.blur(); }
+  });
   $("staffq").addEventListener("input", drawStaffBar);
-  $("staffsel").addEventListener("change", function () { curId = this.value; store("lc-portal-acct", curId); photoUrls = {}; $("view").innerHTML = ""; $("view").appendChild(el("p", "loading", t("Loading your account..."))); loadAccount(); });
+  $("staffsel").addEventListener("change", function () { pickAccount(this.value); });
   $("acctsel").addEventListener("change", function () { curId = this.value; store("lc-portal-acct", curId); photoUrls = {}; loadAccount(); });
   function loadAccount() {
     return sb.rpc("portal_account", { cid: curId }).then(function (r) {

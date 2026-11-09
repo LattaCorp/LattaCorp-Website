@@ -9,6 +9,9 @@
 <title>Client portal · Latta Corp of Central Florida</title>
 <link rel="icon" href="../images/favicon-32.png">
 <link rel="apple-touch-icon" href="../images/favicon-192.png">
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="LattaCorp">
 <link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
@@ -41,7 +44,7 @@ label.f textarea{min-height:120px;resize:vertical}
 .ok{color:var(--forest);font-weight:600}
 
 /* ---------- Sign in ---------- */
-#signin{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 16px;background:var(--mint)}
+#signin{min-height:calc(100vh - var(--hdr));display:flex;flex-direction:column;align-items:center;justify-content:center;padding:28px 16px;background:var(--mint)}
 .sicard{width:100%;max-width:420px;background:#fff;border:1px solid var(--line);border-radius:14px;padding:30px 26px;box-shadow:0 10px 30px rgba(27,85,43,.08)}
 .sibrand{display:flex;align-items:center;gap:12px;margin:0 0 22px}
 .sibrand img{width:46px;height:auto}
@@ -53,16 +56,28 @@ label.f textarea{min-height:120px;resize:vertical}
 
 /* ---------- App frame ---------- */
 #app{min-height:100vh}
-.top{position:sticky;top:0;z-index:20;background:#fff;border-bottom:1px solid var(--line);padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 10px;display:flex;align-items:center;gap:12px}
-.top .brand{display:flex;align-items:center;gap:10px;text-decoration:none;min-width:0}
-.top .brand img{width:34px;height:auto}
-.top .brand b{font-family:var(--serif);color:var(--forest);font-size:1.02rem;white-space:nowrap}
+/* Green header, matching Foreman */
+:root{--hdr:64px}
+.top{position:sticky;top:0;z-index:30;background:var(--forest);color:#fff;padding:env(safe-area-inset-top,0px) 12px 0 0;min-height:var(--hdr);display:flex;align-items:center;gap:8px;box-shadow:0 2px 10px rgba(0,0,0,.18)}
+.brandbar{display:flex;align-items:center;text-decoration:none;align-self:stretch;min-width:0}
+.brandbar .box{width:58px;align-self:stretch;display:grid;place-items:center;border-right:2px solid rgba(255,255,255,.7);margin-right:12px;flex:none}
+.brandbar .tree{height:34px;width:auto;display:block;filter:drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff)}
+.brandbar .bname{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brandbar .fm{font-family:var(--serif);font-weight:700;font-size:1.2rem;line-height:1.1;color:#fff;white-space:nowrap}
+.brandbar .by{display:none;align-items:center;gap:7px;color:#d9ecd8;font-size:.95rem;white-space:nowrap}.brandbar .by img{height:17px;width:auto}
 .top .grow{flex:1}
-.acctsel{max-width:46vw;padding:8px 10px;border:1px solid #c9d6c5;border-radius:8px;background:#fff;font-weight:600;font-size:.92rem}
-.staffbar{position:sticky;top:57px;z-index:19;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 16px;background:#fdf5e6;border-bottom:1px solid #f0dfb8;color:#6b4a0e}
+.hb{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:8px;padding:8px 11px;font-weight:650;font-size:.86rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
+.hb:hover{background:rgba(255,255,255,.27)}.hb svg{width:16px;height:16px;flex:none}
+.hb .long{display:none}
+.acctsel{max-width:40vw;padding:8px 10px;border:0;border-radius:8px;background:#fff;font-weight:600;font-size:.9rem}
+.staffbar{position:sticky;top:var(--hdr);z-index:25;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 16px;background:#fdf5e6;border-bottom:1px solid #f0dfb8;color:#6b4a0e}
 .staffbar input,.staffbar select{padding:8px 10px;border:1px solid #e3cf9f;border-radius:8px;background:#fff;font-size:.92rem}
-.staffbar input{flex:1 1 140px;min-width:0}.staffbar select{flex:2 1 220px;min-width:0;font-weight:600}
-@media(min-width:900px){.staffbar{margin-left:220px}}
+.staffbar #staffq{flex:1 1 140px;min-width:0}.staffbar select{flex:2 1 220px;min-width:0;font-weight:600}
+.combo{display:none;position:relative;flex:1;max-width:560px}
+.combo input{width:100%;font-weight:600;padding-right:34px!important;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%236b4a0e' stroke-width='2.4' stroke-linecap='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 11px center}
+.combo ul{position:absolute;left:0;right:0;top:calc(100% + 6px);margin:0;padding:6px;list-style:none;background:#fff;border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.22);max-height:60vh;overflow:auto;z-index:40;color:var(--ink)}
+.combo li{padding:9px 12px;border-radius:8px;cursor:pointer}.combo li[aria-selected=true],.combo li:hover{background:var(--mint)}
+.combo li small{color:var(--muted);margin-left:6px}.combo li.none{color:var(--muted);cursor:default;background:none}
 .langbtn{background:none;border:1px solid var(--line);border-radius:999px;padding:6px 11px;font-weight:700;font-size:.82rem;color:var(--forest);cursor:pointer}
 nav.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;background:#fff;border-top:1px solid var(--line);display:flex;padding-bottom:env(safe-area-inset-bottom,0px)}
 nav.tabs button{flex:1;height:var(--tabh);background:none;border:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:.74rem;font-weight:600;color:var(--muted);cursor:pointer}
@@ -70,15 +85,22 @@ nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-current=page]{color:var(--forest)}
 nav.tabs button[aria-current=page] svg{stroke-width:2.4}
 main.view{max-width:760px;margin:0 auto;padding:18px 16px calc(var(--tabh) + 34px + env(safe-area-inset-bottom,0px))}
+@media(min-width:600px){.hb .long{display:inline}.hb .short{display:none}}
 @media(min-width:900px){
-  nav.tabs{top:0;bottom:0;right:auto;width:220px;flex-direction:column;border-top:0;border-right:1px solid var(--line);padding:84px 12px 20px;gap:4px}
-  nav.tabs button{flex:0 0 auto;height:auto;flex-direction:row;justify-content:flex-start;gap:12px;padding:11px 14px;border-radius:8px;font-size:.98rem}
-  nav.tabs button[aria-current=page]{background:var(--mint)}
+  :root{--hdr:76px}
+  .brandbar .box{width:88px;margin-right:18px}.brandbar .tree{height:50px}.brandbar .fm{font-size:1.9rem}.brandbar .by{display:flex}
+  .top{padding-right:16px;gap:10px}
+  nav.tabs{top:var(--hdr);bottom:0;right:auto;width:224px;flex-direction:column;border-top:0;border-right:1px solid var(--line);padding:14px 10px;gap:6px}
+  nav.tabs button{flex:0 0 auto;height:auto;flex-direction:row;justify-content:flex-start;gap:14px;padding:14px;border-radius:10px;border-left:5px solid transparent;font-size:1.05rem;font-weight:700;color:var(--forest)}
+  nav.tabs button:hover{background:var(--mint)}
+  nav.tabs button[aria-current=page]{background:#2f7d3f;color:#fff;border-left-color:#14461f}
   nav.tabs .more{display:none}
   nav.tabs .wide{display:flex!important}
-  .top{z-index:30}
-  main.view{margin-left:220px;max-width:none;padding:28px 40px 60px}
+  main.view{margin-left:224px;max-width:none;padding:28px 40px 60px}
   main.view>*{max-width:780px}
+  .staffbar{margin-left:224px}
+  .staffbar #staffq,.staffbar select{display:none}
+  .combo{display:block}
 }
 nav.tabs .wide{display:none}
 
@@ -139,6 +161,14 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 </head>
 <body>
 
+<header class="top">
+  <a class="brandbar" href="./" aria-label="LattaCorp client portal"><span class="box"><img class="tree" src="../images/logo-tree-header.png" alt=""></span><span class="bname"><span class="fm" data-t="Client Portal">Client Portal</span><span class="by">by <img src="../images/logo-wordmark-header.svg" alt="Latta Corp"></span></span></a>
+  <div class="grow"></div>
+  <select id="acctsel" class="acctsel hide" aria-label="Account"></select>
+  <a class="hb" href="../"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span class="long" data-t="Back to website">Back to website</span><span class="short" data-t="Website">Website</span></a>
+  <button type="button" class="hb" data-lang>Español</button>
+</header>
+
 <section id="signin" class="hide" aria-labelledby="sih">
   <div class="sicard">
     <div class="sibrand"><img src="../images/logo-tree-header.png" alt=""><div><b>Latta Corp of Central Florida</b><span data-t="Client portal">Client portal</span></div></div>
@@ -160,21 +190,15 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
       <p class="sifoot"><button type="button" class="linkbtn" id="resend" data-t="Send a new code">Send a new code</button> · <button type="button" class="linkbtn" id="otheremail" data-t="Use a different email">Use a different email</button></p>
     </form>
     <p class="sifoot"><span data-t="No code, or not on file yet? Call or text">No code, or not on file yet? Call or text</span> <a href="tel:4074705309">407-470-5309</a>.</p>
-    <p class="sifoot"><button type="button" class="langbtn" data-lang>Español</button></p>
   </div>
 </section>
 
 <div id="app" class="hide">
-  <header class="top">
-    <a class="brand" href="../" aria-label="Latta Corp of Central Florida website"><img src="../images/logo-tree-header.png" alt=""><b>Latta Corp</b></a>
-    <div class="grow"></div>
-    <select id="acctsel" class="acctsel hide" aria-label="Account"></select>
-    <button type="button" class="langbtn" data-lang>Español</button>
-  </header>
   <div id="staffbar" class="staffbar hide" role="region" aria-label="Staff view">
     <b data-t="Staff view">Staff view</b><span id="staffcount" class="small"></span>
     <input id="staffq" type="search" placeholder="Find a client" data-ph="Find a client" aria-label="Find a client">
     <select id="staffsel" aria-label="Client"></select>
+    <div class="combo"><input id="staffcombo" type="text" role="combobox" aria-expanded="false" aria-controls="stafflist" aria-autocomplete="list" autocomplete="off" placeholder="Find a client" data-ph="Find a client" aria-label="Client"><ul id="stafflist" role="listbox" class="hide"></ul></div>
   </div>
   <nav class="tabs" aria-label="Portal">
     <button type="button" data-v="home"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg><span data-t="Home">Home</span></button>
@@ -192,6 +216,6 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../crm/config.js"></script>
-<script src="portal.js?v=6"></script>
+<script src="portal.js?v=7"></script>
 </body>
 </html>
