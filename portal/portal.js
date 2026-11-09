@@ -35,6 +35,8 @@
     "That code didn't work. Check it, or send a new code.": "Ese código no funcionó. Revíselo o pida uno nuevo.",
     "Something went wrong. Please try again, or call or text 407-470-5309.": "Algo salió mal. Intente de nuevo, o llame o envíe un texto al 407-470-5309.",
     "We sent a new code.": "Le enviamos un código nuevo.",
+    "Info": "Información", "Guides and tips from LattaCorp. More lawn-care guides are on the way.": "Guías y consejos de LattaCorp. Pronto habrá más guías sobre el cuidado del césped.",
+    "You're already using the portal as an app on this device.": "Ya está usando el portal como app en este dispositivo.", "Install the app now": "Instalar la app ahora", "This device": "Este dispositivo",
     "Client Portal": "Portal de Clientes", "Back to website": "Volver al sitio web", "Website": "Sitio web", "No matches": "Sin resultados",
     "Staff view": "Vista del personal", "accounts": "cuentas", "archived": "archivado", "Find a client": "Buscar cliente", "What the client sees": "Lo que ve el cliente",
     "Staff view: sending is turned off here so nothing goes out in the client's name. Their form looks like this for them, with their properties and phone filled in.": "Vista del personal: el envío está desactivado para que nada salga a nombre del cliente. Así ve el cliente su formulario.",
@@ -80,6 +82,7 @@
     document.documentElement.lang = lang;
     [].forEach.call(document.querySelectorAll("[data-t]"), function (e) { e.textContent = t(e.getAttribute("data-t")); });
     [].forEach.call(document.querySelectorAll("[data-ph]"), function (e) { e.placeholder = t(e.getAttribute("data-ph")); });
+    [].forEach.call(document.querySelectorAll("[data-al]"), function (e) { e.setAttribute("aria-label", t(e.getAttribute("data-al"))); });
     [].forEach.call(document.querySelectorAll("[data-lang]"), function (b) { b.textContent = lang === "es" ? "English" : "Español"; });
   }
   document.addEventListener("click", function (e) {
@@ -275,12 +278,12 @@
   }
 
   /* ---------- navigation ---------- */
-  var VIEWS = { home: home, schedule: schedule, billing: billing, requests: requests, photos: photos, account: account, more: more };
+  var VIEWS = { home: home, schedule: schedule, billing: billing, requests: requests, photos: photos, info: info, account: account, more: more };
   [].forEach.call(document.querySelectorAll("nav.tabs [data-v]"), function (b) { b.addEventListener("click", function () { show(b.getAttribute("data-v")); }); });
   function show(v) {
     view = VIEWS[v] ? v : "home";
     [].forEach.call(document.querySelectorAll("nav.tabs [data-v]"), function (b) {
-      var on = b.getAttribute("data-v") === view || (b.getAttribute("data-v") === "more" && (view === "photos" || view === "account"));
+      var on = b.getAttribute("data-v") === view || (b.getAttribute("data-v") === "more" && (view === "photos" || view === "info" || view === "account"));
       if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
     var host = $("view"); host.textContent = ""; VIEWS[view](host);
@@ -571,10 +574,52 @@
   }
   function signOut() { sb.auth.signOut().then(function () { data = null; accounts = []; store("lc-portal-acct", null); view = "home"; showSignin(); }); }
 
+  /* ---------- Info (guides live in portal/guides.js) ---------- */
+  var installEvt = null;
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); installEvt = e; });
+  function myDevice() {
+    var ua = navigator.userAgent || "";
+    if (/iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "ios";
+    if (/Android/.test(ua)) return "android";
+    return "desktop";
+  }
+  function isApp() { return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) || navigator.standalone === true; }
+  function L(o) { return o ? (lang === "es" && o.es ? o.es : o.en) : ""; }
+  function info(host) {
+    var p = panel(host, t("Info"));
+    p.appendChild(el("p", "muted", t("Guides and tips from LattaCorp. More lawn-care guides are on the way.")));
+    var guides = window.PORTAL_GUIDES || [], lastTopic = "", dev = myDevice();
+    guides.forEach(function (g, gi) {
+      var tp = L(g.topic);
+      if (tp && tp !== lastTopic) { host.appendChild(el("h2", "topic", tp)); lastTopic = tp; }
+      var d = el("details", "guide"); if (gi === 0) d.open = true; d.id = "guide-" + g.id;
+      d.appendChild(el("summary", null, L(g.title)));
+      var body = el("div", "gbody"); d.appendChild(body);
+      if (g.intro) body.appendChild(el("p", null, L(g.intro)));
+      if (g.id === "app" && isApp()) body.appendChild(el("p", "ok", t("You're already using the portal as an app on this device.")));
+      if (g.id === "app" && installEvt && !isApp()) {
+        var ib = el("button", "btn", t("Install the app now")); ib.type = "button";
+        ib.onclick = function () { installEvt.prompt(); installEvt.userChoice.then(function () { installEvt = null; ib.remove(); }); };
+        body.appendChild(ib); ib.style.marginBottom = "12px";
+      }
+      var secs = (g.sections || []).slice();
+      secs.sort(function (a, b) { return (b.device === dev) - (a.device === dev); });
+      secs.forEach(function (sc) {
+        var sec = el("div", "gsec" + (sc.device && sc.device === dev ? " mine" : ""));
+        var h3 = el("h3", null, L(sc.heading)); if (sc.device === dev) h3.appendChild(pill(t("This device")));
+        sec.appendChild(h3);
+        if (sc.steps) { var ol = el("ol"); L(sc.steps).forEach(function (x) { ol.appendChild(el("li", null, x)); }); sec.appendChild(ol); }
+        if (sc.text) sec.appendChild(el("p", null, L(sc.text)));
+        body.appendChild(sec);
+      });
+      host.appendChild(d);
+    });
+  }
+
   /* ---------- More (phones) ---------- */
   function more(host) {
     var p = panel(host), l = el("ul", "list more-menu");
-    [["photos", t("Photos")], ["account", t("Account")]].forEach(function (x) { var i = li(l, { title: x[1] }); i.onclick = function () { show(x[0]); }; i.tabIndex = 0; i.onkeydown = function (e) { if (e.key === "Enter") show(x[0]); }; });
+    [["photos", t("Photos")], ["info", t("Info")], ["account", t("Account")]].forEach(function (x) { var i = li(l, { title: x[1] }); i.onclick = function () { show(x[0]); }; i.tabIndex = 0; i.onkeydown = function (e) { if (e.key === "Enter") show(x[0]); }; });
     var o = li(l, { title: t("Sign out") }); o.onclick = signOut; o.tabIndex = 0;
     p.appendChild(l);
   }

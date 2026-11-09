@@ -68,7 +68,7 @@ label.f textarea{min-height:120px;resize:vertical}
 .top .grow{flex:1}
 .hb{background:rgba(255,255,255,.15);color:#fff;border:0;border-radius:8px;padding:8px 11px;font-weight:650;font-size:.86rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;cursor:pointer;white-space:nowrap}
 .hb:hover{background:rgba(255,255,255,.27)}.hb svg{width:16px;height:16px;flex:none}
-.hb .long{display:none}
+.hb .long{display:none}.hb .house{display:none}
 .acctsel{max-width:40vw;padding:8px 10px;border:0;border-radius:8px;background:#fff;font-weight:600;font-size:.9rem}
 .staffbar{position:sticky;top:var(--hdr);z-index:25;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px 16px;background:#fdf5e6;border-bottom:1px solid #f0dfb8;color:#6b4a0e}
 .staffbar input,.staffbar select{padding:8px 10px;border:1px solid #e3cf9f;border-radius:8px;background:#fff;font-size:.92rem}
@@ -85,6 +85,8 @@ nav.tabs button svg{width:22px;height:22px}
 nav.tabs button[aria-current=page]{color:var(--forest)}
 nav.tabs button[aria-current=page] svg{stroke-width:2.4}
 main.view{max-width:760px;margin:0 auto;padding:18px 16px calc(var(--tabh) + 34px + env(safe-area-inset-bottom,0px))}
+.brandbar .bname{overflow:hidden}.brandbar .fm{overflow:hidden;text-overflow:ellipsis}
+@media(max-width:439px){.hb .short{display:none}.hb .chev{display:none}.hb .house{display:block}.hb.site{padding:8px 9px}.brandbar .fm{font-size:1.08rem}}
 @media(min-width:600px){.hb .long{display:inline}.hb .short{display:none}}
 @media(min-width:900px){
   :root{--hdr:76px}
@@ -155,6 +157,18 @@ dialog::backdrop{background:rgba(0,0,0,.75)}
 dialog img{display:block;max-width:94vw;max-height:84vh}
 dialog .cap{color:#fff;padding:10px 14px;font-size:.9rem}
 dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radius:50%;border:0;background:rgba(0,0,0,.6);color:#fff;font-size:22px;cursor:pointer}
+/* Info tab guides */
+.guide{background:#fff;border:1px solid var(--line);border-radius:12px;margin:0 0 12px;overflow:hidden}
+.guide>summary{list-style:none;cursor:pointer;padding:16px 18px;display:flex;align-items:center;gap:12px;font-family:var(--serif);font-size:1.08rem;font-weight:600;color:var(--forest)}
+.guide>summary::-webkit-details-marker{display:none}
+.guide>summary::after{content:"";margin-left:auto;flex:none;width:10px;height:10px;border-right:2.5px solid var(--forest);border-bottom:2.5px solid var(--forest);transform:rotate(45deg);transition:transform .15s}
+.guide[open]>summary::after{transform:rotate(-135deg)}
+.guide .gbody{padding:0 18px 18px}
+.guide .gsec{border-top:1px solid var(--line);padding:14px 0 4px}
+.guide .gsec.mine{background:var(--mint);border:1px solid var(--line);border-left:5px solid var(--leaf);border-radius:10px;padding:14px 16px;margin:6px 0 10px}
+.guide .gsec h3{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 8px}
+.guide ol{margin:0 0 8px;padding-left:22px}.guide ol li{margin:0 0 8px}
+.topic{font-family:var(--serif);color:var(--bark);font-size:1rem;margin:20px 0 8px}
 .loading{padding:60px 0;text-align:center;color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.band{animation:rise .35s ease-out}@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}}
 </style>
@@ -165,7 +179,7 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
   <a class="brandbar" href="./" aria-label="LattaCorp client portal"><span class="box"><img class="tree" src="../images/logo-tree-header.png" alt=""></span><span class="bname"><span class="fm" data-t="Client Portal">Client Portal</span><span class="by">by <img src="../images/logo-wordmark-header.svg" alt="Latta Corp"></span></span></a>
   <div class="grow"></div>
   <select id="acctsel" class="acctsel hide" aria-label="Account"></select>
-  <a class="hb" href="../"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><span class="long" data-t="Back to website">Back to website</span><span class="short" data-t="Website">Website</span></a>
+  <a class="hb site" href="../" aria-label="Back to website" data-al="Back to website"><svg class="chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 18l-6-6 6-6"/></svg><svg class="house" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11 12 4l9 7"/><path d="M5 10v10h14V10"/></svg><span class="long" data-t="Back to website">Back to website</span><span class="short" data-t="Website">Website</span></a>
   <button type="button" class="hb" data-lang>Español</button>
 </header>
 
@@ -206,6 +220,7 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
     <button type="button" data-v="billing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6"/></svg><span data-t="Billing">Billing</span></button>
     <button type="button" data-v="requests"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12h5"/></svg><span data-t="Requests">Requests</span></button>
     <button type="button" data-v="photos" class="wide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11" r="2"/><path d="m21 17-5-5-8 7"/></svg><span data-t="Photos">Photos</span></button>
+    <button type="button" data-v="info" class="wide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span data-t="Info">Info</span></button>
     <button type="button" data-v="account" class="wide"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"/></svg><span data-t="Account">Account</span></button>
     <button type="button" data-v="more" class="more"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><circle cx="5" cy="12" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="19" cy="12" r="1.3"/></svg><span data-t="More">More</span></button>
   </nav>
@@ -216,6 +231,7 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../crm/config.js"></script>
-<script src="portal.js?v=7"></script>
+<script src="guides.js?v=1"></script>
+<script src="portal.js?v=9"></script>
 </body>
 </html>

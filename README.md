@@ -86,6 +86,7 @@ Code style: formatted with Prettier (settings in `crm/src/.prettierrc`).
   Photos, Account; English and Spanish). Requests from the portal arrive in CRM Leads and by email, marked "· Portal".
 - In Foreman, each client page has a **Client portal** box: account status, who can sign in, **Send invite**, and **See their portal**.
 - Staff view (Stage 24): anyone on the Team list can sign in to the portal with their own email and switch between every client's account to see exactly what that client sees. Sending requests is turned off in staff view.
+- Info tab: guides live in `portal/guides.js` (English and Spanish). To add one (grass types, lawn damage...), copy a block there.
 - Turnstile: when the site key is set in `js/forms.js`, also set it in `portal/portal.js` (`TURNSTILE_SITEKEY`).
 
 ## Search-engine pages (SEO)
