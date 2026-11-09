@@ -5,6 +5,9 @@
 
 // Used if the TO_EMAIL setting is missing in Cloudflare.
 const DEFAULT_TO = "lattacorpofcentralfl@gmail.com";
+// Who form emails come FROM. FROM_EMAIL (wrangler.jsonc) uses our own verified domain; this shared Resend address is
+// the backup if Resend ever refuses it.
+const FALLBACK_FROM = "Latta Corp Website <onboarding@resend.dev>";
 // The CRM database (Supabase). The URL is public; the secret key SUPABASE_SECRET_KEY is set in Cloudflare (Settings > Variables and Secrets).
 const DEFAULT_SUPABASE_URL = "https://lvaofwtfxwlqwvzesckt.supabase.co";
 // Public (browser-safe) key, the same one in crm/config.js. Used only to ask Supabase who a signed-in person is.
@@ -34,6 +37,30 @@ async function saveLead(env, kind, lang, fields, photoCount) {
     if (!res.ok) console.log("lead save failed", res.status, (await res.text()).slice(0, 200));
     return res.ok;
   } catch (e) { console.log("lead save error"); return false; }
+}
+
+// Email subject by form, so the inbox can be scanned at a glance:
+//   Quote – Jane Doe – 123 Main St          Service Request – Jane Doe – 45 Oak Ln (The Oaks)
+//   Message – Jane Doe                      Proposal – Jane Doe – Oak Grove HOA, 9 Palm Dr
+//   Sign-up $45/visit – Jane Doe – 123 Main St
+// "(Spanish)" is added when the visitor used the Spanish site, so you know to reply in Spanish.
+const SUBJECT_WORD = { "Quote request": "Quote", "Service request": "Service Request", "Contact message": "Message", "Proposal request": "Proposal", "Instant quote signup": "Sign-up" };
+function emailSubject(kind, fields, lang) {
+  const get = (re) => ((fields.find((f) => re.test(f.label)) || {}).value || "").replace(/\s+/g, " ").trim();
+  const name = get(/name$/i) || get(/name/i);
+  let where = "";
+  if (kind === "Service request") {
+    const home = get(/home address/i), com = get(/^community$/i);
+    where = home && com ? `${home} (${com})` : home || com;
+  } else if (kind === "Proposal request") {
+    where = [get(/community or property name/i), get(/property address/i)].filter(Boolean).join(", ");
+  } else if (kind !== "Contact message") {
+    where = get(/address/i);
+  }
+  let word = SUBJECT_WORD[kind] || kind;
+  if (kind === "Instant quote signup") { const p = get(/instant quote price/i).replace(/\s*per visit/i, "/visit"); if (p) word += " " + p; }
+  const parts = [word, name.slice(0, 60), where.slice(0, 90)].filter(Boolean);
+  return (parts.join(" – ") + (String(lang || "") === "es" ? " (Spanish)" : "")).replace(/[\r\n]/g, " ").slice(0, 200);
 }
 
 // Cloudflare Turnstile ("not a robot" check). Only runs once the secret TURNSTILE_SECRET_KEY is set in Cloudflare.
@@ -99,22 +126,29 @@ export async function handleSubmit(request, env) {
     + `${attachments.length ? `, with ${attachments.length} photo${attachments.length > 1 ? "s" : ""} attached` : ""}.</p></div>`;
 
   const payload = {
-    from: env.FROM_EMAIL || "Latta Corp Website <onboarding@resend.dev>",
+    from: env.FROM_EMAIL || FALLBACK_FROM,
     to: [env.TO_EMAIL || DEFAULT_TO],
-    subject: `${kind}${name ? " from " + name.slice(0, 80) : ""}`.replace(/[\r\n]/g, " "),
+    subject: emailSubject(kind, fields, data.lang),
     html,
   };
   if (emailOk) payload.reply_to = email;
   if (attachments.length) payload.attachments = attachments;
 
   // Save to the CRM and send the email at the same time. The visitor sees success if at least one of them worked.
+  const send = (body) => fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
   const sendEmail = async () => {
     try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      let res = await send(payload);
+      // If Resend refuses our own sender address (for example the domain isn't verified yet), send it from Resend's
+      // shared address instead so the email still arrives.
+      if (!res.ok && payload.from !== FALLBACK_FROM && (res.status === 403 || res.status === 422)) {
+        console.log("sender refused, retrying from the fallback address", res.status, (await res.text()).slice(0, 200));
+        res = await send({ ...payload, from: FALLBACK_FROM });
+      }
       return res.ok;
     } catch { return false; }
   };

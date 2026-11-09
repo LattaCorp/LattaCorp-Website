@@ -8,6 +8,7 @@
     "run_worker_first": ["/api/*"]
   },
   "vars": {
-    "TO_EMAIL": "lattacorpofcentralfl@gmail.com"
+    "TO_EMAIL": "lattacorpofcentralfl@gmail.com",
+    "FROM_EMAIL": "Latta Corp Website <website@lattacorpfl.com>"
   }
 }

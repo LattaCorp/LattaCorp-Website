@@ -3,9 +3,16 @@
 var FORM_LIVE=(location.protocol==="http:"||location.protocol==="https:")&&!/claude|localhost|127\.0\.0\.1/.test(location.hostname)||/[?&]live\b/.test(location.search);
 if(FORM_LIVE)document.documentElement.classList.add("live");
 var FORM_KINDS={qf:"Quote request",cf:"Service request",ctf:"Contact message",hf:"Proposal request"};
+// Text of a label/legend in ENGLISH even when the visitor is on the Spanish site (the language switch keeps each
+// original English text on the page), so the email and the CRM always get the same field names.
+function englishText(node,skip){
+  var out="",w=document.createTreeWalker(node,NodeFilter.SHOW_TEXT,null),n;
+  while(n=w.nextNode()){var p=n.parentNode,bad=false;while(p&&p!==node){if(skip&&p.matches&&p.matches(skip)){bad=true;break}p=p.parentNode}if(!bad)out+=" "+(n._o!==undefined?n._o:n.data)}
+  return out.replace(/\s+/g," ").trim();
+}
 function formLabel(el){
   var lab=el.closest("label");
-  if(lab){var c=lab.cloneNode(true);[].forEach.call(c.querySelectorAll("input,select,textarea,a,small,.ptt"),function(n){n.remove()});var s=c.textContent.replace(/\s+/g," ").replace(/\s*\*$/,"").trim();if(s)return s}
+  if(lab){var s=englishText(lab,"input,select,textarea,a,small,.ptt").replace(/\s*\*$/,"").trim();if(s)return s}
   return el.getAttribute("aria-label")||el.getAttribute("placeholder")||el.name||"Field";
 }
 function formCollect(f){
@@ -14,8 +21,8 @@ function formCollect(f){
     if(el.type==="file"||el.type==="hidden"||el.type==="submit"||el.name==="lc_trap_7")return;
     if(el.type==="checkbox"){
       if(!el.checked)return;
-      var fs=el.closest("fieldset"),key=fs?(fs.querySelector("legend")||{}).textContent||"Options":formLabel(el);
-      var txt=el.value&&el.value!=="on"?el.value:(el.closest("label")?el.closest("label").textContent.replace(/\s+/g," ").trim():"Yes");
+      var fs=el.closest("fieldset"),lg=fs&&fs.querySelector("legend"),key=fs?(lg?englishText(lg):"")||"Options":formLabel(el);
+      var txt=el.value&&el.value!=="on"?el.value:(el.closest("label")?englishText(el.closest("label"),"input"):"Yes");
       if(!fs){out.push({label:key,value:"Yes"});return}
       (groups[key]=groups[key]||[]).push(txt);return}
     var v=(el.value||"").trim();if(!v)return;

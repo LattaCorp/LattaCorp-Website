@@ -20,7 +20,7 @@ assert.equal(sent.body.to[0], "owner@example.com");
 assert.equal(sent.body.reply_to, "jane@example.com");
 assert.equal(sent.body.attachments.length, 1);
 assert(sent.body.html.includes("Jane &lt;b&gt;Doe&lt;/b&gt;"), "html is escaped");
-assert(sent.body.subject.startsWith("Quote request from Jane"));
+assert.equal(sent.body.subject, "Quote – Jane <b>Doe</b>");
 assert(saved, "lead saved to CRM"); assert.equal(saved.opts.headers.apikey, "sb_secret_test"); assert.equal(saved.body.name, "Jane <b>Doe</b>"); assert.equal(saved.body.email, "jane@example.com"); assert.equal(saved.body.photo_count, 1); assert.equal(saved.body.kind, "Quote request");
 sent = null;
 r = await worker.fetch(mk({ lc_trap_7: "spam" }), env); // spam trap: pretend success, send nothing
@@ -53,6 +53,32 @@ r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
   sent = null; r = await worker.fetch(mkT(""), envT); assert.equal(r.status, 403); assert.equal(sent, null);
   sent = null; verifyStatus = 500; r = await worker.fetch(mkT("x"), envT); assert.equal(r.status, 200, "check down: let it through");
   verifyStatus = 200; verdict = false; checked = null; sent = null; r = await worker.fetch(mkT(""), env); assert.equal(r.status, 200, "no secret set: check is off"); assert.equal(checked, null);
+}
+
+// ---- email subjects and sender ----
+{
+  let bodies = [], refuse = false;
+  globalThis.fetch = async (url, opts) => {
+    if (String(url).includes("/rest/v1/leads")) return new Response("", { status: 201 });
+    const b = JSON.parse(opts.body); bodies.push(b);
+    if (refuse && b.from.includes("lattacorpfl.com")) return new Response('{"message":"domain is not verified"}', { status: 403 });
+    return new Response("{}", { status: 200 });
+  };
+  const envF = { ...env, FROM_EMAIL: "Latta Corp Website <website@lattacorpfl.com>" };
+  const send = async (kind, fields, lang = "en") => { bodies = []; const r = await worker.fetch(new Request("https://x.test/api/submit", { method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ kind, lang, lc_trap_7: "", fields, photos: [] }) }), envF); assert.equal(r.status, 200); return bodies; };
+  let b = await send("Quote request", [{ label: "Full name", value: "Jane Doe" }, { label: "Service address", value: "123 Main St, Kissimmee" }, { label: "Service", value: "Mulching" }]);
+  assert.equal(b[0].subject, "Quote – Jane Doe – 123 Main St, Kissimmee"); assert.equal(b[0].from, "Latta Corp Website <website@lattacorpfl.com>");
+  b = await send("Service request", [{ label: "Full name", value: "Al Ruiz" }, { label: "Home address", value: "45 Oak Ln" }, { label: "Community", value: "The Oaks" }], "es");
+  assert.equal(b[0].subject, "Service Request – Al Ruiz – 45 Oak Ln (The Oaks) (Spanish)");
+  b = await send("Contact message", [{ label: "Full name", value: "Kim" }, { label: "Message", value: "Hi at 9 Elm St" }]);
+  assert.equal(b[0].subject, "Message – Kim");
+  b = await send("Proposal request", [{ label: "Your name", value: "Pat Lee" }, { label: "Community or property name", value: "Oak Grove HOA" }, { label: "Property address", value: "9 Palm Dr" }]);
+  assert.equal(b[0].subject, "Proposal – Pat Lee – Oak Grove HOA, 9 Palm Dr");
+  b = await send("Instant quote signup", [{ label: "Full name", value: "Sam" }, { label: "Service address", value: "1 A St" }, { label: "Signed up at instant quote price", value: "$45 per visit" }]);
+  assert.equal(b[0].subject, "Sign-up $45/visit – Sam – 1 A St");
+  refuse = true; b = await send("Contact message", [{ label: "Full name", value: "Kim" }]);
+  assert.equal(b.length, 2, "retried"); assert.equal(b[1].from, "Latta Corp Website <onboarding@resend.dev>");
 }
 // ---- crew login endpoint ----
 const CID = "11111111-1111-4111-8111-111111111111", UID = "22222222-2222-4222-8222-222222222222";
