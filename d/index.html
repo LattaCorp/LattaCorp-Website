@@ -53,6 +53,41 @@ tfoot td{border-bottom:0;padding-top:14px;font-size:1.1rem}tfoot td.r b:last-chi
 .sum .note{font-size:.8rem;color:var(--muted);padding:8px 14px 10px}.sum .note.bad{color:var(--red);font-weight:700}
 tfoot td.lbl{color:var(--muted);font-size:.95rem}
 .pay .acc{font-weight:700;margin:2px 0 6px}
+/* Invoice, classic layout (boxed tables like the GroundsKeeper statements, in LattaCorp green) */
+.cl{padding:28px 34px 26px;font-size:14px;color:#1d2a20}
+.cl .top{display:flex;justify-content:space-between;align-items:flex-start;gap:18px;flex-wrap:wrap;padding-bottom:14px;border-bottom:3px solid var(--forest)}
+.cl .biz{display:flex;gap:12px;align-items:center}.cl .biz img{height:64px;width:auto}
+.cl .biz .bn{font-family:Georgia,"Times New Roman",serif;font-size:1.3rem;font-weight:700;color:var(--forest);line-height:1.15}
+.cl .biz .ba{font-size:.86rem;color:#33443a;margin-top:2px}
+.cl .ttl2{text-align:right}.cl .ttl2 .w{font-family:Georgia,"Times New Roman",serif;font-size:2rem;font-weight:700;letter-spacing:.06em;color:var(--forest);line-height:1}
+.cl .ttl2 .acc{font-size:.86rem;font-style:italic;font-weight:700;color:var(--forest);margin-top:8px;max-width:330px}
+.cl table{border-collapse:collapse;width:100%;margin:0}
+.cl .grid th,.cl .grid td,.cl .asum th,.cl .asum td,.cl .led th,.cl .led td{border:1px solid #8fb08f}
+.cl th{background:var(--forest);color:#fff;font-size:.74rem;font-weight:700;letter-spacing:.02em;text-transform:none;padding:5px 6px;text-align:center;border-radius:0!important}
+.cl .grid{margin:14px 0}.cl .grid td{text-align:center;padding:6px;font-weight:600;background:#fff!important}
+.cl .mid{display:grid;grid-template-columns:1fr 330px;gap:22px;align-items:start;margin-bottom:16px}
+.cl .to .k{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.cl .to .nm{font-size:1.08rem;font-weight:700}.cl .to div{line-height:1.45}.cl .to .sv{margin-top:8px;font-size:.88rem}.cl .to .sv span{color:var(--muted)}
+.cl .asum th{font-size:.82rem;text-align:left;padding:6px 8px}.cl .asum th.r{text-align:right}
+.cl .asum td{padding:5px 8px;background:#fff!important}.cl .asum td.k{background:#eef6ec!important;font-weight:600;color:#26412c;text-align:right;width:62%}
+.cl .asum td.v{text-align:right;font-weight:600;white-space:nowrap}.cl .asum tr.late td.k,.cl .asum tr.late td.v{color:var(--red)}
+.cl .asum tr.tot td{background:var(--forest)!important;color:#fff;font-size:1.05rem;font-weight:800;border-color:var(--forest)}
+.cl .asum tr.tot td.k{color:#fff}
+.cl .asum .nt{font-size:.8rem;padding:6px 2px 0;color:var(--muted)}.cl .asum .nt.bad{color:var(--red);font-weight:700}
+.cl .sect{display:flex;justify-content:space-between;align-items:baseline;margin:6px 0 4px}.cl .sect b{color:var(--forest);font-size:.95rem}.cl .sect span{font-size:.8rem;color:var(--muted)}
+.cl .led td{padding:5px 7px;vertical-align:top;font-size:.9rem}.cl .led tbody tr:nth-child(even) td{background:#f3f8f1}.cl .led tbody tr:nth-child(odd) td{background:#fff}
+.cl .led td.d{white-space:nowrap;width:92px;text-align:center}.cl .led td.a{white-space:nowrap;text-align:right;width:96px}.cl .led td.l{width:32%}
+.cl .led tr.pad td{height:24px}.cl .led .lm{display:none;font-size:.8rem;color:var(--muted)}.cl .led tfoot td.d,.cl .led tfoot td.l{border-right:0}
+.cl .led tfoot td{border:1px solid #8fb08f;background:#eef6ec;font-weight:700;padding:6px 7px;font-size:.95rem}
+.cl .paybox{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:16px;padding:12px 14px;border:2px solid var(--forest);border-radius:6px}
+.cl .paybox h3{margin:0 0 4px;font-size:.92rem;color:var(--forest)}.cl .paybox div{font-size:.9rem;line-height:1.5}
+.cl .thx{text-align:center;font-family:Georgia,"Times New Roman",serif;font-style:italic;font-weight:700;color:var(--forest);font-size:1.08rem;margin-top:16px}
+.cl .stamp{margin-top:12px}
+@media(max-width:700px){.cl{padding:16px 12px 20px}.cl .ttl2{text-align:left}.cl .mid,.cl .paybox{grid-template-columns:1fr}
+ .cl .grid thead{display:none}.cl .grid tr{display:grid;grid-template-columns:1fr 1fr}.cl .grid td{display:flex;flex-direction:column;text-align:left;font-size:.95rem}
+ .cl .grid td::before{content:attr(data-k);font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+ .cl .led td.l,.cl .led th.l{display:none}.cl .led .lm{display:block}.cl .sect{flex-wrap:wrap;gap:2px 10px}}
+@media print{.cl{padding:0}.cl .mid{grid-template-columns:1fr 300px}.cl .paybox{grid-template-columns:1fr 1fr}}
 .foot{text-align:center;color:var(--leaf);margin-top:24px;font-size:1rem;font-weight:700;font-family:"Playfair Display",Georgia,serif}
 .bar[hidden]{display:none}
 body.embed{background:transparent}body.embed #paper{margin:0 auto 16px}
@@ -80,8 +115,11 @@ var T={
   accepted:"Accepted",declined:"Declined",expired:"This estimate has expired. Please contact us for an updated one.",
   thanksA:"Thank you! Your acceptance was received. We'll be in touch soon.",thanksD:"Thanks for letting us know. Your response was received.",by:"by",on:"on",
   confirmD:"Decline this estimate?",
-  acct:"Account",invdate:"Invoice date",duedate:"Due date",period:"Service period",summary:"Account summary",prev:"Previous balance",pastdue:"past due",thisinv:"This invoice",paidthis:"Payments on this invoice",credit:"Credit on account",totaldue:"Total amount due",invtotal:"Invoice total",
-  forprop:"For this property only",lateNow:"Past-due amounts are due now.",dueby:"Please pay by",paidup:"Nothing is due. Thank you!",accepts:"We accept",incl:"Please include invoice {n} with your payment."},
+  acct:"Account",invdate:"Invoice date",duedate:"Due date",period:"Service period",summary:"Account Summary",prev:"Previous Balance",pastdue:"past due",thisinv:"This invoice",paidthis:"Payments on this invoice",credit:"Credit on account",totaldue:"Total amount due",invtotal:"Invoice total",
+  forprop:"For this property only",lateNow:"Past-due amounts are due now.",dueby:"Please pay by",paidup:"Nothing is due. Thank you!",accepts:"We accept",incl:"Please include invoice {n} with your payment.",
+  cinv:"Invoice Number",cacct:"Account Number",pbeg:"Period Beginning",pend:"Period Ending",idate:"Invoice Date",pdue:"Payment Due",
+  payments:"Payments",overdue:"Amount Overdue",curr:"Current Charges",tad:"Total Amount Due",totals:"Totals",activity:"Account Activity",location:"Location",
+  keep:"Please keep this invoice for your records",checks:"Make checks payable to",mailto:"Mail to",payonline:"Pay with Zelle",acceptsT:"We Accept"},
  es:{load:"Cargando…",nf:"No pudimos encontrar esta página. Puede que el enlace esté incompleto. Contáctenos y le enviaremos uno nuevo.",err:"Algo salió mal al cargar esta página. Inténtelo de nuevo en un momento.",
   print:"Imprimir / Guardar PDF",inv:"FACTURA",est:"PRESUPUESTO",invoice:"Factura",estimate:"Presupuesto",issued:"Emitida",due:"Vence",amtdue:"Monto a pagar",total:"Total",validuntil:"Válido hasta",billto:"Facturar a",prepfor:"Preparado para",
   ref:"Ref",addr:"Dirección del servicio",addrs:"Direcciones del servicio",date:"Fecha",service:"Servicio",desc:"Descripción",amount:"Monto",paid:"PAGADA",void:"ANULADA",pay:"Cómo pagar",
@@ -90,8 +128,11 @@ var T={
   accepted:"Aceptado",declined:"Rechazado",expired:"Este presupuesto venció. Contáctenos para uno actualizado.",
   thanksA:"¡Gracias! Recibimos su aceptación. Nos comunicaremos pronto.",thanksD:"Gracias por avisarnos. Recibimos su respuesta.",by:"por",on:"el",
   confirmD:"¿Rechazar este presupuesto?",
-  acct:"Cuenta",invdate:"Fecha de factura",duedate:"Fecha de vencimiento",period:"Período de servicio",summary:"Resumen de cuenta",prev:"Saldo anterior",pastdue:"atrasado",thisinv:"Esta factura",paidthis:"Pagos a esta factura",credit:"Crédito en la cuenta",totaldue:"Total a pagar",invtotal:"Total de la factura",
-  forprop:"Solo para esta propiedad",lateNow:"Los montos atrasados se deben pagar ahora.",dueby:"Por favor pague antes del",paidup:"No hay nada pendiente. ¡Gracias!",accepts:"Aceptamos",incl:"Incluya la factura {n} con su pago."}
+  acct:"Cuenta",invdate:"Fecha de factura",duedate:"Fecha de vencimiento",period:"Período de servicio",summary:"Resumen de Cuenta",prev:"Saldo Anterior",pastdue:"atrasado",thisinv:"Esta factura",paidthis:"Pagos a esta factura",credit:"Crédito en la cuenta",totaldue:"Total a pagar",invtotal:"Total de la factura",
+  forprop:"Solo para esta propiedad",lateNow:"Los montos atrasados se deben pagar ahora.",dueby:"Por favor pague antes del",paidup:"No hay nada pendiente. ¡Gracias!",accepts:"Aceptamos",incl:"Incluya la factura {n} con su pago.",
+  cinv:"Número de factura",cacct:"Número de cuenta",pbeg:"Inicio del período",pend:"Fin del período",idate:"Fecha de factura",pdue:"Fecha de pago",
+  payments:"Pagos",overdue:"Monto atrasado",curr:"Cargos actuales",tad:"Total a pagar",totals:"Totales",activity:"Actividad de la cuenta",location:"Ubicación",
+  keep:"Conserve esta factura para sus registros",checks:"Cheques a nombre de",mailto:"Enviar a",payonline:"Pague con Zelle",acceptsT:"Aceptamos"}
 };
 var qp=new URLSearchParams(location.search),embed=qp.get("embed")==="1";if(embed)document.body.classList.add("embed");
 var lang="en";try{var sv=localStorage.getItem("lc_doc_lang");if(sv==="en"||sv==="es")lang=sv;else if(/^es/i.test(navigator.language||""))lang="es"}catch(e){if(/^es/i.test(navigator.language||""))lang="es"}
@@ -118,32 +159,48 @@ function who(c){return"<b>"+esc(c.name||"")+"</b>"+(c.company?"<div>"+esc(c.comp
 var PAY_ES={"cash":"Efectivo","check":"Cheque","checks":"Cheques","credit/debit card":"Tarjeta de crédito/débito","credit card":"Tarjeta de crédito","debit card":"Tarjeta de débito","automated payments":"Pagos automáticos","automatic payments":"Pagos automáticos","bank transfer":"Transferencia bancaria"};
 function payWords(list){if(lang!=="es")return list;return list.split(",").map(function(w){var k=w.trim(),v=PAY_ES[k.toLowerCase()];return v||k}).join(", ")}
 function sumRow(k,v,neg){return'<div class="r2"><span>'+k+"</span><b>"+(neg?"−":"")+esc(money(v))+"</b></div>"}
+function dn(x){if(!x)return"—";var m=String(x).slice(0,10).split("-");return lang==="es"?m[2]+"/"+m[1]+"/"+m[0]:m[1]+"/"+m[2]+"/"+m[0]}
 function drawInvoice(){
   var d=data.doc,b=data.business,c=data.client,items=data.items||[],s=data.summary||null,addrs=[];
   items.forEach(function(it){if(it.address&&addrs.indexOf(it.address)<0)addrs.push(it.address)});
   if(!addrs.length&&d.property_address)addrs.push(d.property_address);
+  var n=num(d.number,"LC-"),open=d.status==="open";
   var stamp=d.status==="paid"?'<div class="stamp">'+t("paid")+" "+esc(d.paid_at?dts(d.paid_at):"")+(d.paid_method?" · "+esc(d.paid_method):"")+"</div>":d.status==="void"?'<div class="stamp bad">'+t("void")+"</div>":"";
-  var open=d.status==="open",n=num(d.number,"LC-");
-  var fact=function(k,v,cls){return'<div class="fact'+(cls?" "+cls:"")+'"><div class="k">'+k+'</div><div class="v">'+esc(v)+"</div></div>"};
-  var facts='<div class="facts">'+fact(t("invoice"),n)+fact(t("acct"),c.account_no?String(c.account_no):"—")+fact(t("invdate"),dt(d.issue_date))+fact(t("duedate"),dt(d.due_date))+"</div>";
-  var bill='<div class="bill"><div class="k">'+t("billto")+"</div>"+who(c)
-    +(addrs.length?'<div class="ln"><span>'+(addrs.length>1?t("addrs"):t("addr"))+":</span> "+addrs.map(esc).join("; ")+"</div>":"")
-    +(d.period_start&&d.period_end?'<div class="ln"><span>'+t("period")+":</span> "+esc(dt(d.period_start))+" – "+esc(dt(d.period_end))+"</div>":"")
-    +(d.reference?'<div class="ln"><span>'+t("ref")+":</span> "+esc(d.reference)+"</div>":"")+"</div>";
+  // top: business on the left, INVOICE and what we accept on the right
+  var h='<div class="cl"><div class="top"><div class="biz"><img src="../images/logo-tree-header.png" alt=""><div><div class="bn">'+esc(b.name||"Latta Corp")+'</div><div class="ba">'+[b.address,b.phone,b.email].filter(Boolean).map(esc).join("<br>")+"</div></div></div>"
+    +'<div class="ttl2"><div class="w">'+t("inv")+"</div>"+(b.accepts?'<div class="acc">'+t("acceptsT")+": "+esc(payWords(b.accepts))+"</div>":"")+"</div></div>";
+  // the boxed row of invoice facts
+  var cells=[[t("cinv"),n],[t("cacct"),c.account_no?String(c.account_no):"—"],[t("pbeg"),dn(d.period_start)],[t("pend"),dn(d.period_end)],[t("idate"),dn(d.issue_date)],[t("pdue"),dn(d.due_date)]];
+  h+='<table class="grid"><thead><tr>'+cells.map(function(x){return"<th>"+x[0]+"</th>"}).join("")+"</tr></thead><tbody><tr>"+cells.map(function(x){return'<td data-k="'+esc(x[0])+'">'+esc(x[1])+"</td>"}).join("")+"</tr></tbody></table>";
+  // bill to + account summary
+  var to='<div class="to"><div class="k">'+t("billto")+'</div><div class="nm">'+esc(c.name||"")+"</div>"+(c.company?"<div>"+esc(c.company)+"</div>":"")
+    +(addrs.length?'<div class="sv"><span>'+(addrs.length>1?t("addrs"):t("addr"))+":</span><br>"+addrs.map(esc).join("<br>")+"</div>":"")
+    +(d.reference?'<div class="sv"><span>'+t("ref")+":</span> "+esc(d.reference)+"</div>":"")+"</div>";
   var sum="";
   if(s&&d.status!=="void"){
-    sum='<div class="sum"><h2>'+t("summary")+"</h2>"+sumRow(t("prev"),s.previous)
-      +(Number(s.previous_past_due)>0?'<div class="late">'+esc(money(s.previous_past_due))+" "+t("pastdue")+"</div>":"")
-      +sumRow(t("thisinv"),s.this_total)
-      +(Number(s.this_paid)>0?sumRow(t("paidthis"),s.this_paid,true):"")
-      +(Number(s.credit)>0?sumRow(t("credit"),s.credit,true):"")
-      +'<div class="tot"><span>'+t("totaldue")+"</span><b>"+esc(money(s.total_due))+"</b></div>"
-      +(Number(s.total_due)<=0?'<div class="note">'+t("paidup")+"</div>":Number(s.previous_past_due)>0||(Number(s.this_balance)>0&&s.today&&d.due_date<s.today)?'<div class="note bad">'+t("lateNow")+"</div>":'<div class="note">'+t("dueby")+" "+esc(dt(d.due_date))+"</div>")
-      +(s.by_property?'<div class="note">'+t("forprop")+"</div>":"")+"</div>"}
-  var h=head(b,t("inv"))+'<div class="body">'+facts+'<div class="two">'+bill+sum+"</div>"
-   +'<table><thead><tr><th>'+t("date")+"</th><th>"+t("service")+'</th><th class="r">'+t("amount")+"</th></tr></thead><tbody>"+lines(items,true,addrs.length>1)+'</tbody><tfoot><tr><td></td><td class="r lbl">'+t("invtotal")+'</td><td class="r"><b>'+esc(money(d.total))+"</b></td></tr></tfoot></table>"+stamp
-   +(open||(s&&Number(s.total_due)>0)?'<div class="pay"><b>'+t("pay")+"</b>"+(b.accepts?'<div class="acc">'+t("accepts")+": "+esc(payWords(b.accepts))+"</div>":"")+"<div>"+(b.zelle?"Zelle: "+esc(b.zelle)+"<br>":"")+(b.payment_note?esc(b.payment_note)+"<br>":"")+esc(t("incl").replace("{n}",n))+"</div></div>":"")
-   +'<div class="foot">'+esc(b.footer||"")+"</div></div>";
+    var pays=Number(s.this_paid||0)+Number(s.credit||0),late=Number(s.previous_past_due||0)+(Number(s.this_balance)>0&&s.today&&d.due_date<s.today?Number(s.this_balance):0);
+    var row=function(k,v,cls){return'<tr'+(cls?' class="'+cls+'"':"")+'><td class="k">'+k+'</td><td class="v">'+v+"</td></tr>"};
+    sum='<div class="asum"><table><thead><tr><th>'+t("summary")+'</th><th class="r">'+t("totals")+"</th></tr></thead><tbody>"
+      +row(t("prev"),esc(money(s.previous)))
+      +row(t("payments"),pays>0?"−"+esc(money(pays)):esc(money(0)))
+      +row(t("overdue"),esc(money(late)),late>0?"late":"")
+      +row(t("curr"),esc(money(s.this_total)))
+      +row(t("tad"),esc(money(s.total_due)),"tot")+"</tbody></table>"
+      +(Number(s.total_due)<=0?'<div class="nt">'+t("paidup")+"</div>":late>0?'<div class="nt bad">'+t("lateNow")+"</div>":'<div class="nt">'+t("dueby")+" "+esc(dt(d.due_date))+"</div>")
+      +(s.by_property?'<div class="nt">'+t("forprop")+"</div>":"")+"</div>"}
+  h+='<div class="mid">'+to+sum+"</div>";
+  // account activity, with blank lines so a short invoice still reads like a statement
+  var many=addrs.length>1||items.some(function(it){return it.address});
+  var rows=items.map(function(it){var loc=it.address||d.property_address||"";return'<tr><td class="d">'+esc(dn(it.date))+'</td><td class="l">'+esc(loc)+"</td><td>"+esc(it.description)+(loc?'<div class="lm">'+esc(loc)+"</div>":"")+'</td><td class="a">'+esc(money(it.amount))+"</td></tr>"}).join("");
+  for(var i=items.length;i<6;i++)rows+='<tr class="pad"><td class="d"></td><td class="l"></td><td></td><td class="a"></td></tr>';
+  h+='<div class="sect"><b>'+t("activity")+"</b><span>"+t("keep")+"</span></div>"
+    +'<table class="led"><thead><tr><th>'+t("date")+'</th><th class="l">'+t("location")+"</th><th>"+t("desc")+"</th><th>"+t("amount")+"</th></tr></thead><tbody>"+rows
+    +'</tbody><tfoot><tr><td class="d"></td><td class="l"></td><td style="text-align:right">'+t("curr")+'</td><td class="a">'+esc(money(d.total))+"</td></tr></tfoot></table>"+stamp;
+  // how to pay
+  if(open||(s&&Number(s.total_due)>0)){
+    h+='<div class="paybox"><div><h3>'+t("pay")+"</h3>"+(b.zelle?"<div><b>"+t("payonline")+":</b> "+esc(b.zelle)+"</div>":"")+(b.payment_note?"<div>"+esc(b.payment_note)+"</div>":"")+"<div>"+esc(t("incl").replace("{n}",n))+"</div></div>"
+      +"<div><h3>"+t("checks")+"</h3><div>"+esc(b.name||"Latta Corp")+"</div>"+(b.address?"<div>"+t("mailto")+": "+esc(b.address)+"</div>":"")+"</div></div>"}
+  h+=(b.footer?'<div class="thx">'+esc(b.footer)+"</div>":"")+"</div>";
   document.title=t("invoice")+" "+n+" · "+(b.name||"Latta Corp");
   return h}
 
