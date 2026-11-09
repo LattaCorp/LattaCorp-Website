@@ -1160,15 +1160,31 @@ function clientEstimatesSection(c) {
   return sec;
 }
 
-/* ---- Custom invoice: a fill-in-the-blanks PDF in the same design (forms/custom-invoice.pdf, made by
-   tools/build_custom_invoice_pdf.py) for one-off invoices made by hand. Nothing typed into it is saved here. ---- */
-function customInvoiceLink(cls) {
-  var a = el("a", cls, "Custom invoice");
-  a.href = "/forms/custom-invoice.pdf";
+/* ---- Fill-in-the-blanks PDFs in the invoice design (made by tools/build_custom_pdfs.py), for documents made by
+   hand: Custom invoice (Billing) and New Estimate/Quote (Jobs). Nothing typed into them is saved here. ---- */
+function customDocLink(label, file, cls, tip) {
+  var a = el("a", cls, label);
+  a.href = "/forms/" + file;
   a.target = "_blank";
   a.rel = "noopener";
-  a.title = "Fill-in-the-blanks invoice PDF. Not saved in Foreman, so it won't show in balances or the portal.";
+  a.title = tip;
   return a;
+}
+function customInvoiceLink(cls) {
+  return customDocLink(
+    "Custom invoice",
+    "custom-invoice.pdf",
+    cls,
+    "Fill-in-the-blanks invoice PDF. Not saved in Foreman, so it won't show in balances or the portal."
+  );
+}
+function customEstimateLink(cls) {
+  return customDocLink(
+    "New Estimate/Quote",
+    "custom-estimate.pdf",
+    cls,
+    "Fill-in-the-blanks estimate/quote PDF. Not saved in Foreman."
+  );
 }
 
 /* ---- billing settings ---- */
