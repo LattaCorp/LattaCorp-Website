@@ -1,6 +1,7 @@
 /* Signing in and out, and loading all the data from Supabase when the CRM opens or Refresh is pressed. */
 
 /* ---- sign in / out ---- */
+eyeToggle($("pw"), "password");
 $("login").addEventListener("submit", function (e) {
   e.preventDefault();
   $("loginmsg").textContent = "";

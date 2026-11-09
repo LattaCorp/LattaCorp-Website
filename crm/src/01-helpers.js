@@ -132,3 +132,30 @@ function esc(s) {
 function r2(x) {
   return Math.round((Number(x) || 0) * 100) / 100;
 }
+
+/* Eye "Show / Hide" inside a hidden field (SSN, sign-in password). Wraps the input and adds the button at its
+   right edge. The field starts hidden as dots and hides again whenever the screen is drawn fresh. */
+var EYE_ICON =
+  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+var EYE_OFF_ICON =
+  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+function eyeToggle(input, what) {
+  var wrap = el("div", "pwwrap");
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  input.type = "password";
+  var b = btn("", "eyebtn");
+  function draw() {
+    var hidden = input.type === "password";
+    b.innerHTML = (hidden ? EYE_ICON : EYE_OFF_ICON) + "<span>" + (hidden ? "Show" : "Hide") + "</span>";
+    b.setAttribute("aria-label", (hidden ? "Show " : "Hide ") + what);
+  }
+  b.addEventListener("click", function (e) {
+    e.preventDefault();
+    input.type = input.type === "password" ? "text" : "password";
+    draw();
+  });
+  draw();
+  wrap.appendChild(b);
+  return b;
+}

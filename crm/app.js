@@ -246,10 +246,38 @@ function r2(x) {
   return Math.round((Number(x) || 0) * 100) / 100;
 }
 
+/* Eye "Show / Hide" inside a hidden field (SSN, sign-in password). Wraps the input and adds the button at its
+   right edge. The field starts hidden as dots and hides again whenever the screen is drawn fresh. */
+var EYE_ICON =
+  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+var EYE_OFF_ICON =
+  '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
+function eyeToggle(input, what) {
+  var wrap = el("div", "pwwrap");
+  input.parentNode.insertBefore(wrap, input);
+  wrap.appendChild(input);
+  input.type = "password";
+  var b = btn("", "eyebtn");
+  function draw() {
+    var hidden = input.type === "password";
+    b.innerHTML = (hidden ? EYE_ICON : EYE_OFF_ICON) + "<span>" + (hidden ? "Show" : "Hide") + "</span>";
+    b.setAttribute("aria-label", (hidden ? "Show " : "Hide ") + what);
+  }
+  b.addEventListener("click", function (e) {
+    e.preventDefault();
+    input.type = input.type === "password" ? "text" : "password";
+    draw();
+  });
+  draw();
+  wrap.appendChild(b);
+  return b;
+}
+
 /* ======================= crm/src/02-signin-and-loading.js ======================= */
 /* Signing in and out, and loading all the data from Supabase when the CRM opens or Refresh is pressed. */
 
 /* ---- sign in / out ---- */
+eyeToggle($("pw"), "password");
 $("login").addEventListener("submit", function (e) {
   e.preventDefault();
   $("loginmsg").textContent = "";
@@ -5346,28 +5374,7 @@ function personBio(host, p) {
   ss.input.autocomplete = "off";
   ss.input.inputMode = "numeric";
   ss.input.placeholder = "###-##-####";
-  /* The number stays hidden (dots) until the eye "Show" inside the box is pressed; it hides again on Hide
-     or when the screen is reopened. */
-  var EYE =
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
-  var EYE_OFF =
-    '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 3l18 18"/><path d="M10.6 5.1A10.4 10.4 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3.2 4.1M6.6 6.6C3.7 8.4 2 12 2 12s3.6 7 10 7a9.8 9.8 0 0 0 5.4-1.6"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>';
-  var sh = el("div", "pwwrap");
-  ss.input.parentNode.insertBefore(sh, ss.input);
-  sh.appendChild(ss.input);
-  var shb = btn("", "eyebtn");
-  function drawEye() {
-    var hidden = ss.input.type === "password";
-    shb.innerHTML = (hidden ? EYE : EYE_OFF) + "<span>" + (hidden ? "Show" : "Hide") + "</span>";
-    shb.setAttribute("aria-label", hidden ? "Show Social Security number" : "Hide Social Security number");
-  }
-  shb.addEventListener("click", function (e) {
-    e.preventDefault();
-    ss.input.type = ss.input.type === "password" ? "text" : "password";
-    drawEye();
-  });
-  drawEye();
-  sh.appendChild(shb);
+  eyeToggle(ss.input, "Social Security number"); /* hidden as dots until the eye "Show" is pressed */
   ss.input.addEventListener("blur", function () {
     ss.input.value = fmtSsn(ss.input.value);
   });
