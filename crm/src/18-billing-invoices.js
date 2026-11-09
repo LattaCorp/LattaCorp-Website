@@ -247,6 +247,30 @@ function openInvoiceForm(cid) {
   g.appendChild(isd);
   g.appendChild(dd);
   p.appendChild(g);
+  // service period (shows on the invoice); follows the invoice date's month until changed by hand
+  var monthOf = function (d, end) {
+      var m = String(d || today()).slice(0, 7),
+        last = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0).getDate();
+      return m + "-" + (end ? String(last) : "01");
+    },
+    gp = el("div", "grid2"),
+    pbeg = fld("Period beginning", "date", monthOf(today())),
+    pend = fld("Period ending", "date", monthOf(today(), true)),
+    perTouched = false;
+  [pbeg, pend].forEach(function (x) {
+    x.input.addEventListener("change", function () {
+      perTouched = true;
+    });
+  });
+  isd.input.addEventListener("change", function () {
+    if (!perTouched && isd.input.value) {
+      pbeg.input.value = monthOf(isd.input.value);
+      pend.input.value = monthOf(isd.input.value, true);
+    }
+  });
+  gp.appendChild(pbeg);
+  gp.appendChild(pend);
+  p.appendChild(gp);
   var pps = propPicker(cs);
   p.appendChild(pps);
   var ref = fld("Reference / PO number (optional, shows on the invoice)", "text", "");
@@ -320,6 +344,8 @@ function openInvoiceForm(cid) {
         paid_method: zero ? "No charge" : ""
       };
     if (pid) irow.property_id = pid;
+    if (pbeg.input.value) irow.period_start = pbeg.input.value;
+    if (pend.input.value) irow.period_end = pend.input.value;
     sb.from("invoices")
       .insert(irow)
       .select()
@@ -363,4 +389,46 @@ function openInvoiceForm(cid) {
   });
   go.style.marginTop = "14px";
   p.appendChild(go);
+
+  // live preview of the invoice the client will get
+  var show = livePreview(p);
+  function draft() {
+    var c = byId(clients, cs.input.value),
+      pid = pps.input.value || null,
+      items = [],
+      total = 0;
+    rows.forEach(function (r) {
+      var d = r.d.input.value.trim(),
+        a = parseFloat(r.a.input.value);
+      if (!d && isNaN(a)) return;
+      a = isNaN(a) ? 0 : a;
+      total += a;
+      items.push({ date: isd.input.value, description: d, amount: a, address: pid ? paddr(pid) : "" });
+    });
+    total = r2(total);
+    show({
+      kind: "invoice",
+      doc: {
+        number: lpNextNumber(invoices),
+        issue_date: isd.input.value,
+        due_date: dd.input.value,
+        status: "open",
+        total: total,
+        reference: ref.input.value.trim(),
+        period_start: pbeg.input.value,
+        period_end: pend.input.value,
+        property_address: pid ? paddr(pid) : c ? lpMainAddress(c.id) : ""
+      },
+      summary: lpSummary(c, pid, total),
+      items: items,
+      client: lpClient(c),
+      business: lpBusiness()
+    });
+  }
+  p.addEventListener("input", draft);
+  p.addEventListener("change", draft);
+  p.addEventListener("click", function () {
+    setTimeout(draft, 0);
+  });
+  draft();
 }

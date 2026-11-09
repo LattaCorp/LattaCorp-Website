@@ -64,6 +64,7 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 .cl .top .mid2{text-align:center}.cl .top .sa{margin-top:8px;font-size:.92rem;color:#e3f1e0;line-height:1.35}
 .cl .top .sa span,.cl .top .bt span{display:block;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#b9d8b6;margin-bottom:1px}
 .cl .top .bt{justify-self:end;text-align:right;font-size:.9rem;color:#e3f1e0;line-height:1.35}.cl .top .bt b{display:block;color:#fff;font-size:1.05rem}
+.cl .top .w.est{font-size:2.3rem;letter-spacing:.08em}.cl .proj{margin:0 0 14px;padding:10px 14px;border:1px solid #8fb08f;border-left:5px solid var(--forest);background:#f7fbf6}.cl .proj .pt{font-family:Georgia,"Times New Roman",serif;font-weight:700;font-size:1.15rem;color:var(--forest)}.cl .proj .ps{white-space:pre-wrap;margin-top:4px;font-size:.92rem}
 .cl .asum tr.per td{font-weight:600}.cl .asum tr.per td.v{color:#1d2a20}
 .cl .ct .wmg{display:block;height:64px;width:auto;margin:auto auto 0}.cl .ct .gap{height:4px;flex:none}
 .cl .biz{display:flex;gap:14px;align-items:center}.cl .biz .lg{background:#fff;border-radius:12px;padding:6px 8px;display:flex}.cl .biz img{height:62px;width:auto}
@@ -78,7 +79,7 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 .cl .to .k{font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 .cl .to .nm{font-size:1.08rem;font-weight:700}.cl .to div{line-height:1.45}.cl .to .sv{margin-top:8px;font-size:.88rem}.cl .to .sv span{color:var(--muted)}
 .cl .asum th{font-size:.82rem;text-align:left;padding:6px 8px}.cl .asum th.r{text-align:right}
-.cl .asum td{padding:5px 8px;background:#fff!important}.cl .asum td.k{background:#eef6ec!important;font-weight:600;color:#26412c;text-align:right;width:62%}
+.cl .asum td{padding:5px 8px;background:#fff!important;vertical-align:middle}.cl .asum td.k{background:#eef6ec!important;font-weight:600;color:#26412c;text-align:right;width:62%}
 .cl .asum td.v{text-align:right;font-weight:600;white-space:nowrap}.cl .asum tr.late td.k,.cl .asum tr.late td.v{color:var(--red)}
 .cl .asum tr.tot td{background:var(--forest)!important;color:#fff;font-size:1.05rem;font-weight:800;border-color:var(--forest)}
 .cl .asum tr.tot td.k{color:#fff}
@@ -93,7 +94,7 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 .cl .ct .blk{border-left:4px solid var(--leaf);padding:2px 0 2px 12px;margin-bottom:14px}.cl .ct .lb{display:block;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .cl .top .bt b.big{font-size:1.7rem;line-height:1.15;margin:2px 0}.cl .top .bt div{white-space:nowrap}
 .cl .stamp{margin-top:12px}
-@media(max-width:700px){#paper.sheet{min-height:0}.cl .led tr.more{display:none}.cl>.inner{padding:16px 12px 0}.cl .top{padding:16px 14px;grid-template-columns:auto 1fr;row-gap:12px}.cl .top .lg img{height:48px}.cl .top .mid2{display:contents}.cl .top .w{font-size:2.2rem;text-align:right}.cl .top .sa{grid-column:1/-1;text-align:left;margin-top:0}.cl .top .bt{grid-column:1/-1;justify-self:start;text-align:left}.cl .ct .wmg{height:44px;margin:16px auto 0}.cl .ct{padding-top:0}.cl .asum{width:100%}.cl .sumwrap{flex-direction:column-reverse;gap:16px}
+@media(max-width:700px){#paper.sheet{min-height:0}.cl .led tr.more{display:none}.cl>.inner{padding:16px 12px 0}.cl .top{padding:16px 14px;grid-template-columns:auto 1fr;row-gap:12px}.cl .top .lg img{height:48px}.cl .top .mid2{display:contents}.cl .top .w{font-size:2.2rem;text-align:right}.cl .top .w.est{font-size:1.45rem;letter-spacing:.04em}.cl .top .sa{grid-column:1/-1;text-align:left;margin-top:0}.cl .top .bt{grid-column:1/-1;justify-self:start;text-align:left}.cl .ct .wmg{height:44px;margin:16px auto 0}.cl .ct{padding-top:0}.cl .asum{width:100%}.cl .sumwrap{flex-direction:column-reverse;gap:16px}
  .cl .grid thead{display:none}.cl .grid tr{display:grid;grid-template-columns:1fr 1fr}.cl .grid td{display:flex;flex-direction:column;text-align:left;font-size:.95rem}
  .cl .grid td::before{content:attr(data-k);font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
  .cl .led td.l,.cl .led th.l{display:none}.cl .led .lm{display:block}.cl .sect{flex-wrap:wrap;gap:2px 10px}}
@@ -127,7 +128,7 @@ var T={
   confirmD:"Decline this estimate?",
   acct:"Account",invdate:"Invoice date",duedate:"Due date",period:"Service period",summary:"Invoice Summary",prev:"Previous Balance",pastdue:"past due",thisinv:"This invoice",paidthis:"Payments on this invoice",credit:"Credit on account",totaldue:"Total amount due",invtotal:"Invoice total",
   forprop:"For this property only",lateNow:"Past-due amounts are due now.",dueby:"Please pay by",paidup:"Nothing is due. Thank you!",accepts:"We accept",incl:"Please include invoice {n} with your payment.",
-  questions:"Questions? Contact us",cinv:"Invoice Number",cacct:"Account Number",pbeg:"Period Beginning",pend:"Period Ending",idate:"Invoice Date",pdue:"Payment Due",
+  questions:"Questions? Contact us",estq:"ESTIMATE / QUOTE",validU:"Valid Until",cest:"Estimate Number",edate:"Estimate Date",propwork:"Proposed Work",goodthru:"Prices are good through the Valid Until date",esum:"Estimate Summary",subtotal:"Subtotal",etotal:"Estimated Total",cinv:"Invoice Number",cacct:"Account Number",pbeg:"Period Beginning",pend:"Period Ending",idate:"Invoice Date",pdue:"Payment Due",
   payments:"Payments",overdue:"Amount Overdue",curr:"Current Charges",tad:"Total Amount Due",totals:"Totals",activity:"Account Activity",location:"Location",keep:"Please keep this invoice for your records"},
  es:{load:"Cargando…",nf:"No pudimos encontrar esta página. Puede que el enlace esté incompleto. Contáctenos y le enviaremos uno nuevo.",err:"Algo salió mal al cargar esta página. Inténtelo de nuevo en un momento.",
   print:"Imprimir / Guardar PDF",inv:"FACTURA",est:"PRESUPUESTO",invoice:"Factura",estimate:"Presupuesto",issued:"Emitida",due:"Vence",amtdue:"Monto a pagar",total:"Total",validuntil:"Válido hasta",billto:"Facturar a",prepfor:"Preparado para",
@@ -139,12 +140,14 @@ var T={
   confirmD:"¿Rechazar este presupuesto?",
   acct:"Cuenta",invdate:"Fecha de factura",duedate:"Fecha de vencimiento",period:"Período de servicio",summary:"Resumen de Factura",prev:"Saldo Anterior",pastdue:"atrasado",thisinv:"Esta factura",paidthis:"Pagos a esta factura",credit:"Crédito en la cuenta",totaldue:"Total a pagar",invtotal:"Total de la factura",
   forprop:"Solo para esta propiedad",lateNow:"Los montos atrasados se deben pagar ahora.",dueby:"Por favor pague antes del",paidup:"No hay nada pendiente. ¡Gracias!",accepts:"Aceptamos",incl:"Incluya la factura {n} con su pago.",
-  questions:"¿Preguntas? Contáctenos",cinv:"Número de factura",cacct:"Número de cuenta",pbeg:"Inicio del período",pend:"Fin del período",idate:"Fecha de factura",pdue:"Fecha de pago",
+  questions:"¿Preguntas? Contáctenos",estq:"PRESUPUESTO",validU:"Válido hasta",cest:"Número de presupuesto",edate:"Fecha del presupuesto",propwork:"Trabajo propuesto",goodthru:"Precios válidos hasta la fecha indicada",esum:"Resumen del presupuesto",subtotal:"Subtotal",etotal:"Total estimado",cinv:"Número de factura",cacct:"Número de cuenta",pbeg:"Inicio del período",pend:"Fin del período",idate:"Fecha de factura",pdue:"Fecha de pago",
   payments:"Pagos",overdue:"Monto atrasado",curr:"Cargos actuales",tad:"Total a pagar",totals:"Totales",activity:"Actividad de la cuenta",location:"Ubicación",keep:"Conserve esta factura para sus registros"}
 };
 var qp=new URLSearchParams(location.search),embed=qp.get("embed")==="1";if(embed)document.body.classList.add("embed");
 var lang="en";try{var sv=localStorage.getItem("lc_doc_lang");if(sv==="en"||sv==="es")lang=sv;else if(/^es/i.test(navigator.language||""))lang="es"}catch(e){if(/^es/i.test(navigator.language||""))lang="es"}
 if(qp.get("lang")==="en"||qp.get("lang")==="es")lang=qp.get("lang");
+// preview=1: Foreman shows this page beside its New invoice / New estimate forms and sends the draft to draw
+var preview=qp.get("preview")==="1";
 var data=null,root=document.getElementById("root"),cfg=window.CRM_CONFIG;
 function t(k){return T[lang][k]||T.en[k]||k}
 function esc(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
@@ -217,14 +220,30 @@ function drawEstimate(){
   if(d.status==="accepted")banner='<div class="stamp">'+t("accepted").toUpperCase()+" "+esc(d.responded_at?dts(d.responded_at):"")+(d.response_name?" · "+esc(d.response_name):"")+"</div>";
   else if(d.status==="declined")banner='<div class="stamp bad">'+t("declined").toUpperCase()+" "+esc(d.responded_at?dts(d.responded_at):"")+"</div>";
   else if(expired)banner='<div class="sm" style="color:#b3261e;font-weight:700;margin:10px 0">'+t("expired")+"</div>";
-  var canAct=(d.status==="draft"||d.status==="sent")&&!expired;
-  var h=head(b,t("est"))+'<div class="body"><div class="facts"><div class="fact"><div class="k">'+t("estimate")+'</div><div class="v">'+esc(num(d.number,"EST-"))+'</div></div><div class="fact"><div class="k">'+t("issued")+'</div><div class="v">'+esc(dt(d.issue_date))+'</div></div><div class="fact"><div class="k">'+t("validuntil")+'</div><div class="v">'+esc(d.valid_until?dt(d.valid_until):"—")+'</div></div><div class="fact due"><div class="k">'+t("total")+'</div><div class="v">'+esc(money(d.total))+"</div></div></div>"
-   +'<div class="bill"><div class="k">'+t("prepfor")+"</div>"+who(c)+"</div>"
-   +(d.title?'<h1 class="ttl">'+esc(d.title)+"</h1>":"")+(d.scope?'<p class="scope">'+esc(d.scope)+"</p>":"")
-   +'<table><thead><tr><th>'+t("desc")+'</th><th class="r">'+t("amount")+"</th></tr></thead><tbody>"+lines(items,false)+'</tbody><tfoot><tr><td class="r"><b>'+t("total")+'</b></td><td class="r"><b>'+esc(money(d.total))+"</b></td></tr></tfoot></table>"+banner
+  var canAct=!preview&&(d.status==="draft"||d.status==="sent")&&!expired,n=num(d.number,"EST-");
+  var h='<div class="cl"><div class="top"><div class="lg"><img src="../images/logo-tree-header.png" alt="'+esc(b.name||"Latta Corp")+'"></div>'
+    +'<div class="mid2"><div class="w est">'+t("estq")+"</div>"
+    +(d.property_address?'<div class="sa"><span>'+t("addr")+"</span>"+esc(d.property_address)+"</div>":"")+"</div>"
+    +'<div class="bt"></div></div><div class="inner">';
+  var cells=[[t("cest"),n],[t("cacct"),c.account_no?String(c.account_no):"—"],[t("edate"),dn(d.issue_date)],[t("validU"),dn(d.valid_until)]];
+  h+='<table class="grid"><thead><tr>'+cells.map(function(x){return"<th>"+x[0]+"</th>"}).join("")+"</tr></thead><tbody><tr>"+cells.map(function(x){return'<td data-k="'+esc(x[0])+'">'+esc(x[1])+"</td>"}).join("")+"</tr></tbody></table>";
+  if(d.title||d.scope)h+='<div class="proj">'+(d.title?'<div class="pt">'+esc(d.title)+"</div>":"")+(d.scope?'<div class="ps">'+esc(d.scope)+"</div>":"")+"</div>";
+  var rows=items.map(function(it){return'<tr><td>'+esc(it.description)+'</td><td class="a">'+esc(money(it.amount))+"</td></tr>"}).join("");
+  for(var i=items.length;i<14;i++)rows+='<tr class="pad'+(i>=5?" more":"")+(i>=10?" scr":"")+'"><td></td><td class="a"></td></tr>';
+  h+='<div class="sect"><b>'+t("propwork")+"</b><span>"+t("goodthru")+"</span></div>"
+    +'<table class="led"><thead><tr><th>'+t("desc")+"</th><th>"+t("amount")+"</th></tr></thead><tbody>"+rows+"</tbody></table>";
+  var row=function(k,v,cls){return'<tr'+(cls?' class="'+cls+'"':"")+'><td class="k">'+k+'</td><td class="v">'+v+"</td></tr>"};
+  var sum='<div class="asum"><table><thead><tr><th>'+t("esum")+'</th><th class="r">'+t("totals")+"</th></tr></thead><tbody>"
+    +row(t("edate"),esc(dn(d.issue_date)),"per")+row(t("validU"),esc(dn(d.valid_until)),"per")
+    +row(t("subtotal"),esc(money(d.total)))+row(t("etotal"),esc(money(d.total)),"tot")+"</tbody></table></div>";
+  var ct='<div class="ct"><div class="blk"><span class="lb">'+t("prepfor")+"</span><b>"+esc(c.name||"")+"</b>"+(c.company?"<div>"+esc(c.company)+"</div>":"")
+    +(c.account_no?"<div>"+t("cacct")+": "+esc(String(c.account_no))+"</div>":"")+"</div>"
+    +'<div class="blk"><span class="lb">'+t("questions")+"</span><b>"+esc(b.name||"Latta Corp")+"</b>"+[b.phone,b.email].filter(Boolean).map(function(x){return"<div>"+esc(x)+"</div>"}).join("")+"</div>"
+    +'<div class="gap"></div><img class="wmg" src="../images/logo-wordmark-green.svg" alt=""></div>';
+  h+='<div class="sumwrap">'+ct+sum+"</div>"+banner
    +(canAct?'<div class="accept" id="acc"><h2>'+t("ahead")+"</h2><div class=\"sm\">"+t("ahelp")+'</div><label for="an">'+t("name")+'</label><input id="an" autocomplete="name" maxlength="120"><label for="anote">'+t("note")+'</label><textarea id="anote" rows="2" maxlength="500"></textarea><div class="row"><button class="go" id="ay" type="button">'+t("accept")+'</button><button class="no" id="an2" type="button">'+t("decline")+'</button></div><div class="err" id="aerr" role="alert"></div></div>':"")
-   +'<div class="foot">'+esc(b.footer||"")+"</div></div>";
-  document.title=t("estimate")+" "+num(d.number,"EST-")+" · "+(b.name||"Latta Corp");
+   +(b.footer?'<div class="thx">'+esc(b.footer)+"</div>":"")+"</div></div>";
+  document.title=t("estimate")+" "+n+" · "+(b.name||"Latta Corp");
   return h}
 
 function respond(decision){
@@ -241,8 +260,9 @@ function draw(){
   var bar=document.getElementById("bar");bar.hidden=embed;
   document.getElementById("en").className=lang==="en"?"on":"";document.getElementById("es").className=lang==="es"?"on":"";document.getElementById("pr").textContent=t("print");
   document.documentElement.lang=lang;
-  root.innerHTML='<div id="paper"'+(data.kind==="invoice"?' class="sheet"':"")+">"+(data.kind==="invoice"?drawInvoice():drawEstimate())+"</div>";
-  var ay=document.getElementById("ay");if(ay){ay.addEventListener("click",function(){respond("accepted")});document.getElementById("an2").addEventListener("click",function(){respond("declined")})}}
+  root.innerHTML='<div id="paper" class="sheet">'+(data.kind==="invoice"?drawInvoice():drawEstimate())+"</div>";
+  var ay=document.getElementById("ay");if(ay){ay.addEventListener("click",function(){respond("accepted")});document.getElementById("an2").addEventListener("click",function(){respond("declined")})}
+  if(preview)setTimeout(function(){parent.postMessage({type:"lc-doc-h",h:document.documentElement.scrollHeight},location.origin)},30)}
 
 function showState(msg){root.innerHTML='<div class="state">'+esc(msg)+"</div>";document.getElementById("bar").hidden=true}
 function load(cb){
@@ -255,7 +275,10 @@ document.getElementById("en").addEventListener("click",function(){setLang("en")}
 document.getElementById("es").addEventListener("click",function(){setLang("es")});
 document.getElementById("pr").addEventListener("click",function(){window.print()});
 document.getElementById("state").textContent=t("load");
-load();
+if(preview){
+  window.addEventListener("message",function(e){if(e.origin!==location.origin||!e.data||e.data.type!=="lc-doc")return;data=e.data.data;draw()});
+  root.innerHTML="";parent.postMessage({type:"lc-doc-ready"},location.origin);
+}else load();
 })();
 </script>
 </body>

@@ -559,6 +559,8 @@ function render() {
 function panel() {
   var p = $("panel");
   p.textContent = "";
+  p.classList.remove("withprev");
+  lpFrame = null;
   p.appendChild(btn("×", "close", closeDetail)).setAttribute("aria-label", "Close");
   $("detail").classList.add("on");
   p.scrollTop = 0;
@@ -10910,6 +10912,30 @@ function openInvoiceForm(cid) {
   g.appendChild(isd);
   g.appendChild(dd);
   p.appendChild(g);
+  // service period (shows on the invoice); follows the invoice date's month until changed by hand
+  var monthOf = function (d, end) {
+      var m = String(d || today()).slice(0, 7),
+        last = new Date(Number(m.slice(0, 4)), Number(m.slice(5, 7)), 0).getDate();
+      return m + "-" + (end ? String(last) : "01");
+    },
+    gp = el("div", "grid2"),
+    pbeg = fld("Period beginning", "date", monthOf(today())),
+    pend = fld("Period ending", "date", monthOf(today(), true)),
+    perTouched = false;
+  [pbeg, pend].forEach(function (x) {
+    x.input.addEventListener("change", function () {
+      perTouched = true;
+    });
+  });
+  isd.input.addEventListener("change", function () {
+    if (!perTouched && isd.input.value) {
+      pbeg.input.value = monthOf(isd.input.value);
+      pend.input.value = monthOf(isd.input.value, true);
+    }
+  });
+  gp.appendChild(pbeg);
+  gp.appendChild(pend);
+  p.appendChild(gp);
   var pps = propPicker(cs);
   p.appendChild(pps);
   var ref = fld("Reference / PO number (optional, shows on the invoice)", "text", "");
@@ -10983,6 +11009,8 @@ function openInvoiceForm(cid) {
         paid_method: zero ? "No charge" : ""
       };
     if (pid) irow.property_id = pid;
+    if (pbeg.input.value) irow.period_start = pbeg.input.value;
+    if (pend.input.value) irow.period_end = pend.input.value;
     sb.from("invoices")
       .insert(irow)
       .select()
@@ -11026,6 +11054,48 @@ function openInvoiceForm(cid) {
   });
   go.style.marginTop = "14px";
   p.appendChild(go);
+
+  // live preview of the invoice the client will get
+  var show = livePreview(p);
+  function draft() {
+    var c = byId(clients, cs.input.value),
+      pid = pps.input.value || null,
+      items = [],
+      total = 0;
+    rows.forEach(function (r) {
+      var d = r.d.input.value.trim(),
+        a = parseFloat(r.a.input.value);
+      if (!d && isNaN(a)) return;
+      a = isNaN(a) ? 0 : a;
+      total += a;
+      items.push({ date: isd.input.value, description: d, amount: a, address: pid ? paddr(pid) : "" });
+    });
+    total = r2(total);
+    show({
+      kind: "invoice",
+      doc: {
+        number: lpNextNumber(invoices),
+        issue_date: isd.input.value,
+        due_date: dd.input.value,
+        status: "open",
+        total: total,
+        reference: ref.input.value.trim(),
+        period_start: pbeg.input.value,
+        period_end: pend.input.value,
+        property_address: pid ? paddr(pid) : c ? lpMainAddress(c.id) : ""
+      },
+      summary: lpSummary(c, pid, total),
+      items: items,
+      client: lpClient(c),
+      business: lpBusiness()
+    });
+  }
+  p.addEventListener("input", draft);
+  p.addEventListener("change", draft);
+  p.addEventListener("click", function () {
+    setTimeout(draft, 0);
+  });
+  draft();
 }
 
 /* ======================= crm/src/19-billing-payments.js ======================= */
@@ -16248,6 +16318,45 @@ function openEstimateForm(cid) {
   });
   go.style.marginTop = "14px";
   p.appendChild(go);
+
+  // live preview of the estimate the client will get
+  var show = livePreview(p);
+  function draft() {
+    var c = byId(clients, cs.input.value),
+      days = parseInt(vd.input.value, 10),
+      items = [],
+      total = 0;
+    rows.forEach(function (r) {
+      var d = r.d.input.value.trim(),
+        a = parseFloat(r.a.input.value);
+      if (!d && isNaN(a)) return;
+      a = isNaN(a) ? 0 : a;
+      total += a;
+      items.push({ description: d, amount: a });
+    });
+    show({
+      kind: "estimate",
+      doc: {
+        number: lpNextNumber(estimates),
+        title: ttl.input.value.trim(),
+        scope: scp.input.value.trim(),
+        issue_date: today(),
+        valid_until: days > 0 ? addDays(today(), days) : null,
+        status: "draft",
+        total: r2(total),
+        property_address: c ? lpMainAddress(c.id) : ""
+      },
+      items: items,
+      client: lpClient(c),
+      business: lpBusiness()
+    });
+  }
+  p.addEventListener("input", draft);
+  p.addEventListener("change", draft);
+  p.addEventListener("click", function () {
+    setTimeout(draft, 0);
+  });
+  draft();
 }
 function openEstimate(id) {
   var e = byId(estimates, id);
@@ -17922,6 +18031,122 @@ function clientPortalSection(c) {
   portalBoxRedraw = draw;
   draw();
   return sec;
+}
+
+/* ======================= crm/src/26-live-preview.js ======================= */
+/* Live preview for the New invoice and New estimate forms: the panel splits in two, with the form on the left and
+   the exact page the client will get (d/index.html in preview mode) on the right, redrawn as you type. On narrow
+   screens the preview sits under the form. */
+var lpFrame = null,
+  lpReady = false,
+  lpLast = null;
+window.addEventListener("message", function (e) {
+  if (!lpFrame || e.source !== lpFrame.contentWindow || !e.data) return;
+  if (e.data.type === "lc-doc-ready") {
+    lpReady = true;
+    if (lpLast) lpSend(lpLast);
+  } else if (e.data.type === "lc-doc-h") {
+    lpFrame._h = e.data.h;
+    lpFit();
+  }
+});
+function lpSend(d) {
+  lpLast = d;
+  if (lpFrame && lpReady) lpFrame.contentWindow.postMessage({ type: "lc-doc", data: d }, location.origin);
+}
+function lpFit() {
+  if (!lpFrame) return;
+  var wrap = lpFrame.parentNode,
+    s = Math.min(1, (wrap.clientWidth || 520) / 860),
+    h = lpFrame._h || 1100;
+  lpFrame.style.transform = "scale(" + s + ")";
+  lpFrame.style.height = h + "px";
+  wrap.style.height = Math.ceil(h * s) + "px";
+}
+window.addEventListener("resize", lpFit);
+
+/* Turns the open panel into form + preview. Returns a function to call with the draft document. */
+function livePreview(p) {
+  p.classList.add("withprev");
+  var form = el("div", "pform"),
+    side = el("div", "pprev");
+  [].slice.call(p.childNodes).forEach(function (n) {
+    if (!(n.classList && n.classList.contains("close"))) form.appendChild(n);
+  });
+  p.appendChild(form);
+  p.appendChild(side);
+  side.appendChild(el("div", "pphd", "Live preview · what the client will see"));
+  var wrap = el("div", "ppwrap"),
+    f = document.createElement("iframe");
+  f.title = "Live preview";
+  f.src = "/d/?preview=1&embed=1&lang=en";
+  wrap.appendChild(f);
+  side.appendChild(wrap);
+  lpFrame = f;
+  lpReady = false;
+  lpLast = null;
+  setTimeout(lpFit, 0);
+  return lpSend;
+}
+function lpBusiness() {
+  return {
+    name: bizv("name", "LattaCorp of Central Florida"),
+    phone: bizv("phone", ""),
+    email: bizv("email", ""),
+    address: bizv("address", ""),
+    zelle: bizv("zelle", ""),
+    payment_note: bizv("payment_note", ""),
+    footer: bizv("footer", "")
+  };
+}
+function lpClient(c) {
+  return c ? { name: c.name, company: c.company || "", account_no: c.account_no || null } : { name: "" };
+}
+function lpMainAddress(cid) {
+  var ps = clientProps(cid);
+  var m =
+    ps.filter(function (x) {
+      return x.label === "Main" && x.address;
+    })[0] ||
+    ps.filter(function (x) {
+      return x.address;
+    })[0];
+  return m ? m.address : "";
+}
+function lpNextNumber(list) {
+  var n = 0;
+  list.forEach(function (x) {
+    if (Number(x.number) > n) n = Number(x.number);
+  });
+  return n + 1;
+}
+/* The Invoice Summary for a draft, worked out the same way as the invoice page (Stage 26). */
+function lpSummary(c, pid, total, dueDate) {
+  var byProp = !!(c && c.bill_by_property && pid),
+    prev = 0,
+    late = 0,
+    t0 = today();
+  if (c)
+    invoices.forEach(function (i) {
+      if (i.client_id !== c.id || i.status !== "open") return;
+      if (byProp && i.property_id !== pid) return;
+      var b = balOf(i);
+      prev += b;
+      if (b > 0 && i.due_date && i.due_date < t0) late += b;
+    });
+  var credit = c && !byProp ? creditOf(c.id) : 0;
+  prev = r2(prev);
+  return {
+    previous: prev,
+    previous_past_due: r2(late),
+    this_total: total,
+    this_paid: 0,
+    this_balance: total,
+    credit: credit,
+    by_property: byProp,
+    today: t0,
+    total_due: Math.max(0, r2(prev + total - credit))
+  };
 }
 
 })();

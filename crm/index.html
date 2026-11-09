@@ -115,6 +115,10 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 #detail{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:20;overflow:auto}
 #detail.on{display:block}
 .panel{background:#fff;max-width:640px;margin:20px auto;border-radius:14px;padding:20px;position:relative}
+.panel.withprev{max-width:1360px;display:grid;grid-template-columns:minmax(0,560px) minmax(0,1fr);gap:24px;align-items:start}
+.pprev{position:sticky;top:0;padding-top:30px}.pphd{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.ppwrap{overflow:hidden;border-radius:8px;background:#e9efe6;border:1px solid var(--line)}.ppwrap iframe{display:block;border:0;width:860px;transform-origin:0 0;background:transparent}
+@media(max-width:1000px){.panel.withprev{grid-template-columns:1fr}.pprev{position:static;padding-top:6px}}
 .panel h2{margin:0 0 2px;color:var(--forest)}
 .close{position:absolute;right:12px;top:10px;background:none;border:0;font-size:1.8rem;cursor:pointer;color:var(--muted)}
 .contact{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
@@ -279,7 +283,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=97"></script>
+<script src="app.js?v=98"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

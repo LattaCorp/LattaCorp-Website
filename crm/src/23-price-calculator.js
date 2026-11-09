@@ -473,6 +473,45 @@ function openEstimateForm(cid) {
   });
   go.style.marginTop = "14px";
   p.appendChild(go);
+
+  // live preview of the estimate the client will get
+  var show = livePreview(p);
+  function draft() {
+    var c = byId(clients, cs.input.value),
+      days = parseInt(vd.input.value, 10),
+      items = [],
+      total = 0;
+    rows.forEach(function (r) {
+      var d = r.d.input.value.trim(),
+        a = parseFloat(r.a.input.value);
+      if (!d && isNaN(a)) return;
+      a = isNaN(a) ? 0 : a;
+      total += a;
+      items.push({ description: d, amount: a });
+    });
+    show({
+      kind: "estimate",
+      doc: {
+        number: lpNextNumber(estimates),
+        title: ttl.input.value.trim(),
+        scope: scp.input.value.trim(),
+        issue_date: today(),
+        valid_until: days > 0 ? addDays(today(), days) : null,
+        status: "draft",
+        total: r2(total),
+        property_address: c ? lpMainAddress(c.id) : ""
+      },
+      items: items,
+      client: lpClient(c),
+      business: lpBusiness()
+    });
+  }
+  p.addEventListener("input", draft);
+  p.addEventListener("change", draft);
+  p.addEventListener("click", function () {
+    setTimeout(draft, 0);
+  });
+  draft();
 }
 function openEstimate(id) {
   var e = byId(estimates, id);

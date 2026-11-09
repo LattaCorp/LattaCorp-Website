@@ -91,6 +91,8 @@ function render() {
 function panel() {
   var p = $("panel");
   p.textContent = "";
+  p.classList.remove("withprev");
+  lpFrame = null;
   p.appendChild(btn("×", "close", closeDetail)).setAttribute("aria-label", "Close");
   $("detail").classList.add("on");
   p.scrollTop = 0;
