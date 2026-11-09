@@ -450,14 +450,16 @@ export async function handlePortalInvite(request, env) {
       es, heading: `Bienvenido${name ? ", " + esc(name) : ""}`,
       lines: ["Ahora puede ver su cuenta con LattaCorp en línea, cuando quiera:",
         "• Sus próximas visitas y las ya realizadas<br>• Facturas, pagos y estados de cuenta para imprimir<br>• Fotos de su propiedad<br>• Pedir servicio o una cotización",
-        `Para entrar, abra el portal y escriba este correo (${esc(to)}). Le enviaremos un código de un solo uso. No necesita contraseña.`],
+        `Para entrar, abra el portal y escriba este correo (${esc(to)}). Le enviaremos un código de un solo uso. No necesita contraseña.`,
+        "Consejo: agregue website@lattacorpfl.com a sus contactos para que sus códigos no lleguen a Spam."],
       button: "Abrir mi portal", link: PORTAL_URL + "?lang=es",
       small: "¿Preguntas? Llame o envíe un texto al 407-470-5309.",
     } : {
       heading: `Welcome${name ? ", " + esc(name) : ""}`,
       lines: ["You can now view your LattaCorp account online, any time:",
         "• Upcoming and past visits<br>• Invoices, payments and printable statements<br>• Photos of your property<br>• Request service or a quote",
-        `To sign in, open the portal and enter this email (${esc(to)}). We'll send you a one-time code. No password needed.`],
+        `To sign in, open the portal and enter this email (${esc(to)}). We'll send you a one-time code. No password needed.`,
+        "Tip: add website@lattacorpfl.com to your contacts so your sign-in codes don't land in Spam."],
       button: "Open my portal", link: PORTAL_URL,
       small: "Questions? Call or text 407-470-5309.",
     };

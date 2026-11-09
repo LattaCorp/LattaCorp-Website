@@ -150,6 +150,7 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
       <h1 data-t="Check your email">Check your email</h1>
       <p class="muted"><span data-t="If this email is on file with us, a code is on its way to">If this email is on file with us, a code is on its way to</span> <b id="sentto"></b>.</p>
       <label class="f"><span data-t="Sign-in code">Sign-in code</span><input id="sicode" class="codein" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]*" required></label>
+      <p class="small muted" data-t="Can't find it? Check your Spam or Junk folder. It comes from website@lattacorpfl.com.">Can't find it? Check your Spam or Junk folder. It comes from website@lattacorpfl.com.</p>
       <p class="err hide" id="codeerr" role="alert"></p>
       <button class="btn block" type="submit" id="verifybtn" data-t="Sign in">Sign in</button>
       <p class="sifoot"><button type="button" class="linkbtn" id="resend" data-t="Send a new code">Send a new code</button> · <button type="button" class="linkbtn" id="otheremail" data-t="Use a different email">Use a different email</button></p>
@@ -182,6 +183,6 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../crm/config.js"></script>
-<script src="portal.js?v=4"></script>
+<script src="portal.js?v=5"></script>
 </body>
 </html>

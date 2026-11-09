@@ -35,6 +35,7 @@
     "That code didn't work. Check it, or send a new code.": "Ese código no funcionó. Revíselo o pida uno nuevo.",
     "Something went wrong. Please try again, or call or text 407-470-5309.": "Algo salió mal. Intente de nuevo, o llame o envíe un texto al 407-470-5309.",
     "We sent a new code.": "Le enviamos un código nuevo.",
+    "Can't find it? Check your Spam or Junk folder. It comes from website@lattacorpfl.com.": "¿No lo encuentra? Revise su carpeta de Spam o Correo no deseado. Llega de website@lattacorpfl.com.",
     "Too many codes were requested for this email. Please use the newest code we sent, or try again in": "Se pidieron demasiados códigos para este correo. Use el código más reciente que le enviamos, o intente de nuevo en",
     "minutes": "minutos", "We just sent a code. Please wait a minute before asking for another.": "Acabamos de enviarle un código. Espere un minuto antes de pedir otro.",
     "This email isn't linked to an account yet. Call or text 407-470-5309 and we'll set it up.": "Este correo aún no está vinculado a una cuenta. Llame o envíe un texto al 407-470-5309 y lo configuramos.",
