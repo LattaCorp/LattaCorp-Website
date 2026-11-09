@@ -2659,6 +2659,12 @@ function renderJobs() {
     })
   );
   tb.appendChild(document.createTextNode(" "));
+  tb.appendChild(
+    btn("+ New Estimate/Quote", "btn alt", function () {
+      openEstimateForm(null);
+    })
+  );
+  tb.appendChild(document.createTextNode(" "));
   tb.appendChild(customEstimateLink("btn alt"));
   tb.appendChild(document.createTextNode(" "));
   tb.appendChild(btn("Services", "btn alt", openServices));
@@ -14681,7 +14687,7 @@ function customInvoiceLink(cls) {
 }
 function customEstimateLink(cls) {
   return customDocLink(
-    "+ New Estimate/Quote",
+    "Custom estimate",
     "custom-estimate.pdf",
     cls,
     "Fill-in-the-blanks estimate/quote PDF. Not saved in Foreman."

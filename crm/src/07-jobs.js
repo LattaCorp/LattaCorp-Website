@@ -149,6 +149,12 @@ function renderJobs() {
     })
   );
   tb.appendChild(document.createTextNode(" "));
+  tb.appendChild(
+    btn("+ New Estimate/Quote", "btn alt", function () {
+      openEstimateForm(null);
+    })
+  );
+  tb.appendChild(document.createTextNode(" "));
   tb.appendChild(customEstimateLink("btn alt"));
   tb.appendChild(document.createTextNode(" "));
   tb.appendChild(btn("Services", "btn alt", openServices));
