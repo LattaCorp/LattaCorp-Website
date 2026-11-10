@@ -186,16 +186,15 @@ function createInvoice(cid, vs, through, pid) {
 }
 
 /* Property picker: follows the chosen client's properties. Empty = the whole account (no specific property). */
-function propPicker(cs) {
-  var w = fld("Property (optional: bill this to one property of the account)", "select", "", [
-    ["", "Whole account / no specific property"]
-  ]);
+function propPicker(cs, label, emptyText) {
+  emptyText = emptyText || "Whole account / no specific property";
+  var w = fld(label || "Property (optional: bill this to one property of the account)", "select", "", [["", emptyText]]);
   function fill() {
     var cur = w.input.value;
     w.input.textContent = "";
     var o = document.createElement("option");
     o.value = "";
-    o.textContent = "Whole account / no specific property";
+    o.textContent = emptyText;
     w.input.appendChild(o);
     clientProps(cs.input.value).forEach(function (p) {
       var op = document.createElement("option");

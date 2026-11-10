@@ -10926,16 +10926,15 @@ function createInvoice(cid, vs, through, pid) {
 }
 
 /* Property picker: follows the chosen client's properties. Empty = the whole account (no specific property). */
-function propPicker(cs) {
-  var w = fld("Property (optional: bill this to one property of the account)", "select", "", [
-    ["", "Whole account / no specific property"]
-  ]);
+function propPicker(cs, label, emptyText) {
+  emptyText = emptyText || "Whole account / no specific property";
+  var w = fld(label || "Property (optional: bill this to one property of the account)", "select", "", [["", emptyText]]);
   function fill() {
     var cur = w.input.value;
     w.input.textContent = "";
     var o = document.createElement("option");
     o.value = "";
-    o.textContent = "Whole account / no specific property";
+    o.textContent = emptyText;
     w.input.appendChild(o);
     clientProps(cs.input.value).forEach(function (p) {
       var op = document.createElement("option");
@@ -16286,6 +16285,9 @@ function openEstimateForm(cid) {
     scp = fld("Details the client will see (optional)", "textarea", ""),
     vd = fld("Valid for (days)", "number", "30");
   p.appendChild(cs);
+  // which property the work is for (shows as the service address on the estimate); blank = their Main address
+  var pps = propPicker(cs, "Property (which property this estimate is for)", "Main address");
+  p.appendChild(pps);
   p.appendChild(ttl);
   p.appendChild(scp);
   p.appendChild(vd);
@@ -16352,20 +16354,23 @@ function openEstimateForm(cid) {
         }, 0)
       );
     go.disabled = true;
-    sb.from("estimates")
-      .insert({
+    var pid = pps.input.value || null,
+      erow = {
         client_id: cs.input.value,
         title: ttl.input.value.trim(),
         scope: scp.input.value.trim(),
         valid_until: days > 0 ? addDays(today(), days) : null,
         total: total
-      })
+      };
+    if (pid) erow.property_id = pid;
+    sb.from("estimates")
+      .insert(erow)
       .select()
       .single()
       .then(function (r) {
         if (r.error || !r.data) {
           go.disabled = false;
-          alert("Could not save. Did you run the Stage 11 SQL?");
+          alert(pid ? "Could not save. Did you run the Stage 31 SQL?" : "Could not save. Did you run the Stage 11 SQL?");
           return;
         }
         var e = r.data;
@@ -16419,7 +16424,7 @@ function openEstimateForm(cid) {
         valid_until: days > 0 ? addDays(today(), days) : null,
         status: "draft",
         total: r2(total),
-        property_address: c ? lpMainAddress(c.id) : ""
+        property_address: pps.input.value ? paddr(pps.input.value) : c ? lpMainAddress(c.id) : ""
       },
       items: items,
       client: lpClient(c),
@@ -16497,8 +16502,20 @@ function openEstimate(id) {
       }
       var ttl = fld("Title", "text", e.title || ""),
         scp = fld("Details the client will see", "textarea", e.scope || ""),
-        vu = fld("Valid until", "date", e.valid_until || "");
+        vu = fld("Valid until", "date", e.valid_until || ""),
+        eps = clientProps(e.client_id),
+        pf = fld(
+          "Property",
+          "select",
+          e.property_id || "",
+          [["", "Main address"]].concat(
+            eps.map(function (x) {
+              return [x.id, (x.label ? x.label + " \u00b7 " : "") + x.address];
+            })
+          )
+        );
       if (edit) {
+        if (eps.length > 1 || e.property_id) body.appendChild(pf);
         body.appendChild(ttl);
         body.appendChild(scp);
         body.appendChild(vu);
@@ -16508,14 +16525,16 @@ function openEstimate(id) {
             scope: scp.input.value.trim(),
             valid_until: vu.input.value || null
           };
+          if ((pf.input.value || null) !== (e.property_id || null)) row.property_id = pf.input.value || null;
           sb.from("estimates")
             .update(row)
             .eq("id", e.id)
             .then(function (r2_) {
               if (r2_.error) {
-                alert("Could not save.");
+                alert("property_id" in row ? "Could not save. Did you run the Stage 31 SQL?" : "Could not save.");
                 return;
               }
+              if ("property_id" in row) e.property_id = row.property_id;
               e.title = row.title;
               e.scope = row.scope;
               e.valid_until = row.valid_until;
@@ -16529,6 +16548,7 @@ function openEstimate(id) {
         sv.style.marginBottom = "10px";
         body.appendChild(sv);
       } else {
+        if (e.property_id && paddr(e.property_id)) body.appendChild(el("div", "note", "Property: " + paddr(e.property_id)));
         if (e.title) body.appendChild(el("b", null, e.title));
         if (e.scope) {
           var sc = el("div", "note", e.scope);
