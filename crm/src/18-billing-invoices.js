@@ -278,15 +278,17 @@ function openInvoiceForm(cid) {
   var box = el("div"),
     rows = [];
   function addRow() {
-    var r = el("div", "grid2"),
+    var r = el("div", "grid3"),
+      tt = fld("Title", "text", ""),
       d = fld("Description", "text", ""),
-      a = fld("Amount ($, negative = discount, 0 = no charge)", "number", "");
+      a = fld("Total ($, negative = discount, 0 = no charge)", "number", "");
     a.input.step = "0.01";
     a.input.inputMode = "decimal";
+    r.appendChild(tt);
     r.appendChild(d);
     r.appendChild(a);
     box.appendChild(r);
-    rows.push({ d: d, a: a });
+    rows.push({ t: tt, d: d, a: a });
   }
   p.appendChild(box);
   addRow();
@@ -305,15 +307,16 @@ function openInvoiceForm(cid) {
     }
     var items = [];
     for (var i = 0; i < rows.length; i++) {
-      var d = rows[i].d.input.value.trim(),
+      var tt = rows[i].t.input.value.trim(),
+        d = rows[i].d.input.value.trim(),
         raw = rows[i].a.input.value.trim(),
         a = raw === "" ? 0 : parseFloat(raw);
-      if (!d && raw === "") continue;
-      if (!d || isNaN(a)) {
-        alert("Each line needs a description. (Leave the amount empty or 0 for a no-charge line.)");
+      if (!tt && !d && raw === "") continue;
+      if ((!tt && !d) || isNaN(a)) {
+        alert("Each line needs a title or description. (Leave the total empty or 0 for a no-charge line.)");
         return;
       }
-      items.push({ description: d, amount: a });
+      items.push({ title: tt, description: d, amount: a });
     }
     if (!items.length) {
       alert("Add at least one line.");
@@ -374,7 +377,7 @@ function openInvoiceForm(cid) {
                 .eq("id", inv.id)
                 .then(function () {
                   go.disabled = false;
-                  alert("Could not save the lines.");
+                  alert("Could not save the lines. Did you run the Stage 32 SQL?");
                 });
               return;
             }
@@ -397,12 +400,13 @@ function openInvoiceForm(cid) {
       items = [],
       total = 0;
     rows.forEach(function (r) {
-      var d = r.d.input.value.trim(),
+      var tt = r.t.input.value.trim(),
+        d = r.d.input.value.trim(),
         a = parseFloat(r.a.input.value);
-      if (!d && isNaN(a)) return;
+      if (!tt && !d && isNaN(a)) return;
       a = isNaN(a) ? 0 : a;
       total += a;
-      items.push({ date: isd.input.value, description: d, amount: a, address: pid ? paddr(pid) : "" });
+      items.push({ date: isd.input.value, title: tt, description: d, amount: a, address: pid ? paddr(pid) : "" });
     });
     total = r2(total);
     show({

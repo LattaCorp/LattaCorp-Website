@@ -528,7 +528,8 @@ function openInvoice(id) {
       items.forEach(function (it) {
         var tr = document.createElement("tr");
         tr.appendChild(el("td", null, it.service_date ? dshort(it.service_date) : ""));
-        var d = el("td", null, it.description + (it.address ? " · " + it.address : ""));
+        tr.appendChild(el("td", "ttl", it.title || ""));
+        var d = el("td", null, (it.description || "") + (it.address ? " · " + it.address : ""));
         tr.appendChild(d);
         var a = el("td", "amt", money(it.amount));
         tr.appendChild(a);
@@ -551,30 +552,34 @@ function openInvoice(id) {
       body.appendChild(tot);
       if (!locked) {
         var add = el("div", "pcard"),
-          g = el("div", "grid2");
-        var dsc = fld("Add a line (extra work, discount, late fee)", "text", ""),
-          amt = fld("Amount ($, negative = discount)", "number", "");
+          g = el("div", "grid3");
+        var ttl = fld("Add a line: title", "text", ""),
+          dsc = fld("Description (extra work, discount, late fee)", "text", ""),
+          amt = fld("Total ($, negative = discount)", "number", "");
         amt.input.step = "0.01";
         amt.input.inputMode = "decimal";
+        g.appendChild(ttl);
         g.appendChild(dsc);
         g.appendChild(amt);
         add.appendChild(g);
         var ab = btn("Add line", "btn alt sm", function () {
           var a2 = parseFloat(amt.input.value);
-          if (!dsc.input.value.trim() || isNaN(a2)) {
-            alert("Enter a description and an amount.");
+          if ((!ttl.input.value.trim() && !dsc.input.value.trim()) || isNaN(a2)) {
+            alert("Enter a title or description, and a total.");
             return;
           }
+          var line = {
+            invoice_id: inv.id,
+            service_date: today(),
+            description: dsc.input.value.trim(),
+            amount: a2
+          };
+          if (ttl.input.value.trim()) line.title = ttl.input.value.trim();
           sb.from("invoice_items")
-            .insert({
-              invoice_id: inv.id,
-              service_date: today(),
-              description: dsc.input.value.trim(),
-              amount: a2
-            })
+            .insert(line)
             .then(function (r2_) {
               if (r2_.error) {
-                alert("Could not add the line.");
+                alert(line.title ? "Could not add the line. Did you run the Stage 32 SQL?" : "Could not add the line.");
                 return;
               }
               setTotal(inv, r2(Number(inv.total) + a2), function () {
@@ -895,6 +900,7 @@ function showInvoice(inv, items) {
         "<tr><td>" +
         esc(it.service_date ? dshort(it.service_date) : "") +
         "</td><td>" +
+        (it.title ? "<b>" + esc(it.title) + "</b> " : "") +
         esc(it.description) +
         (it.address ? '<div class="sm">' + esc(it.address) + "</div>" : "") +
         '</td><td class="r">' +

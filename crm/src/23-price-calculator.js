@@ -362,7 +362,7 @@ function openEstimateForm(cid) {
       })
     )
   );
-  var ttl = fld("Title (for example: Spring cleanup and mulch)", "text", ""),
+  var ttl = fld("Job Title (shows under ESTIMATE / QUOTE, for example: Spring cleanup and mulch)", "text", ""),
     scp = fld("Details the client will see (optional)", "textarea", ""),
     vd = fld("Valid for (days)", "number", "30");
   p.appendChild(cs);
@@ -376,15 +376,17 @@ function openEstimateForm(cid) {
   var box = el("div"),
     rows = [];
   function addRow() {
-    var r = el("div", "grid2"),
+    var r = el("div", "grid3"),
+      tt = fld("Title", "text", ""),
       d = fld("Description", "text", ""),
-      a = fld("Amount ($)", "number", "");
+      a = fld("Total ($)", "number", "");
     a.input.step = "0.01";
     a.input.inputMode = "decimal";
+    r.appendChild(tt);
     r.appendChild(d);
     r.appendChild(a);
     box.appendChild(r);
-    rows.push({ d: d, a: a });
+    rows.push({ t: tt, d: d, a: a });
   }
   var cd = document.createElement("details");
   cd.style.margin = "0 0 10px";
@@ -392,7 +394,7 @@ function openEstimateForm(cid) {
   cd.appendChild(
     calcWidget(function (desc, amt) {
       var t = rows.filter(function (x) {
-        return !x.d.input.value.trim() && x.a.input.value === "";
+        return !x.t.input.value.trim() && !x.d.input.value.trim() && x.a.input.value === "";
       })[0];
       if (!t) {
         addRow();
@@ -415,14 +417,15 @@ function openEstimateForm(cid) {
     }
     var items = [];
     for (var i = 0; i < rows.length; i++) {
-      var d = rows[i].d.input.value.trim(),
+      var tt = rows[i].t.input.value.trim(),
+        d = rows[i].d.input.value.trim(),
         a = parseFloat(rows[i].a.input.value);
-      if (!d && isNaN(a)) continue;
-      if (!d || isNaN(a)) {
-        alert("Each line needs a description and an amount.");
+      if (!tt && !d && isNaN(a)) continue;
+      if ((!tt && !d) || isNaN(a)) {
+        alert("Each line needs a title or description, and a total.");
         return;
       }
-      items.push({ description: d, amount: a });
+      items.push({ title: tt, description: d, amount: a });
     }
     if (!items.length) {
       alert("Add at least one line.");
@@ -467,7 +470,7 @@ function openEstimateForm(cid) {
                 .eq("id", e.id)
                 .then(function () {
                   go.disabled = false;
-                  alert("Could not save the lines.");
+                  alert("Could not save the lines. Did you run the Stage 32 SQL?");
                 });
               return;
             }
@@ -488,12 +491,13 @@ function openEstimateForm(cid) {
       items = [],
       total = 0;
     rows.forEach(function (r) {
-      var d = r.d.input.value.trim(),
+      var tt = r.t.input.value.trim(),
+        d = r.d.input.value.trim(),
         a = parseFloat(r.a.input.value);
-      if (!d && isNaN(a)) return;
+      if (!tt && !d && isNaN(a)) return;
       a = isNaN(a) ? 0 : a;
       total += a;
-      items.push({ description: d, amount: a });
+      items.push({ title: tt, description: d, amount: a });
     });
     show({
       kind: "estimate",
@@ -552,7 +556,7 @@ function openEstimate(id) {
   sb.from("estimate_items")
     .select("*")
     .eq("estimate_id", e.id)
-    .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
     .limit(500)
     .then(function (r) {
       var items = r.error ? [] : r.data || [];
@@ -581,7 +585,7 @@ function openEstimate(id) {
         }
         body.appendChild(ans);
       }
-      var ttl = fld("Title", "text", e.title || ""),
+      var ttl = fld("Job Title", "text", e.title || ""),
         scp = fld("Details the client will see", "textarea", e.scope || ""),
         vu = fld("Valid until", "date", e.valid_until || ""),
         eps = clientProps(e.client_id),
@@ -641,6 +645,7 @@ function openEstimate(id) {
       t.className = "itable";
       items.forEach(function (it) {
         var tr = document.createElement("tr");
+        tr.appendChild(el("td", "ttl", it.title || ""));
         tr.appendChild(el("td", null, it.description));
         tr.appendChild(el("td", "amt", money(it.amount)));
         if (edit && items.length > 1) {
@@ -670,25 +675,29 @@ function openEstimate(id) {
       body.appendChild(el("div", "invtotal", "Total " + money(e.total)));
       if (edit) {
         var add = el("div", "pcard"),
-          g = el("div", "grid2"),
-          dsc = fld("Add a line", "text", ""),
-          amt = fld("Amount ($)", "number", "");
+          g = el("div", "grid3"),
+          ttl = fld("Add a line: title", "text", ""),
+          dsc = fld("Description", "text", ""),
+          amt = fld("Total ($)", "number", "");
         amt.input.step = "0.01";
         amt.input.inputMode = "decimal";
+        g.appendChild(ttl);
         g.appendChild(dsc);
         g.appendChild(amt);
         add.appendChild(g);
         var ab = btn("Add line", "btn alt sm", function () {
           var a2 = parseFloat(amt.input.value);
-          if (!dsc.input.value.trim() || isNaN(a2)) {
-            alert("Enter a description and an amount.");
+          if ((!ttl.input.value.trim() && !dsc.input.value.trim()) || isNaN(a2)) {
+            alert("Enter a title or description, and a total.");
             return;
           }
+          var line = { estimate_id: e.id, description: dsc.input.value.trim(), amount: a2 };
+          if (ttl.input.value.trim()) line.title = ttl.input.value.trim();
           sb.from("estimate_items")
-            .insert({ estimate_id: e.id, description: dsc.input.value.trim(), amount: a2 })
+            .insert(line)
             .then(function (r2_) {
               if (r2_.error) {
-                alert("Could not add the line.");
+                alert(line.title ? "Could not add the line. Did you run the Stage 32 SQL?" : "Could not add the line.");
                 return;
               }
               setEstTotal(e, r2(Number(e.total) + a2), function () {
