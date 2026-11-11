@@ -453,6 +453,19 @@ function renderCrewApp() {
     t = today();
   box.textContent = "";
   box.appendChild(el("h2", null, "Hi, " + String(crewMe.name || "").split(" ")[0]));
+  // snap a receipt: it goes to the office's Receipts to enter
+  var rb = el("div", "qacts cwrcpt");
+  var rst = el("span", "note");
+  rb.appendChild(
+    btn("Upload receipt", "btn alt sm", function () {
+      var note = prompt("What was it for? (optional)", "") || "";
+      pickPhotos(true, function (fs) {
+        crewReceipts(fs, note, rst);
+      });
+    })
+  );
+  rb.appendChild(rst);
+  box.appendChild(rb);
   box.appendChild(
     calNav(
       longDate(d),
@@ -543,5 +556,50 @@ function renderCrewApp() {
       card.appendChild(acts);
       body.appendChild(card);
     });
+  });
+}
+
+function crewReceipts(files, note, st) {
+  files = Array.prototype.slice.call(files || []);
+  if (!files.length) return;
+  st.textContent = "Uploading...";
+  sb.auth.getSession().then(function (ss) {
+    var uidv = ss && ss.data && ss.data.session && ss.data.session.user && ss.data.session.user.id;
+    if (!uidv) {
+      st.textContent = "Please sign in again.";
+      return;
+    }
+    var ok = 0;
+    files
+      .reduce(function (pr, f) {
+        return pr.then(function () {
+          return loadImg(f)
+            .then(function (img) {
+              return Promise.all([toJpeg(img, 1600, 0.82), toJpeg(img, 360, 0.7)]);
+            })
+            .then(function (rs) {
+              var id = uid(),
+                path = "crew-receipts/" + uidv + "/" + id + ".jpg",
+                tpath = "crew-receipts/" + uidv + "/" + id + "_t.jpg",
+                bk = sb.storage.from("photos");
+              return bk.upload(path, rs[0].blob, { contentType: "image/jpeg" }).then(function (u) {
+                if (u.error) throw new Error("up");
+                return bk.upload(tpath, rs[1].blob, { contentType: "image/jpeg" }).then(function (u2) {
+                  if (u2.error) throw new Error("up");
+                  return sb
+                    .rpc("crew_add_receipt", { p_path: path, p_thumb: tpath, p_size: rs[0].blob.size + rs[1].blob.size, p_w: rs[0].w, p_h: rs[0].h, p_caption: note })
+                    .then(function (r) {
+                      if (r.error) throw new Error("rpc");
+                      ok++;
+                    });
+                });
+              });
+            })
+            .catch(function () {});
+        });
+      }, Promise.resolve())
+      .then(function () {
+        st.textContent = ok ? "\u2713 Receipt sent to the office." : "Could not upload. Try again.";
+      });
   });
 }
