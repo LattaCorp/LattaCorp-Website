@@ -118,6 +118,7 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 .cl.qd .asum td.k{background-color:rgba(27,85,43,.075)!important}
 .cl.qd .asum tr.dep1 td,.cl.qd .asum tr.dep1 td.k{background-color:rgba(27,85,43,.2)!important}
 .cl.qd .asum tr.tot td,.cl.qd .asum tr.tot td.k{background-color:var(--forest)!important}
+.cl .appr .apv .sx{font-weight:700;font-size:.95rem;color:#1d2a20;line-height:1;margin:0 0 2px 1px}
 .cl .nbox{flex:1;display:flex;flex-direction:column;border:1px solid #8fb08f;background:#fff}
 .cl .nbox .nbh{background:var(--forest);color:#fff;font-size:.82rem;font-weight:700;text-align:center;padding:6px 8px;line-height:1.5}
 #paper.page .cl .nbox .nbh{padding:4px 8px}
@@ -351,7 +352,7 @@ function drawEstimate(){
   var mark=acc?'<span class="ok">✓ '+t("accepted").toUpperCase()+(d.responded_at?" · "+esc(dts(d.responded_at)):"")+"</span>"
     :d.status==="declined"?'<span class="no">'+t("declined").toUpperCase()+(d.responded_at?" · "+esc(dts(d.responded_at)):"")+"</span>":"";
   var appr='<div class="appr"><div class="aph"><b>'+t("appr")+'</b><span class="apl2">'+(isQ()?t("q_ap"):t("e_ap"))+"</span>"+mark+'</div><div class="apg">'
-    +cell("sigc",sigOk?'<img src="'+d.response_signature+'" alt="'+esc(t("sig"))+'">':"",t("sig"))
+    +cell("sigc",sigOk?'<img src="'+d.response_signature+'" alt="'+esc(t("sig"))+'">':'<span class="sx">X</span>',t("sig"))
     +cell("",acc?esc(d.response_name||""):"",t("pname"))
     +cell("",acc&&d.responded_at?esc(dn(String(d.responded_at).slice(0,10))):"",t("date"))
     +cell("",acc?esc(d.response_po||""):"",t("po"))
