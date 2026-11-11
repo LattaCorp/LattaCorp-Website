@@ -419,19 +419,20 @@ function renderSchedule() {
     dn = visits.filter(function (v) {
       return v.status !== "scheduled";
     });
+  // Today / Week / Month / List; List holds Upcoming, Overdue and Done
+  var isList = smode === "upcoming" || smode === "overdue" || smode === "done";
   [
-    ["day", selDate === t ? "Today" : "Day", -1],
-    ["week", "Week", -1],
-    ["month", "Month", -1],
-    ["upcoming", "Upcoming", up.length],
-    ["overdue", "Overdue", od.length],
-    ["done", "Done", dn.length]
+    ["day", selDate === t ? "Today" : "Day"],
+    ["week", "Week"],
+    ["month", "Month"],
+    ["list", "List"]
   ].forEach(function (s) {
-    var b = el("button", "tab" + (smode === s[0] ? " on" : ""), s[1]);
+    var on = s[0] === "list" ? isList : smode === s[0],
+      b = el("button", "tab" + (on ? " on" : ""), s[1]);
     b.type = "button";
-    if (s[2] >= 0) b.appendChild(el("span", null, "(" + s[2] + ")"));
+    if (s[0] === "list" && od.length) b.appendChild(el("i", "tnew red", od.length + " overdue"));
     b.addEventListener("click", function () {
-      smode = s[0];
+      smode = s[0] === "list" ? (isList ? smode : od.length ? "overdue" : "upcoming") : s[0];
       render();
     });
     tabs.appendChild(b);
@@ -458,6 +459,22 @@ function renderSchedule() {
   if (smode === "day") return renderDay(list, od.length);
   if (smode === "week") return renderWeek(list);
   if (smode === "month") return renderMonth(list);
+  var sub = el("div", "tabs subtabs");
+  [
+    ["upcoming", "Upcoming", up.length],
+    ["overdue", "Overdue", od.length],
+    ["done", "Done", dn.length]
+  ].forEach(function (x) {
+    var b = el("button", "tab" + (smode === x[0] ? " on" : "") + (x[0] === "overdue" && x[2] ? " warn" : ""), x[1]);
+    b.type = "button";
+    b.appendChild(el("span", null, "(" + x[2] + ")"));
+    b.addEventListener("click", function () {
+      smode = x[0];
+      render();
+    });
+    sub.appendChild(b);
+  });
+  list.appendChild(sub);
   var set = smode === "upcoming" ? up : smode === "overdue" ? od : dn;
   set = set.filter(function (v) {
     if (!query) return true;
