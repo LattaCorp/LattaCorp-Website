@@ -182,6 +182,7 @@ function renderClients() {
     var ps = clientProps(c.id),
       left = el("div");
     left.appendChild(el("b", null, dispName(c) + (c.company ? " · " + c.company : "")));
+    b.title = dispName(c) + (c.company ? " · " + c.company : "");
     left.appendChild(el("div", "sub", [c.phone, c.email].filter(Boolean).join(" · ")));
     if (ps[0])
       left.appendChild(
