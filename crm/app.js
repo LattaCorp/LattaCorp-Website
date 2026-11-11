@@ -11197,7 +11197,7 @@ function openInvoiceForm(cid) {
   var pps = propPicker(cs);
   p.appendChild(pps);
   var ttl = fld("Job Title", "text", ""),
-    nt = fld("Notes & Terms (optional, the client sees these)", "textarea", "");
+    nt = fld("Notes & Terms (optional; the \"Zelle to ..., or Cash upon next visit\" line is always included)", "textarea", "");
   p.appendChild(ttl);
   p.appendChild(nt);
   var terms = Number(bizv("terms_days", 10));
