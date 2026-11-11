@@ -131,7 +131,7 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .panel.withprev .pform .adjbox .fxbox{background:rgba(255,255,255,.14);color:#fff}
 .panel.withprev .pform .qe label.o{background:#fff;border-color:transparent;box-shadow:none}
 .panel.withprev .pform .qe label.o.on{background:#d6efd0;border-color:transparent;box-shadow:none}
-.panel.withprev .pform .qe label.o .t b,.panel.withprev .pform .qe label.o .t small{color:var(--ink)}
+.panel.withprev .pform .qe label.o .t b{color:var(--ink);font-weight:500;font-size:1.05rem}.panel.withprev .pform .qe label.o .t small{color:var(--muted);opacity:1}
 .panel.withprev .pform .btn{background:#fff;color:var(--forest);border-color:#fff}
 .panel.withprev .pform .pcard{color:var(--ink)}.panel.withprev .pform .pcard b,.panel.withprev .pform .pcard h3{color:var(--forest)}.panel.withprev .pform .pcard .f span,.panel.withprev .pform .pcard .note{color:var(--muted)}
 /* the preview sits in a light tray with a divider, so the page's own dark green header stands apart from the window */
@@ -357,7 +357,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=122"></script>
+<script src="app.js?v=123"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
