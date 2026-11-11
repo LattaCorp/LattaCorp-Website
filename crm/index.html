@@ -141,6 +141,11 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 .grid3{display:grid;grid-template-columns:1fr 1.4fr .7fr;gap:0 12px}
 @media(max-width:520px){.grid3{grid-template-columns:1fr}}
 .itable td.ttl{font-weight:600}
+.grid4{display:grid;grid-template-columns:1fr 1.4fr .45fr .7fr;gap:0 12px}
+@media(max-width:520px){.grid4{grid-template-columns:1fr 1fr}}
+.itable td.qty{text-align:center;white-space:nowrap;color:var(--muted)}
+.adjbox{margin:12px 0 4px;padding:10px 12px;border:1px solid var(--line,#d9e3d6);border-radius:10px}
+.adjbox>b{display:block;margin-bottom:2px}
 .sec{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
 .sec h3{margin:0 0 8px;font-size:1rem;color:var(--forest);display:flex;justify-content:space-between;align-items:center;gap:8px}
 .pcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fbfdfb}
@@ -317,7 +322,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=102"></script>
+<script src="app.js?v=103"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

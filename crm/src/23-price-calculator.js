@@ -376,17 +376,19 @@ function openEstimateForm(cid) {
   var box = el("div"),
     rows = [];
   function addRow() {
-    var r = el("div", "grid3"),
+    var r = el("div", "grid4"),
       tt = fld("Title", "text", ""),
       d = fld("Description", "text", ""),
+      q = fld("QTY", "text", ""),
       a = fld("Total ($)", "number", "");
     a.input.step = "0.01";
     a.input.inputMode = "decimal";
     r.appendChild(tt);
     r.appendChild(d);
+    r.appendChild(q);
     r.appendChild(a);
     box.appendChild(r);
-    rows.push({ t: tt, d: d, a: a });
+    rows.push({ t: tt, d: d, q: q, a: a });
   }
   var cd = document.createElement("details");
   cd.style.margin = "0 0 10px";
@@ -394,7 +396,7 @@ function openEstimateForm(cid) {
   cd.appendChild(
     calcWidget(function (desc, amt) {
       var t = rows.filter(function (x) {
-        return !x.t.input.value.trim() && !x.d.input.value.trim() && x.a.input.value === "";
+        return !x.t.input.value.trim() && !x.d.input.value.trim() && !x.q.input.value.trim() && x.a.input.value === "";
       })[0];
       if (!t) {
         addRow();
@@ -410,6 +412,16 @@ function openEstimateForm(cid) {
   addRow();
   var more = btn("+ Add another line", "btn alt sm", addRow);
   p.appendChild(more);
+  function linesSub() {
+    return r2(
+      rows.reduce(function (s2, x) {
+        var v = parseFloat(x.a.input.value);
+        return s2 + (isNaN(v) ? 0 : v);
+      }, 0)
+    );
+  }
+  var adj = adjEditor([], linesSub);
+  p.appendChild(adj.el);
   var go = btn("Save estimate", "btn", function () {
     if (!cs.input.value) {
       alert("Choose a client.");
@@ -419,23 +431,28 @@ function openEstimateForm(cid) {
     for (var i = 0; i < rows.length; i++) {
       var tt = rows[i].t.input.value.trim(),
         d = rows[i].d.input.value.trim(),
+        q = rows[i].q.input.value.trim(),
         a = parseFloat(rows[i].a.input.value);
-      if (!tt && !d && isNaN(a)) continue;
+      if (!tt && !d && !q && isNaN(a)) continue;
       if ((!tt && !d) || isNaN(a)) {
         alert("Each line needs a title or description, and a total.");
         return;
       }
-      items.push({ title: tt, description: d, amount: a });
+      items.push({ title: tt, description: d, qty: q, amount: a });
     }
     if (!items.length) {
       alert("Add at least one line.");
       return;
     }
     var days = parseInt(vd.input.value, 10),
-      total = r2(
-        items.reduce(function (s2, x) {
-          return s2 + x.amount;
-        }, 0)
+      adjs = adj.value(),
+      total = estTotal(
+        r2(
+          items.reduce(function (s2, x) {
+            return s2 + x.amount;
+          }, 0)
+        ),
+        adjs
       );
     go.disabled = true;
     var pid = pps.input.value || null,
@@ -447,6 +464,7 @@ function openEstimateForm(cid) {
         total: total
       };
     if (pid) erow.property_id = pid;
+    if (adjs.length) erow.adjustments = adjs;
     sb.from("estimates")
       .insert(erow)
       .select()
@@ -454,7 +472,7 @@ function openEstimateForm(cid) {
       .then(function (r) {
         if (r.error || !r.data) {
           go.disabled = false;
-          alert(pid ? "Could not save. Did you run the Stage 31 SQL?" : "Could not save. Did you run the Stage 11 SQL?");
+          alert(adjs.length ? "Could not save. Did you run the Stage 33 SQL?" : pid ? "Could not save. Did you run the Stage 31 SQL?" : "Could not save. Did you run the Stage 11 SQL?");
           return;
         }
         var e = r.data;
@@ -470,7 +488,7 @@ function openEstimateForm(cid) {
                 .eq("id", e.id)
                 .then(function () {
                   go.disabled = false;
-                  alert("Could not save the lines. Did you run the Stage 32 SQL?");
+                  alert("Could not save the lines. Did you run the Stage 33 SQL?");
                 });
               return;
             }
@@ -493,12 +511,14 @@ function openEstimateForm(cid) {
     rows.forEach(function (r) {
       var tt = r.t.input.value.trim(),
         d = r.d.input.value.trim(),
+        q = r.q.input.value.trim(),
         a = parseFloat(r.a.input.value);
-      if (!tt && !d && isNaN(a)) return;
+      if (!tt && !d && !q && isNaN(a)) return;
       a = isNaN(a) ? 0 : a;
       total += a;
-      items.push({ title: tt, description: d, amount: a });
+      items.push({ title: tt, description: d, qty: q, amount: a });
     });
+    adj.refresh();
     show({
       kind: "estimate",
       doc: {
@@ -508,7 +528,8 @@ function openEstimateForm(cid) {
         issue_date: today(),
         valid_until: days > 0 ? addDays(today(), days) : null,
         status: "draft",
-        total: r2(total),
+        total: estTotal(r2(total), adj.value()),
+        adjustments: adj.value(),
         property_address: pps.input.value ? paddr(pps.input.value) : c ? lpMainAddress(c.id) : ""
       },
       items: items,
@@ -599,27 +620,53 @@ function openEstimate(id) {
             })
           )
         );
+      var isub = r2(
+          items.reduce(function (s2, x) {
+            return s2 + Number(x.amount || 0);
+          }, 0)
+        ),
+        eadj = adjEditor(e.adjustments || [], function () {
+          return isub;
+        });
       if (edit) {
         if (eps.length > 1 || e.property_id) body.appendChild(pf);
         body.appendChild(ttl);
         body.appendChild(scp);
         body.appendChild(vu);
+        body.appendChild(eadj.el);
         var sv = btn("Save details", "btn alt sm", function () {
           var row = {
             title: ttl.input.value.trim(),
             scope: scp.input.value.trim(),
             valid_until: vu.input.value || null
           };
+          var na = eadj.value();
+          if (JSON.stringify(na) !== JSON.stringify(e.adjustments || [])) {
+            row.adjustments = na;
+            row.total = estTotal(isub, na);
+          }
           if ((pf.input.value || null) !== (e.property_id || null)) row.property_id = pf.input.value || null;
           sb.from("estimates")
             .update(row)
             .eq("id", e.id)
             .then(function (r2_) {
               if (r2_.error) {
-                alert("property_id" in row ? "Could not save. Did you run the Stage 31 SQL?" : "Could not save.");
+                alert(
+                  "adjustments" in row
+                    ? "Could not save. Did you run the Stage 33 SQL?"
+                    : "property_id" in row
+                      ? "Could not save. Did you run the Stage 31 SQL?"
+                      : "Could not save."
+                );
                 return;
               }
               if ("property_id" in row) e.property_id = row.property_id;
+              if ("adjustments" in row) {
+                e.adjustments = row.adjustments;
+                e.total = row.total;
+                openEstimate(e.id);
+                return;
+              }
               e.title = row.title;
               e.scope = row.scope;
               e.valid_until = row.valid_until;
@@ -647,6 +694,7 @@ function openEstimate(id) {
         var tr = document.createElement("tr");
         tr.appendChild(el("td", "ttl", it.title || ""));
         tr.appendChild(el("td", null, it.description));
+        tr.appendChild(el("td", "qty", it.qty ? "× " + it.qty : ""));
         tr.appendChild(el("td", "amt", money(it.amount)));
         if (edit && items.length > 1) {
           var x = el("td");
@@ -659,7 +707,7 @@ function openEstimate(id) {
                   alert("Could not remove the line.");
                   return;
                 }
-                setEstTotal(e, r2(Number(e.total) - Number(it.amount)), function () {
+                setEstTotal(e, estTotal(r2(isub - Number(it.amount)), e.adjustments), function () {
                   openEstimate(e.id);
                 });
               });
@@ -672,17 +720,34 @@ function openEstimate(id) {
         t.appendChild(tr);
       });
       body.appendChild(t);
+      var ac = estAdjCalc(isub, e.adjustments);
+      if (ac.rows.length)
+        body.appendChild(
+          el(
+            "div",
+            "note",
+            "Subtotal " +
+              money(isub) +
+              ac.rows
+                .map(function (x) {
+                  return " · " + ADJ_NAMES[x.kind] + " " + (x.kind === "discount" ? "−" : "") + money(x.amt);
+                })
+                .join("")
+          )
+        );
       body.appendChild(el("div", "invtotal", "Total " + money(e.total)));
       if (edit) {
         var add = el("div", "pcard"),
-          g = el("div", "grid3"),
+          g = el("div", "grid4"),
           ttl = fld("Add a line: title", "text", ""),
           dsc = fld("Description", "text", ""),
+          qy = fld("QTY", "text", ""),
           amt = fld("Total ($)", "number", "");
         amt.input.step = "0.01";
         amt.input.inputMode = "decimal";
         g.appendChild(ttl);
         g.appendChild(dsc);
+        g.appendChild(qy);
         g.appendChild(amt);
         add.appendChild(g);
         var ab = btn("Add line", "btn alt sm", function () {
@@ -693,14 +758,15 @@ function openEstimate(id) {
           }
           var line = { estimate_id: e.id, description: dsc.input.value.trim(), amount: a2 };
           if (ttl.input.value.trim()) line.title = ttl.input.value.trim();
+          if (qy.input.value.trim()) line.qty = qy.input.value.trim();
           sb.from("estimate_items")
             .insert(line)
             .then(function (r2_) {
               if (r2_.error) {
-                alert(line.title ? "Could not add the line. Did you run the Stage 32 SQL?" : "Could not add the line.");
+                alert(line.title || line.qty ? "Could not add the line. Did you run the Stage 33 SQL?" : "Could not add the line.");
                 return;
               }
-              setEstTotal(e, r2(Number(e.total) + a2), function () {
+              setEstTotal(e, estTotal(r2(isub + a2), e.adjustments), function () {
                 openEstimate(e.id);
               });
             });
@@ -824,6 +890,108 @@ function openEstimate(id) {
           el("div", "note", "Next: add the work under Jobs for this client so it lands on the schedule.")
         );
     });
+}
+/* ---- Estimate Summary options: the two open rows can be a Discount, Sales tax or Fee, as a % or a dollar amount.
+   Same rules as the client's page (d/index.html): discount and fee are a % of the subtotal,
+   sales tax a % of the subtotal after any discount. Whichever box was typed in last (% or $) is kept; the other follows. */
+var ADJ_NAMES = { discount: "Discount", tax: "Sales tax", fee: "Fee" };
+function estAdjCalc(sub, list) {
+  var disc = 0,
+    add = 0,
+    rows = (Array.isArray(list) ? list : [])
+      .slice(0, 2)
+      .filter(function (a) {
+        return a && ADJ_NAMES[a.kind];
+      })
+      .map(function (a) {
+        var base = a.kind === "tax" ? sub - disc : sub,
+          pct = Number(a.pct),
+          amt = Number(a.amt);
+        if (a.mode === "pct" && !isNaN(pct)) amt = Math.round(base * pct) / 100;
+        else {
+          amt = isNaN(amt) ? 0 : amt;
+          pct = base ? (amt / base) * 100 : 0;
+        }
+        if (a.kind === "discount") disc += amt;
+        else add += amt;
+        return { kind: a.kind, pct: pct, amt: amt };
+      });
+  return { rows: rows, total: r2(sub - disc + add) };
+}
+function estTotal(sub, list) {
+  return estAdjCalc(sub, list).total;
+}
+function adjEditor(list, getSub) {
+  var box = el("div", "adjbox");
+  box.appendChild(el("b", null, "Estimate Summary options"));
+  box.appendChild(el("div", "note", "Use the two open rows for a discount, sales tax or fee. Type a % or a dollar amount; the other fills in."));
+  var slots = [0, 1].map(function (i) {
+    var a = (list || [])[i] || {},
+      r = el("div", "grid3"),
+      k = fld("Row " + (i + 1), "select", a.kind || "", [
+        ["", "None (blank row)"],
+        ["discount", "Discount"],
+        ["tax", "Sales tax"],
+        ["fee", "Fee"]
+      ]),
+      pc = fld("%", "number", a.mode === "pct" && a.pct != null ? String(a.pct) : ""),
+      am = fld("Amount ($)", "number", a.kind && a.mode !== "pct" && a.amt != null ? String(a.amt) : "");
+    pc.input.step = "0.01";
+    am.input.step = "0.01";
+    pc.input.inputMode = am.input.inputMode = "decimal";
+    r.appendChild(k);
+    r.appendChild(pc);
+    r.appendChild(am);
+    box.appendChild(r);
+    var s = { k: k, pc: pc, am: am, mode: a.mode === "pct" ? "pct" : "amt" };
+    pc.input.addEventListener("input", function () {
+      s.mode = "pct";
+      refresh();
+    });
+    am.input.addEventListener("input", function () {
+      s.mode = "amt";
+      refresh();
+    });
+    k.input.addEventListener("change", refresh);
+    return s;
+  });
+  function raw() {
+    return slots
+      .filter(function (s) {
+        return s.k.input.value;
+      })
+      .map(function (s) {
+        var v = parseFloat(s.mode === "pct" ? s.pc.input.value : s.am.input.value);
+        return s.mode === "pct"
+          ? { kind: s.k.input.value, mode: "pct", pct: isNaN(v) ? 0 : v }
+          : { kind: s.k.input.value, mode: "amt", amt: isNaN(v) ? 0 : r2(v) };
+      });
+  }
+  function refresh() {
+    var c = estAdjCalc(getSub(), raw()),
+      n = 0;
+    slots.forEach(function (s) {
+      var on = !!s.k.input.value;
+      s.pc.style.visibility = s.am.style.visibility = on ? "" : "hidden";
+      if (!on) return;
+      var x = c.rows[n++];
+      if (s.mode === "pct" && document.activeElement !== s.am.input) s.am.input.value = x.amt.toFixed(2);
+      if (s.mode === "amt" && document.activeElement !== s.pc.input)
+        s.pc.input.value = s.am.input.value === "" ? "" : String(Math.round(x.pct * 100) / 100);
+    });
+  }
+  refresh();
+  return {
+    el: box,
+    refresh: refresh,
+    value: function () {
+      // store both numbers so the client page and lists never have to guess
+      var c = estAdjCalc(getSub(), raw());
+      return raw().map(function (a, i) {
+        return { kind: a.kind, mode: a.mode, pct: Math.round(c.rows[i].pct * 100) / 100, amt: c.rows[i].amt };
+      });
+    }
+  };
 }
 function setEstTotal(e, total, cb) {
   sb.from("estimates")
