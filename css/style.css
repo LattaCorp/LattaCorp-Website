@@ -711,3 +711,11 @@ footer .brand.fbrand img.wword{width:100%;max-width:280px;min-width:170px}
 .hr-card b{display:block;font-family:Lora,Georgia,serif;color:var(--forest);font-size:1.08rem;margin-bottom:4px}
 .hr-card span{display:block;color:var(--muted);font-size:.92rem;line-height:1.45}
 }
+/* Home hero: bigger logo, trust points on one line, Licensed & Insured badge top right */
+.home3{position:relative}
+.home3 .hero .big{width:min(540px,100%)}
+@media (min-width:1101px){
+.home3 .h3c>.hero.h3hero .trust{flex-wrap:nowrap;width:max-content;max-width:none;margin-left:50%;transform:translateX(-50%);gap:6px 26px}
+.home3 .h3hero .trust li{white-space:nowrap}
+.home3 .herolic{position:absolute;top:14px;right:12px;left:auto;margin:0;z-index:2}
+}
