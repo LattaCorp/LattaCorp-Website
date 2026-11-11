@@ -96,8 +96,8 @@ window.PORTAL_GUIDES = [
       {
         heading: { en: "See a charge you don't recognize?", es: "¿Ve un cargo que no reconoce?" },
         text: {
-          en: "Let us know immediately. Call or text 407-470-5309, or email Support@lattacorpfl.com.",
-          es: "Avísenos de inmediato. Llame o envíe un texto al 407-470-5309, o escriba a Support@lattacorpfl.com."
+          en: "Let us know immediately. Call or text 407-470-5309, or email Support@LattaCorpFL.com.",
+          es: "Avísenos de inmediato. Llame o envíe un texto al 407-470-5309, o escriba a Support@LattaCorpFL.com."
         }
       },
       {

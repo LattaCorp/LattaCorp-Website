@@ -27,7 +27,7 @@ WORDMARK = os.path.join(ROOT, "images", "logo-wordmark-green.png")
 BIZ = {
     "name": "LattaCorp of Central Florida",
     "phone": "407-470-5309",
-    "email": "Support@lattacorpfl.com",
+    "email": "Support@LattaCorpFL.com",
     "footer": 'Thank you for letting us treat your lawn with a "Latta" love!',
 }
 DOCS = {

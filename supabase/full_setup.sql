@@ -241,7 +241,7 @@ create table if not exists public.business (
   id           int primary key default 1 check (id = 1),
   name         text not null default 'LattaCorp of Central Florida',
   phone        text not null default '407-470-5309',
-  email        text not null default 'Support@lattacorpfl.com',
+  email        text not null default 'Support@LattaCorpFL.com',
   address      text not null default '',
   zelle        text not null default '',
   payment_note text not null default 'Cash and check also accepted.',

@@ -14,7 +14,7 @@
   });
   // Cloudflare "not a robot" check (same key as js/forms.js). Off while empty.
   var TURNSTILE_SITEKEY = "";
-  var PHONE = "4074705309", PHONE_TXT = "407-470-5309", SUPPORT = "Support@lattacorpfl.com";
+  var PHONE = "4074705309", PHONE_TXT = "407-470-5309", SUPPORT = "Support@LattaCorpFL.com";
 
   var $ = function (id) { return document.getElementById(id); };
   function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }

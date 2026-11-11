@@ -108,7 +108,7 @@ r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
   let mail = calls.find((c) => c.u.includes("api.resend.com"));
   assert(mail, "code emailed"); assert.deepEqual(mail.body.to, ["jane@example.com"]); assert(mail.body.subject.includes("482913"));
   assert.equal(mail.body.from, "Latta Corp of Central Florida <website@lattacorpfl.com>"); assert(mail.body.html.includes("portal/?th=abc123"));
-  assert.equal(mail.body.reply_to, "Support@lattacorpfl.com"); assert(mail.body.html.includes("automated message")); assert(mail.body.text.includes("482913"));
+  assert.equal(mail.body.reply_to, "Support@LattaCorpFL.com"); assert(mail.body.html.includes("automated message")); assert(mail.body.text.includes("482913"));
   assert.equal(mail.body.headers["Auto-Submitted"], "auto-generated");
   assert(calls.find((c) => c.u.includes("/rest/v1/portal_signins") && c.body && c.body.sent === true), "logged");
   // unknown email: same answer, but nothing is created or sent

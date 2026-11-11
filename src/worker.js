@@ -14,7 +14,7 @@ const FALLBACK_FROM = "Latta Corp Website <onboarding@resend.dev>";
 // Form notifications to the business still come from FROM_EMAIL. Support@ is the one address people talk to.
 const AUTO_FROM = "Latta Corp of Central Florida <website@lattacorpfl.com>";
 const BILLING_FROM = "Latta Corp Billing <billing@lattacorpfl.com>";
-const SUPPORT_EMAIL = "Support@lattacorpfl.com";
+const SUPPORT_EMAIL = "Support@LattaCorpFL.com";
 // Marks a message as automatic, so mail programs don't send vacation auto-replies to it.
 const AUTO_HEADERS = { "Auto-Submitted": "auto-generated", "X-Auto-Response-Suppress": "All" };
 // The CRM database (Supabase). The URL is public; the secret key SUPABASE_SECRET_KEY is set in Cloudflare (Settings > Variables and Secrets).
