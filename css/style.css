@@ -614,3 +614,6 @@ footer .brand.fbrand img.wword{width:100%;max-width:280px;min-width:170px}
 .tband h1 .ptl{position:relative;display:inline-block}
 .tband h1 .ptl .soon{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:12px}
 @media (max-width:600px){.tband h1 .ptl .soon{position:static;transform:none;display:table;margin:6px auto 0}}
+
+/* Terms of Service */
+.terms{max-width:760px}.terms h2{font-size:1.2rem;color:var(--forest);margin:28px 0 8px}.terms p{margin:0 0 12px;line-height:1.65;color:#2c3a30}.terms .tupd{margin-top:30px;font-size:.88rem;color:var(--muted)}

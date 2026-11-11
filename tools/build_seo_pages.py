@@ -55,11 +55,15 @@ PAGES = [
  ("faqs", "#/faqs", "info", "FAQs",
   "Answers about Latta Corp lawn care in Kissimmee, FL: how quotes work, service schedules, weather delays and more.",
   "Respuestas sobre el servicio de césped de Latta Corp en Kissimmee, FL: cómo funcionan las cotizaciones, los horarios de servicio, retrasos por clima y más."),
+ ("terms", "#/terms", "info", "Terms of Service",
+  "Latta Corp's terms of service for lawn care and landscaping in Kissimmee, FL: quotes, deposits, payments, late fees, cancellations, guarantees and damage.",
+  "Términos de servicio de Latta Corp para cuidado de césped y jardinería en Kissimmee, FL: cotizaciones, depósitos, pagos, cargos por atraso, cancelaciones, garantías y daños."),
  ("about", "#/about", "info", "About us",
   "Meet Matteo Latalladi and the Latta Corp crew: a locally owned lawn care company serving The Oaks, Kissimmee, Campbell and Upper Poinciana, FL.",
   "Conozca a Matteo Latalladi y al equipo de Latta Corp: una empresa local de cuidado de césped que atiende The Oaks, Kissimmee, Campbell y Upper Poinciana, FL."),
 ]
 TITLES = {  # page title (en, es) for every page
+ "terms": ("Terms of Service | Latta Corp", "Términos de servicio | Latta Corp"),
  "services/lawn-care": ("Lawn Maintenance in Kissimmee, FL | Latta Corp", "Mantenimiento de césped en Kissimmee, FL | Latta Corp"),
  "services/tree-and-hedge-trimming": ("Tree and Hedge Trimming in Kissimmee, FL | Latta Corp", "Poda de árboles y setos en Kissimmee, FL | Latta Corp"),
  "services/mulching": ("Mulching in Kissimmee, FL | Latta Corp", "Mantillo (mulch) en Kissimmee, FL | Latta Corp"),
