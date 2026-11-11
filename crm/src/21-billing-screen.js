@@ -35,6 +35,8 @@ function renderBilling() {
     })
   );
   $("topbtns").appendChild(document.createTextNode(" "));
+  $("topbtns").appendChild(btn("Bill the month", "btn alt", openBillMonth));
+  $("topbtns").appendChild(document.createTextNode(" "));
   $("topbtns").appendChild(
     btn("Record payment", "btn alt", function () {
       openPayment(null);
@@ -1074,6 +1076,148 @@ function customInvoiceLink(cls) {
     cls,
     "Fill-in-the-blanks invoice PDF. Not saved in Foreman, so it won't show in balances or the portal."
   );
+}
+
+/* ---- Bill the month: every client's completed visits become invoices in one step, then a send list ---- */
+function openBillMonth() {
+  if (billErr) {
+    alert("Billing isn't set up yet.");
+    return;
+  }
+  var p = panel();
+  p.appendChild(el("h2", null, "Bill the month"));
+  p.appendChild(el("p", "note", "Makes one invoice per client (or per property, for clients billed that way) from completed visits that aren't invoiced or paid yet."));
+  var thr = fld("Bill visits done through", "date", lastMonthEnd());
+  p.appendChild(thr);
+  var body = el("div");
+  p.appendChild(body);
+  function draw() {
+    body.textContent = "";
+    var through = thr.input.value || lastMonthEnd(),
+      vs = unbilled.filter(function (v) {
+        return v.scheduled_date <= through && Number(v.price) > 0;
+      }),
+      noPriceN = unbilled.filter(function (v) {
+        return v.scheduled_date <= through && !(Number(v.price) > 0);
+      }).length,
+      gv = groupVisits(vs),
+      tot = r2(
+        vs.reduce(function (a, v) {
+          return a + Number(v.price || 0);
+        }, 0)
+      );
+    if (!gv.order.length) {
+      body.appendChild(el("div", "pcard", "Nothing to bill through " + dshort(through) + ". Every completed visit is already invoiced or paid."));
+      return;
+    }
+    var sum = el("div", "cstats");
+    [
+      ["Invoices", String(gv.order.length)],
+      ["Visits", String(vs.length)],
+      ["Total", money(tot)]
+    ].forEach(function (x) {
+      var d = el("div");
+      d.appendChild(el("span", null, x[0]));
+      d.appendChild(el("b", null, x[1]));
+      sum.appendChild(d);
+    });
+    body.appendChild(sum);
+    if (noPriceN) {
+      var w = el("div", "note", "\u26a0 " + noPriceN + " completed visit" + (noPriceN > 1 ? "s have" : " has") + " no price and will be left out. Set prices on the To bill tab first if they should be billed.");
+      w.style.cssText = "color:#f2c94c;font-weight:700;margin:6px 0";
+      body.appendChild(w);
+    }
+    var lst = el("div", "pcard bmlist");
+    gv.order.forEach(function (k) {
+      var x = gv.g[k],
+        r = el("div", "bmrow");
+      r.appendChild(el("span", null, groupTitle(x) + " \u00b7 " + x.vs.length + " visit" + (x.vs.length > 1 ? "s" : "")));
+      r.appendChild(
+        el(
+          "b",
+          null,
+          money(
+            x.vs.reduce(function (a, v) {
+              return a + Number(v.price || 0);
+            }, 0)
+          )
+        )
+      );
+      lst.appendChild(r);
+    });
+    body.appendChild(lst);
+    var go = btn("Create " + gv.order.length + " invoice" + (gv.order.length > 1 ? "s" : ""), "btn", function () {
+      go.disabled = true;
+      thr.input.disabled = true;
+      var made = [],
+        fails = [],
+        i = 0;
+      gv.order
+        .reduce(function (pr, k) {
+          return pr.then(function () {
+            i++;
+            go.textContent = "Creating " + i + " of " + gv.order.length + "...";
+            return createInvoice(gv.g[k].cid, gv.g[k].vs, through, gv.g[k].pid).then(
+              function (inv) {
+                made.push(inv);
+              },
+              function (e) {
+                fails.push(groupTitle(gv.g[k]) + ": " + e);
+              }
+            );
+          });
+        }, Promise.resolve())
+        .then(function () {
+          return loadUnbilled();
+        })
+        .then(function () {
+          bfilter = "open";
+          render();
+          sendList(made, fails);
+        });
+    });
+    go.style.marginTop = "10px";
+    body.appendChild(go);
+  }
+  thr.input.addEventListener("change", draw);
+  draw();
+  // after creating: one row per new invoice with Email / Text, so sending them all is quick
+  function sendList(made, fails) {
+    body.textContent = "";
+    thr.hidden = true;
+    body.appendChild(el("div", "qban ok")).appendChild(el("b", null, "\u2713 Created " + made.length + " invoice" + (made.length === 1 ? "" : "s")));
+    if (fails.length) body.appendChild(el("div", "note", "Could not create: " + fails.join("; ")));
+    body.appendChild(el("p", "note", "Send each one. A row turns green once it's sent."));
+    made.forEach(function (inv) {
+      var c = byId(clients, inv.client_id),
+        msg = invMessage(inv, c),
+        r = el("div", "pcard bmsend" + (inv.sent_at ? " sent" : "")),
+        l = el("div");
+      l.appendChild(el("b", null, cname(inv.client_id)));
+      l.appendChild(el("div", "note", invNum(inv.number) + " \u00b7 " + money(inv.total)));
+      r.appendChild(l);
+      var a = el("div", "qacts");
+      function sent() {
+        markSent(inv);
+        r.classList.add("sent");
+      }
+      if (c && c.email) {
+        var em = el("a", "btn sm", "Email");
+        em.href = mailHref(c.email, "Invoice " + invNum(inv.number) + " from " + bizv("name", "Latta Corp"), msg);
+        em.addEventListener("click", sent);
+        a.appendChild(em);
+      }
+      if (c && c.phone) {
+        var tx = el("a", "btn alt sm", "Text");
+        tx.href = smsHref(c.phone, msg);
+        tx.addEventListener("click", sent);
+        a.appendChild(tx);
+      }
+      a.appendChild(copyBtn("Copy", msg, true, sent));
+      r.appendChild(a);
+      body.appendChild(r);
+    });
+  }
 }
 
 /* ---- Billing tools: the things you only need now and then ---- */

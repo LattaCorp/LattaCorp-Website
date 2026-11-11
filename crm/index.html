@@ -418,6 +418,8 @@ body.dock #rightcol>.rinbox .rcard .qacts{flex-direction:column}body.dock #right
 .rcard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:4px}
 .rcard img{width:100%;height:130px;object-fit:cover;border-radius:6px;background:#eee}.rcard .qacts{margin:4px 0 0}
 .rtodo img{display:block;width:100%;max-height:340px;object-fit:contain;background:#f3f3f3;border-radius:8px;cursor:zoom-in;margin-bottom:6px}
+.bmlist{padding:6px 12px;max-height:280px;overflow:auto}.bmrow{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--line);font-size:.92rem}.bmrow:last-child{border-bottom:0}
+.bmsend{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px}.bmsend .qacts{margin:0}.bmsend.sent{background:#e4f5e1!important;border-color:var(--leaf)}
 .toolrow{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(127,127,127,.25)}.toolrow .btn{text-align:center}.toolrow .note{margin:0}
 .weekgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:8px}
 .daycol{background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;min-height:120px}.daycol.today{border-color:var(--forest);box-shadow:0 0 0 2px rgba(27,85,43,.18)}.daycol.wkend{background:#fafcf9}
@@ -588,7 +590,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=186"></script>
+<script src="app.js?v=187"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
