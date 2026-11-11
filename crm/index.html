@@ -74,7 +74,7 @@ textarea{min-height:110px;resize:vertical}
 #list .pcol .row.pipe>div:nth-child(2){text-align:left!important;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
 #list .pcol .row.pipe>div:nth-child(2)>div{display:flex;gap:4px}#list .pcol .row.pipe>div:nth-child(2) .sub{margin-left:auto}#list .pcol .row.pipe b,#list .pcol .row.pipe .sub{overflow:hidden;text-overflow:ellipsis}
 @media(max-width:900px){#list .board{grid-template-columns:1fr}}
-#list .row.pipe{position:relative}#list .row.pipe .mkjob{grid-column:1/-1;display:flex;gap:6px;margin-top:6px}
+#list .row.pipe{position:relative}#list .row.pipe .mkjob{grid-column:1/-1;display:flex;gap:6px;margin-top:6px}#list .row.pipe .mkjob:empty{display:none}#panel>.mkjob:empty{display:none}
 .mkjob .btn.sm{padding:5px 12px;font-size:.85rem}
 .row.pipe.st-new{border-left-color:var(--gold)}.row.pipe.st-quoted{border-left-color:#7aa7d6}.row.pipe.st-approved{border-left-color:var(--leaf);background:#f3faf0}
 .row.pipe.st-won{border-left-color:var(--forest)}.row.pipe.st-lost{border-left-color:#bbb;opacity:.8}
@@ -495,7 +495,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=164"></script>
+<script src="app.js?v=165"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

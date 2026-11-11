@@ -1070,17 +1070,23 @@ function makeJobBar(it, small) {
     );
     return bar;
   }
-  bar.appendChild(
-    btn("Make job", "btn sm", function () {
-      makeJobFrom(it);
-    })
-  );
-  if (it.lead && !it.est && pipeStage(it) === "new")
+  var st = pipeStage(it),
+    mkJob = function (cls) {
+      return btn("Make job", cls, function () {
+        makeJobFrom(it);
+      });
+    };
+  // pending quotes wait on the client: no buttons yet
+  if (st === "quoted") return bar;
+  // a new request: Make quote is the main (green) button; Make job is the rare one (white, second)
+  if (st === "new" && it.lead && !it.est) {
     bar.appendChild(
-      btn("Make quote", "btn alt sm", function () {
+      btn("Make quote", "btn sm", function () {
         makeQuoteFrom(it.lead);
       })
     );
+    bar.appendChild(mkJob("btn alt sm"));
+  } else bar.appendChild(mkJob("btn sm"));
   if (!small) bar.classList.add("big");
   return bar;
 }
