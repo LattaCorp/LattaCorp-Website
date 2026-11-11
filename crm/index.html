@@ -195,10 +195,25 @@ body.dock #rightcol .top{display:block;padding:0 12px 12px;margin:0;border-botto
 body.dock #rightcol #topbtns{display:flex;flex-direction:column;gap:6px;width:100%}
 body.dock #rightcol #topbtns>*{display:block;width:100%;margin:0!important;text-align:left;background:#f3f8f1;color:var(--forest);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-weight:700;box-shadow:none}
 body.dock #rightcol #topbtns>*:hover{background:#e3f1df}
+body.dock #rightcol #topbtns>*.on,body.dock #rightcol #topbtns>*.on:hover{background:var(--forest);color:#fff;border-color:var(--forest)}
 body.dock #rightcol #topbtns:empty::before{content:"No options on this screen";color:var(--muted);font-size:.9rem}
 body.dock #detail{position:static;inset:auto;background:none;display:none;flex:1;min-height:0;overflow:auto;z-index:auto}
 body.dock #detail.on{display:block}
 body.dock #detail .panel{max-width:none;margin:0;border-radius:0;box-shadow:none;padding:16px 16px 28px;min-height:0}
+/* Docked Options forms (New job, New client, Services...): green panel, white text, white boxes */
+body.dock #detail.on:not(.full){background:var(--forest)}
+body.dock #detail:not(.full) .panel{background:var(--forest);color:#fff}
+body.dock #detail:not(.full) .panel :is(h1,h2,h3,h4,label,legend,summary,.f span,.f>b,dt,th){color:#fff}
+body.dock #detail:not(.full) .panel :is(.note,.muted,small,.sub,.hint){color:#d6ead1}
+body.dock #detail:not(.full) .panel .close{color:#fff}
+body.dock #detail:not(.full) .panel a:not(.btn){color:#fff}
+body.dock #detail:not(.full) .panel :is(input:not([type=checkbox]):not([type=radio]),select,textarea){background:#fff;color:var(--ink);border-color:#0f3a1c}
+body.dock #detail:not(.full) .panel input:is([type=checkbox],[type=radio]){accent-color:#fff}
+body.dock #detail:not(.full) .panel .btn{background:#fff;color:var(--forest);border:1px solid #fff}
+body.dock #detail:not(.full) .panel .btn.alt{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.75)}
+body.dock #detail:not(.full) .panel :is(hr,.sep){border-color:rgba(255,255,255,.25)}
+body.dock #detail:not(.full) .panel :is(.row,.pcard,.card,.empty,table){color:var(--ink)}
+body.dock #detail:not(.full) .panel :is(.row,.pcard,.card) :is(h3,b,label,.f span){color:inherit}
 body.dock #detail.full{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;overflow:auto;flex:none}
 body.dock #detail.full .panel{margin:40px auto;border-radius:14px}body.dock #detail.full .panel.withprev{max-width:min(1200px,calc(100vw - 80px))}
 body.dock #app{max-width:none}
@@ -418,7 +433,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=146"></script>
+<script src="app.js?v=148"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
