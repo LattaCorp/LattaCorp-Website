@@ -640,7 +640,7 @@ function render() {
     ["jobs", "Jobs", 0],
     ["schedule", "Schedule", stops],
     ["billing", "Billing", invoices.filter(isOverdue).length],
-    ["expenses", "Expenses", 0],
+    ["expenses", "Expenses", receiptsToEnter().length],
     ["reports", "Reports", 0],
     ["photos", "Photos", 0],
     ["inventory", "Inventory", 0],
@@ -8875,9 +8875,12 @@ function renderExpensesView() {
     })
   );
   tb.appendChild(document.createTextNode(" "));
-  tb.appendChild(btn("Scan receipt", "btn alt", openScan));
+  tb.appendChild(btn("Upload receipt", "btn alt", openReceiptUpload));
   tb.appendChild(document.createTextNode(" "));
   tb.appendChild(btn("Paste from Excel", "btn alt", openExpPaste));
+  setTimeout(function () {
+    receiptInbox($("list"));
+  }, 0);
   if (expenses.length && !("tax" in expenses[0])) {
     var wn = el(
       "div",
@@ -8992,7 +8995,7 @@ function renderExpensesView() {
           "empty",
           expenses.length
             ? "Nothing matches. Try another year or category."
-            : "No expenses yet. Tap + Add expense, Scan receipt, or Paste from Excel."
+            : "No expenses yet. Tap + Add expense, Upload receipt, or Paste from Excel."
         )
       );
       return;
@@ -9090,12 +9093,39 @@ function renderExpensesView() {
   draw();
 }
 
-function openExpense(e, pre, scanFile) {
+function openExpense(e, pre, scanFile, todo) {
   pre = pre || {};
   var src = e || pre,
     splitIds = pre.splitIds || {};
   var p = panel();
   p.appendChild(el("h2", null, e ? "Expense" : "Add expense"));
+  if (todo && !e) {
+    // the uploaded receipt, right above the form, so it can be typed in
+    var rbox = el("div", "pcard rtodo");
+    var rim = document.createElement("img");
+    rim.alt = "Receipt photo";
+    rbox.appendChild(rim);
+    signPaths([todo.path]).then(function () {
+      if (pcache[todo.path]) {
+        rim.src = pcache[todo.path].url;
+        rim.addEventListener("click", function () {
+          window.open(pcache[todo.path].url, "_blank", "noopener");
+        });
+      }
+    });
+    rbox.appendChild(
+      el(
+        "div",
+        "note",
+        (todo.caption ? '"' + todo.caption + '" \u00b7 ' : "") +
+          "Uploaded " +
+          dshort(String(todo.created_at).slice(0, 10)) +
+          (todo.created_by ? " by " + todo.created_by.split("@")[0] : "") +
+          ". Tap the photo to see it full size. It's deleted once you Save (Save and add another item keeps it for the next line)."
+      )
+    );
+    p.appendChild(rbox);
+  }
   if (scanFile && !e) {
     var sn_ = el(
       "div",
@@ -9536,19 +9566,29 @@ function openExpense(e, pre, scanFile) {
       var files = pend.slice();
       if (keep && keep.checked && scanFile) files.push(scanFile);
       function done() {
+        if (todo && !e && !again) {
+          removePhotos([todo]).then(function () {
+            render();
+          });
+        }
         if (again) {
           var ids = Object.assign({}, splitIds);
           ids[r.data.id] = 1;
           closeDetail();
           render();
-          openExpense(null, {
-            date: r.data.spent_on,
-            vendor: r.data.vendor,
-            receipt_no: r.data.receipt_no,
-            payment: r.data.payment,
-            code: r.data.code,
-            splitIds: ids
-          });
+          openExpense(
+            null,
+            {
+              date: r.data.spent_on,
+              vendor: r.data.vendor,
+              receipt_no: r.data.receipt_no,
+              payment: r.data.payment,
+              code: r.data.code,
+              splitIds: ids
+            },
+            null,
+            todo
+          );
           setTimeout(function () {
             $("panel").scrollTop = 0;
             $("detail").scrollTop = 0;
@@ -10065,6 +10105,94 @@ function openExpPaste() {
   });
   go.style.marginTop = "8px";
   p.appendChild(go);
+}
+
+/* ---- Receipts to enter: anyone can snap a receipt and upload it; a staff member types it in later from the
+   Expenses page, and the photo is deleted once the expense is saved. ---- */
+function receiptsToEnter() {
+  return (photos || []).filter(function (p) {
+    return p.kind === "receipt_todo";
+  });
+}
+function openReceiptUpload() {
+  if (photoErr) {
+    alert("Photos aren't set up yet. Run the Stage 10 SQL in Supabase first.");
+    return;
+  }
+  var p = panel();
+  p.appendChild(el("h2", null, "Upload a receipt"));
+  p.appendChild(el("p", "note", "Snap or choose the receipt. It waits under Receipts to enter on the Expenses page until someone types it in, then the photo is deleted."));
+  var nt = fld("Note", "text", "");
+  nt.input.placeholder = "e.g. Mulch for the Oak Grove job";
+  p.appendChild(nt);
+  var st = el("div", "note");
+  st.style.cssText = "font-weight:700;margin:10px 0;min-height:1.4em";
+  function go(files) {
+    if (!files || !files.length) return;
+    st.textContent = "Uploading...";
+    uploadMany(Array.prototype.slice.call(files), { kind: "receipt_todo", caption: nt.input.value.trim() }, function (i, n) {
+      st.textContent = "Uploading " + i + " of " + n + "...";
+    }).then(function (res) {
+      var msg = uploadMsg(res);
+      if (msg) alert(msg);
+      st.textContent = res.ok ? "\u2713 " + res.ok + " receipt" + (res.ok > 1 ? "s" : "") + " saved to Receipts to enter." : "";
+      nt.input.value = "";
+      render();
+    });
+  }
+  var row = el("div", "qacts");
+  row.appendChild(
+    btn("Take photo", "btn", function () {
+      pickPhotos(true, go);
+    })
+  );
+  row.appendChild(
+    btn("Choose photos", "btn alt", function () {
+      pickPhotos(false, go);
+    })
+  );
+  p.appendChild(row);
+  p.appendChild(st);
+}
+function receiptInbox(list) {
+  if (view !== "expenses" || !list) return;
+  var old = list.querySelector(".rinbox");
+  if (old) old.parentNode.removeChild(old);
+  var todo = receiptsToEnter().sort(function (a, b) {
+    return String(a.created_at) < String(b.created_at) ? -1 : 1;
+  });
+  if (!todo.length) return;
+  var box = el("div", "rinbox");
+  box.appendChild(el("h3", null, "Receipts to enter (" + todo.length + ")"));
+  var g = el("div", "rgrid");
+  todo.forEach(function (ph) {
+    var c = el("div", "rcard"),
+      im = document.createElement("img");
+    im.alt = "Receipt";
+    im.loading = "lazy";
+    c.appendChild(im);
+    signPaths([ph.thumb_path || ph.path]).then(function () {
+      var k = pcache[ph.thumb_path || ph.path];
+      if (k) im.src = k.url;
+    });
+    c.appendChild(el("b", null, ph.caption || "Receipt"));
+    c.appendChild(el("div", "note", dshort(String(ph.created_at).slice(0, 10)) + (ph.created_by ? " \u00b7 " + ph.created_by.split("@")[0] : "")));
+    var a = el("div", "qacts");
+    a.appendChild(
+      btn("Enter it", "btn sm", function () {
+        openExpense(null, {}, null, ph);
+      })
+    );
+    a.appendChild(
+      btn("Delete", "btn alt sm", function () {
+        deletePhotos([ph]);
+      })
+    );
+    c.appendChild(a);
+    g.appendChild(c);
+  });
+  box.appendChild(g);
+  list.insertBefore(box, list.firstChild);
 }
 
 /* ======================= crm/src/15-tax-report.js ======================= */
@@ -10963,7 +11091,7 @@ function clientPhotosSection(c) {
   function mine() {
     return photos
       .filter(function (p) {
-        return p.client_id === c.id;
+        return p.client_id === c.id && p.kind !== "receipt_todo";
       })
       .sort(function (a, b) {
         return String(b.created_at) < String(a.created_at) ? -1 : 1;
@@ -11118,6 +11246,7 @@ function renderPhotoLib() {
   var set = photos
     .filter(function (p) {
       return (
+        p.kind !== "receipt_todo" &&
         (pf.client === "all" || (pf.client === "none" ? !p.client_id : p.client_id === pf.client)) &&
         (pf.kind === "all" || p.kind === pf.kind) &&
         (!from || String(p.created_at).slice(0, 10) >= from) &&

@@ -486,7 +486,7 @@ function clientPhotosSection(c) {
   function mine() {
     return photos
       .filter(function (p) {
-        return p.client_id === c.id;
+        return p.client_id === c.id && p.kind !== "receipt_todo";
       })
       .sort(function (a, b) {
         return String(b.created_at) < String(a.created_at) ? -1 : 1;
@@ -641,6 +641,7 @@ function renderPhotoLib() {
   var set = photos
     .filter(function (p) {
       return (
+        p.kind !== "receipt_todo" &&
         (pf.client === "all" || (pf.client === "none" ? !p.client_id : p.client_id === pf.client)) &&
         (pf.kind === "all" || p.kind === pf.kind) &&
         (!from || String(p.created_at).slice(0, 10) >= from) &&

@@ -98,7 +98,7 @@ function render() {
     ["jobs", "Jobs", 0],
     ["schedule", "Schedule", stops],
     ["billing", "Billing", invoices.filter(isOverdue).length],
-    ["expenses", "Expenses", 0],
+    ["expenses", "Expenses", receiptsToEnter().length],
     ["reports", "Reports", 0],
     ["photos", "Photos", 0],
     ["inventory", "Inventory", 0],
