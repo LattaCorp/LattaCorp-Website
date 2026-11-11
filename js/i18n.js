@@ -1,5 +1,18 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"Your own client portal": "Su propio portal de clientes",
+"Lake and pond banks": "Orillas de lagos y estanques",
+"Service requests online": "Solicitudes de servicio en línea",
+"Questions or concerns? Reach us any time, right from our website.": "¿Preguntas o inquietudes? Contáctenos cuando quiera, desde nuestro sitio web.",
+"Before and after": "Antes y después",
+"Clear, detailed invoices": "Facturas claras y detalladas",
+"Every visit listed, nothing to mail": "Cada visita detallada, nada que enviar por correo",
+"Community common areas": "Áreas comunes de la comunidad",
+"Instant quote calculator": "Calculadora de cotización instantánea",
+"See a rough price in seconds, any time.": "Vea un precio aproximado en segundos, cuando quiera.",
+"Clubhouse grounds": "Terrenos de la casa club",
+"Hablamos español": "Hablamos español",
+"Our whole website, quotes and portal work in Spanish too.": "Todo nuestro sitio web, las cotizaciones y el portal también funcionan en español.",
 "The all-in-one plan: everything in Premier, plus tree trimming about twice a year and mulching once a year.": "El plan todo en uno: todo lo de Premier, más poda de árboles unas dos veces al año y mulch una vez al año.",
 "Mulching once a year": "Mulch una vez al año",
 "Our Elite plan includes tree trimming about two times a year and mulching once a year, which suits property managers and commercial properties.": "Nuestro plan Elite incluye poda de árboles unas dos veces al año y mulch una vez al año, ideal para administradores de propiedades y propiedades comerciales.",
