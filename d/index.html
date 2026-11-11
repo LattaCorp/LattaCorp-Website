@@ -110,6 +110,14 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 #paper.page.tight .cl .ntw{margin-top:8px}#paper.page.tight .cl .appr{margin-top:8px}#paper.page.tight .cl .appr .apv{height:44px}#paper.page.tight .cl .thx{margin-top:8px;padding-top:4px;font-size:1.08rem}
 .cl .ct.mid .blk{flex:1;display:flex;flex-direction:column;justify-content:center;margin:0}
 .cl .ntw.side{margin:0;flex:1}
+#paper{position:relative}.wmk{position:absolute;left:50%;top:54%;width:58%;max-width:440px;transform:translate(-50%,-50%);opacity:.07;pointer-events:none;z-index:0}
+/* the watermark sits behind everything: the page content is layered above it, and the white cell fills become see-through */
+.cl.qd{position:relative;z-index:1}
+.cl.qd td,.cl.qd .asum td,.cl.qd .grid td,.cl.qd .led tbody tr:nth-child(odd) td,.cl.qd .nbox,.cl.qd .appr{background-color:transparent!important}
+.cl.qd .led tbody tr:nth-child(even) td{background-color:rgba(27,85,43,.055)!important}
+.cl.qd .asum td.k{background-color:rgba(27,85,43,.075)!important}
+.cl.qd .asum tr.dep1 td,.cl.qd .asum tr.dep1 td.k{background-color:rgba(27,85,43,.2)!important}
+.cl.qd .asum tr.tot td,.cl.qd .asum tr.tot td.k{background-color:var(--forest)!important}
 .cl .nbox{flex:1;display:flex;flex-direction:column;border:1px solid #8fb08f;background:#fff}
 .cl .nbox .nbh{background:var(--forest);color:#fff;font-size:.82rem;font-weight:700;text-align:center;padding:6px 8px;line-height:1.5}
 #paper.page .cl .nbox .nbh{padding:4px 8px}
@@ -306,7 +314,7 @@ function drawEstimate(){
   var banner="";
   if(expired)banner='<div class="sm" style="color:#b3261e;font-weight:700;margin:10px 0">'+tq("expired")+"</div>";
   var canAct=!preview&&(d.status==="draft"||d.status==="sent")&&!expired,n=num(d.number,isQ()?"QTE-":"EST-");
-  var h='<div class="cl"><div class="top"><div class="lg"><img src="../images/logo-tree-header.png" alt="'+esc(b.name||"Latta Corp")+'"></div>'
+  var h='<img class="wmk" src="../images/logo-tree-watermark.png" alt=""><div class="cl qd"><div class="top"><div class="lg"><img src="../images/logo-tree-header.png" alt="'+esc(b.name||"Latta Corp")+'"></div>'
     +'<div class="mid2"><div class="w est">'+(isQ()?t("q_word"):t("e_word"))+"</div>"+(d.title?'<div class="jt">'+esc(d.title)+"</div>":"")
     +"</div>"
     +hdrRight(b,1)+'</div><div class="inner">';
