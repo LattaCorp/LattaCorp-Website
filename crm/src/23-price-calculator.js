@@ -342,14 +342,15 @@ function openCalc() {
   );
   p.appendChild(calcWidget(null));
 }
-function openEstimateForm(cid, leadId) {
+function openEstimateForm(cid, leadId, ex) {
+  var E = ex ? ex.e : null;
   if (estErr) {
     alert("Run the Stage 11 SQL in Supabase first, then press Refresh.");
     return;
   }
   var p = panel();
-  p.appendChild(el("h2", null, "New quote or estimate"));
-  var qe = qeChoice("quote");
+  p.appendChild(el("h2", null, E ? "Edit " + estWord(E) + " " + estNum(E.number, E.doc_type) : "New quote or estimate"));
+  var qe = qeChoice(E ? E.doc_type || "quote" : "quote");
   p.appendChild(qe);
   var list = clients.filter(function (c) {
     return !c.archived || c.id === cid;
@@ -364,14 +365,18 @@ function openEstimateForm(cid, leadId) {
       })
     )
   );
-  var ttl = fld("Job Title", "text", ""),
-    scp = fld("Notes & Terms", "textarea", ""),
-    vd = fld("Valid for (days)", "number", "30");
+  var vdays = 30;
+  if (E && E.valid_until) vdays = Math.max(1, Math.round((new Date(E.valid_until + "T12:00:00") - new Date(today() + "T12:00:00")) / 864e5));
+  var ttl = fld("Job Title", "text", E ? E.title || "" : ""),
+    scp = fld("Notes & Terms", "textarea", E ? E.scope || "" : ""),
+    vd = fld("Valid for (days)", "number", String(vdays));
+  if (E) cs.input.disabled = true;
   vd.classList.add("short");
   p.appendChild(cs);
   // which property the work is for (shows as the service address on the estimate); blank = their Main address
   var pps = propPicker(cs, "Property", "Main address");
   p.appendChild(pps);
+  if (E && E.property_id) pps.input.value = E.property_id;
   p.appendChild(ttl);
   p.appendChild(scp);
   p.appendChild(vd);
@@ -428,6 +433,15 @@ function openEstimateForm(cid, leadId) {
   );
   p.appendChild(cd);
   p.appendChild(box);
+  if (ex)
+    ex.items.forEach(function (it) {
+      addRow();
+      var x = rows[rows.length - 1];
+      x.t.input.value = it.title || "";
+      x.d.input.value = it.description || "";
+      x.q.input.value = it.qty || "";
+      x.a.input.value = it.amount == null ? "" : String(it.amount);
+    });
   addRow();
   function linesSub() {
     return r2(
@@ -437,8 +451,8 @@ function openEstimateForm(cid, leadId) {
       }, 0)
     );
   }
-  var adj = adjEditor([], linesSub),
-    dep = depEditor(null, function () {
+  var adj = adjEditor(E ? E.adjustments || [] : [], linesSub),
+    dep = depEditor(E ? E.deposit : null, function () {
       return estTotal(linesSub(), adj.value());
     });
   adj.el.appendChild(dep.el);
@@ -446,7 +460,7 @@ function openEstimateForm(cid, leadId) {
     setTimeout(dep.refresh, 0);
   });
   p.appendChild(adj.el);
-  var go = btn("Save", "btn", function () {
+  var go = btn(E ? "Save changes" : "Save", "btn", function () {
     if (!cs.input.value) {
       alert("Choose a client.");
       return;
@@ -479,6 +493,50 @@ function openEstimateForm(cid, leadId) {
         adjs
       );
     go.disabled = true;
+    if (E) {
+      // save the changes: the quote's details, then swap in the new lines (new ones first, so nothing is lost)
+      var urow = {
+        title: ttl.input.value.trim(),
+        scope: scp.input.value.trim(),
+        valid_until: days > 0 ? addDays(today(), days) : null,
+        total: total,
+        property_id: pps.input.value || null,
+        adjustments: adjs,
+        deposit: dep.value() || null,
+        doc_type: qe.value()
+      };
+      var oldIds = ex.items.map(function (x) {
+        return x.id;
+      });
+      sb.from("estimates")
+        .update(urow)
+        .eq("id", E.id)
+        .then(function (r) {
+          if (r.error) {
+            go.disabled = false;
+            alert("Could not save the changes.");
+            return;
+          }
+          Object.assign(E, urow);
+          items.forEach(function (x) {
+            x.estimate_id = E.id;
+          });
+          sb.from("estimate_items")
+            .insert(items)
+            .then(function (r2_) {
+              if (r2_.error) {
+                go.disabled = false;
+                alert("The details saved, but the lines could not. Try Save again.");
+                return;
+              }
+              (oldIds.length ? sb.from("estimate_items").delete().in("id", oldIds) : Promise.resolve()).then(function () {
+                render();
+                openEstimate(E.id);
+              });
+            });
+        });
+      return;
+    }
     var pid = pps.input.value || null,
       erow = {
         client_id: cs.input.value,
@@ -555,10 +613,10 @@ function openEstimateForm(cid, leadId) {
     show({
       kind: "estimate",
       doc: {
-        number: lpNextNumber(estimates),
+        number: E ? E.number : lpNextNumber(estimates),
         title: ttl.input.value.trim(),
         scope: scp.input.value.trim(),
-        issue_date: today(),
+        issue_date: E ? E.issue_date : today(),
         valid_until: days > 0 ? addDays(today(), days) : null,
         status: "draft",
         total: estTotal(r2(total), adj.value()),
@@ -579,43 +637,188 @@ function openEstimateForm(cid, leadId) {
   });
   draft();
 }
+/* ---- One quote / estimate, in the side panel: a plain, readable summary and only the buttons that fit where it stands.
+   Not answered yet: Edit (opens the full quote window with the live preview), Send (Email / Text / Copy link),
+   Preview. Approved: who signed and when, Make job, Share approval, Signed copy. More options (Client said yes/no,
+   Reopen, Delete) are tucked under "More". ---- */
 function openEstimate(id) {
   var e = byId(estimates, id);
   if (!e) return;
   markRespSeen(e);
-  setTimeout(function () {
-    var p0 = $("panel"),
-      n0 = p0.querySelector(".note");
-    if (!n0 || p0.querySelector(".mkjob")) return;
-    n0.parentNode.insertBefore(makeJobBar({ est: e, lead: (e.lead_id && byId(leads, e.lead_id)) || null }), n0.nextSibling);
-  }, 0);
   var c = byId(clients, e.client_id),
-    p = panel();
-  p.appendChild(el("h2", null, estNum(e.number, e.doc_type) + " · " + cname(e.client_id)));
-  var st =
-    e.status === "accepted"
-      ? "Accepted"
-      : e.status === "declined"
-        ? "Declined"
-        : estExpired(e)
-          ? "Expired"
-          : e.status === "sent"
-            ? "Sent"
-            : "Draft";
-  p.appendChild(
-    el(
-      "div",
-      "note",
-      st +
-        " · issued " +
-        dshort(e.issue_date) +
-        (e.valid_until ? " · valid until " + dshort(e.valid_until) : "") +
-        (e.sent_at ? " · sent " + dshort(String(e.sent_at).slice(0, 10)) : " · not sent yet")
-    )
+    p = panel(),
+    lead = (e.lead_id && byId(leads, e.lead_id)) || null,
+    it0 = { est: e, lead: lead },
+    word = estWord(e, true),
+    open = estOpen(e) && !estExpired(e);
+  p.classList.add("qpanel");
+  p.appendChild(el("h2", null, cname(e.client_id)));
+  var st = e.status === "accepted" ? ["Approved by client", "ok"] : e.status === "declined" ? ["Declined", "no"] : estExpired(e) ? ["Expired", "no"] : e.status === "sent" ? [e.viewed_at ? "Sent · client opened it" : "Sent · not opened yet", "wait"] : ["DRAFT · not sent yet", "draft"];
+  var hd = el("div", "qhead");
+  hd.appendChild(el("span", "qnum", word + " " + estNum(e.number, e.doc_type)));
+  hd.appendChild(el("span", "qst " + st[1], st[0]));
+  p.appendChild(hd);
+  // approved / declined: who answered and when, big and clear
+  if (e.status === "accepted" || e.status === "declined") {
+    var ok = e.status === "accepted",
+      ban = el("div", "qban " + (ok ? "ok" : "no"));
+    var byTeam = /^Recorded/.test(e.response_name || "");
+    ban.appendChild(el("b", null, (ok ? "✓ Approved" : "Declined") + (e.response_name && !byTeam ? " by " + e.response_name : byTeam ? " (marked by our team)" : "")));
+    var bits = [];
+    if (e.responded_at) bits.push(new Date(e.responded_at).toLocaleString([], { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" }));
+    if (e.response_po) bits.push("PO / Approval # " + e.response_po);
+    if (bits.length) ban.appendChild(el("div", null, bits.join(" · ")));
+    if (e.response_note) ban.appendChild(el("div", null, '"' + e.response_note + '"'));
+    if (ok && /^data:image\/png;base64,/.test(e.response_signature || "")) {
+      var sg = document.createElement("img");
+      sg.src = e.response_signature;
+      sg.alt = "Client signature";
+      ban.appendChild(sg);
+    }
+    p.appendChild(ban);
+  }
+  // the main buttons
+  var main = el("div", "qacts");
+  p.appendChild(main);
+  var sendRow = null;
+  if (open) {
+    main.appendChild(
+      btn("Edit " + estWord(e), "btn", function () {
+        openEstimateEditor(e);
+      })
+    );
+    var sb_ = btn(e.status === "sent" ? "Send again" : "Send to client", "btn alt", function () {
+      sendRow.hidden = !sendRow.hidden;
+    });
+    main.appendChild(sb_);
+    sendRow = el("div", "qsend");
+    sendRow.hidden = true;
+    var msg = estMessage(e, c);
+    if (c && c.email) {
+      var em = el("a", "btn alt", "Email");
+      em.href = mailHref(c.email, word + " " + estNum(e.number, e.doc_type) + " from " + bizv("name", "Latta Corp"), msg);
+      em.addEventListener("click", function () {
+        markEstSent(e);
+      });
+      sendRow.appendChild(em);
+    }
+    if (c && c.phone) {
+      var tx = el("a", "btn alt", "Text");
+      tx.href = smsHref(c.phone, msg);
+      tx.addEventListener("click", function () {
+        markEstSent(e);
+      });
+      sendRow.appendChild(tx);
+    }
+    sendRow.appendChild(
+      copyBtn("Copy link", docUrl(e.share_token), false, function () {
+        markEstSent(e);
+      })
+    );
+    p.appendChild(sendRow);
+    var pv = el("a", "btn alt", "Preview");
+    pv.href = docUrl(e.share_token, true);
+    pv.target = "_blank";
+    pv.rel = "noopener";
+    main.appendChild(pv);
+  } else if (e.status === "accepted") {
+    var jb = makeJobBar(it0);
+    [].slice.call(jb.children).forEach(function (x) {
+      x.className = "btn";
+      main.appendChild(x);
+    });
+    var sm =
+      cname(e.client_id) + " approved " + word.toLowerCase() + " " + estNum(e.number, e.doc_type) + (e.title ? " (" + e.title + ")" : "") + " for " + money(e.total) +
+      (e.responded_at ? " on " + dshort(String(e.responded_at).slice(0, 10)) : "") + (e.response_name && !/^Recorded/.test(e.response_name) ? ", signed by " + e.response_name : "") +
+      (e.response_po ? " (PO " + e.response_po + ")" : "") + ". Signed copy: " + docUrl(e.share_token, true);
+    var sh = btn("Share approval", "btn alt", function () {
+      if (navigator.share) navigator.share({ title: word + " approved", text: sm }).catch(function () {});
+      else copyText(sm, sh);
+    });
+    main.appendChild(sh);
+    var sc = el("a", "btn alt", "Signed copy");
+    sc.href = docUrl(e.share_token, true);
+    sc.target = "_blank";
+    sc.rel = "noopener";
+    main.appendChild(sc);
+  } else {
+    var pv2 = el("a", "btn alt", "View");
+    pv2.href = docUrl(e.share_token, true);
+    pv2.target = "_blank";
+    pv2.rel = "noopener";
+    main.appendChild(pv2);
+  }
+  // what's in it: a white card that reads like the quote
+  var card = el("div", "pcard qcard");
+  card.appendChild(el("div", "note", "Loading..."));
+  p.appendChild(card);
+  // more (rarely needed)
+  function setStatus(s2, extra) {
+    var row = { status: s2 };
+    Object.keys(extra || {}).forEach(function (k) {
+      row[k] = extra[k];
+    });
+    sb.from("estimates")
+      .update(row)
+      .eq("id", e.id)
+      .then(function (r2_) {
+        if (r2_.error) {
+          alert("Could not save.");
+          return;
+        }
+        Object.keys(row).forEach(function (k) {
+          e[k] = row[k];
+        });
+        render();
+        openEstimate(e.id);
+      });
+  }
+  var more = document.createElement("details");
+  more.className = "qmore";
+  more.appendChild(el("summary", null, "More"));
+  var mr = el("div", "qacts");
+  if (open) {
+    mr.appendChild(
+      btn("Client said yes", "btn alt", function () {
+        setStatus("accepted", { responded_at: new Date().toISOString(), response_name: "Recorded by our team" });
+      })
+    );
+    mr.appendChild(
+      btn("Client said no", "btn alt", function () {
+        setStatus("declined", { responded_at: new Date().toISOString(), response_name: "Recorded by our team" });
+      })
+    );
+  } else if (!pipeJob(it0)) {
+    mr.appendChild(
+      btn("Reopen", "btn alt", function () {
+        if (!confirm("Reopen this " + estWord(e) + "? It goes back to waiting on the client" + (estExpired(e) ? " and is good for 30 more days." : "."))) return;
+        var x = { responded_at: null, response_name: "", response_note: "", response_signature: null, response_po: "" };
+        if (estExpired(e)) x.valid_until = addDays(today(), 30);
+        setStatus(e.sent_at ? "sent" : "draft", x);
+      })
+    );
+  }
+  mr.appendChild(
+    btn("Delete", "btn danger", function () {
+      if (!confirm("Delete this " + estWord(e) + " for good? Its link stops working.")) return;
+      sb.from("estimates")
+        .delete()
+        .eq("id", e.id)
+        .then(function (r2_) {
+          if (r2_.error) {
+            alert("Could not delete.");
+            return;
+          }
+          estimates = estimates.filter(function (z) {
+            return z.id !== e.id;
+          });
+          closeDetail();
+          render();
+        });
+    })
   );
-  var body = el("div");
-  body.appendChild(el("div", "note", "Loading..."));
-  p.appendChild(body);
+  more.appendChild(mr);
+  p.appendChild(more);
   sb.from("estimate_items")
     .select("*")
     .eq("estimate_id", e.id)
@@ -623,345 +826,105 @@ function openEstimate(id) {
     .limit(500)
     .then(function (r) {
       var items = r.error ? [] : r.data || [];
-      body.textContent = "";
-      var edit = estOpen(e);
-      if (e.status === "accepted" || e.status === "declined") {
-        var ans = el(
-          "div",
-          "pcard",
-          (e.status === "accepted" ? "✓ Accepted" : "Declined") +
-            (e.response_name
-              ? /^Recorded/.test(e.response_name)
-                ? " (" + e.response_name.toLowerCase() + ")"
-                : " by " + e.response_name
-              : "") +
-            (e.responded_at ? " on " + dshort(String(e.responded_at).slice(0, 10)) : "") +
-            (e.response_po ? " · PO / approval # " + e.response_po : "") +
-            (e.response_note ? '. Note: "' + e.response_note + '"' : "")
-        );
-        ans.style.fontWeight = "700";
-        if (e.status === "accepted" && /^data:image\/png;base64,/.test(e.response_signature || "")) {
-          var sg = document.createElement("img");
-          sg.src = e.response_signature;
-          sg.alt = "Client signature";
-          sg.style.cssText = "display:block;height:60px;width:auto;margin-top:8px;border-bottom:1.5px solid #1d2a20";
-          ans.appendChild(sg);
-        }
-        body.appendChild(ans);
-      }
-      var ttl = fld("Job Title", "text", e.title || ""),
-        scp = fld("Notes & Terms", "textarea", e.scope || ""),
-        vu = fld("Valid until", "date", e.valid_until || ""),
-        eps = clientProps(e.client_id),
-        pf = fld(
-          "Property",
-          "select",
-          e.property_id || "",
-          [["", "Main address"]].concat(
-            eps.map(function (x) {
-              return [x.id, (x.label ? x.label + " \u00b7 " : "") + x.address];
-            })
-          )
-        );
+      card.textContent = "";
+      if (e.title) card.appendChild(el("h3", "qtitle", e.title));
+      var facts = [
+        ["Service address", e.property_id ? paddr(e.property_id) : (clientProps(e.client_id)[0] || {}).address || ""],
+        ["Issued", dshort(e.issue_date)],
+        ["Valid until", e.valid_until ? dshort(e.valid_until) : ""],
+        ["Type", e.doc_type === "estimate" ? "Estimate (price may change)" : "Quote (fixed price)"]
+      ].filter(function (x) {
+        return x[1];
+      });
+      var fl = el("div", "qfacts");
+      facts.forEach(function (x) {
+        var d = el("div");
+        d.appendChild(el("span", null, x[0]));
+        d.appendChild(el("b", null, x[1]));
+        fl.appendChild(d);
+      });
+      card.appendChild(fl);
+      var t = el("div", "qlines");
+      items.forEach(function (it) {
+        var ln = el("div", "ql"),
+          l = el("div");
+        l.appendChild(el("b", null, it.title || it.description || ""));
+        if (it.title && it.description) l.appendChild(el("div", null, it.description));
+        ln.appendChild(l);
+        var rt = el("div", "qamt");
+        rt.appendChild(el("b", null, money(it.amount)));
+        if (it.qty) rt.appendChild(el("div", null, "QTY " + it.qty));
+        ln.appendChild(rt);
+        t.appendChild(ln);
+      });
+      if (!items.length) t.appendChild(el("div", "note", "No lines yet."));
+      card.appendChild(t);
       var isub = r2(
-          items.reduce(function (s2, x) {
-            return s2 + Number(x.amount || 0);
+          items.reduce(function (a, x) {
+            return a + Number(x.amount || 0);
           }, 0)
         ),
-        eadj = adjEditor(e.adjustments || [], function () {
-          return isub;
-        }),
-        edep = depEditor(e.deposit, function () {
-          return estTotal(isub, eadj.value());
-        });
-      eadj.el.appendChild(edep.el);
-      eadj.el.addEventListener("input", function () {
-        setTimeout(edep.refresh, 0);
-      });
-      if (edit) {
-        var eqe = qeChoice(e.doc_type);
-        body.appendChild(eqe);
-        if (eps.length > 1 || e.property_id) body.appendChild(pf);
-        body.appendChild(ttl);
-        body.appendChild(scp);
-        body.appendChild(vu);
-        body.appendChild(eadj.el);
-        var sv = btn("Save details", "btn alt sm", function () {
-          var row = {
-            title: ttl.input.value.trim(),
-            scope: scp.input.value.trim(),
-            valid_until: vu.input.value || null
-          };
-          if (eqe.value() !== (e.doc_type || "quote")) row.doc_type = eqe.value();
-          var na = eadj.value();
-          if (JSON.stringify(na) !== JSON.stringify(e.adjustments || [])) {
-            row.adjustments = na;
-            row.total = estTotal(isub, na);
-          }
-          if ((pf.input.value || null) !== (e.property_id || null)) row.property_id = pf.input.value || null;
-          var nd = edep.value();
-          if (JSON.stringify(nd) !== JSON.stringify(e.deposit || null)) row.deposit = nd;
-          sb.from("estimates")
-            .update(row)
-            .eq("id", e.id)
-            .then(function (r2_) {
-              if (r2_.error) {
-                alert(
-                  "deposit" in row
-                    ? "Could not save. Did you run the Stage 36 SQL?"
-                    : "doc_type" in row
-                    ? "Could not save. Did you run the Stage 34 SQL?"
-                    : "adjustments" in row
-                    ? "Could not save. Did you run the Stage 33 SQL?"
-                    : "property_id" in row
-                      ? "Could not save. Did you run the Stage 31 SQL?"
-                      : "Could not save."
-                );
-                return;
-              }
-              if ("property_id" in row) e.property_id = row.property_id;
-              if ("deposit" in row) e.deposit = row.deposit;
-              if ("doc_type" in row) {
-                e.doc_type = row.doc_type;
-                if (!("adjustments" in row)) {
-                  openEstimate(e.id);
-                  return;
-                }
-              }
-              if ("adjustments" in row) {
-                e.adjustments = row.adjustments;
-                e.total = row.total;
-                openEstimate(e.id);
-                return;
-              }
-              e.title = row.title;
-              e.scope = row.scope;
-              e.valid_until = row.valid_until;
-              sv.textContent = "Saved";
-              render();
-              setTimeout(function () {
-                sv.textContent = "Save details";
-              }, 1200);
-            });
-        });
-        sv.style.marginBottom = "10px";
-        body.appendChild(sv);
-      } else {
-        body.appendChild(el("div", "note", estWord(e, true) + (e.doc_type === "estimate" ? " (price may change)" : " (fixed price)")));
-        if (e.property_id && paddr(e.property_id)) body.appendChild(el("div", "note", "Property: " + paddr(e.property_id)));
-        if (e.title) body.appendChild(el("b", null, e.title));
-        if (e.scope) {
-          var sc = el("div", "note", e.scope);
-          sc.style.whiteSpace = "pre-wrap";
-          body.appendChild(sc);
-        }
+        ac = estAdjCalc(isub, e.adjustments),
+        tot = el("div", "qtot");
+      function trow(k, v, cls) {
+        var d = el("div", cls || "");
+        d.appendChild(el("span", null, k));
+        d.appendChild(el("span", null, v));
+        tot.appendChild(d);
       }
-      var t = document.createElement("table");
-      t.className = "itable";
-      items.forEach(function (it) {
-        var tr = document.createElement("tr");
-        tr.appendChild(el("td", "ttl", it.title || ""));
-        tr.appendChild(el("td", null, it.description));
-        tr.appendChild(el("td", "qty", it.qty ? "× " + it.qty : ""));
-        tr.appendChild(el("td", "amt", money(it.amount)));
-        if (edit && items.length > 1) {
-          var x = el("td");
-          var rm = btn("×", "link", function () {
-            sb.from("estimate_items")
-              .delete()
-              .eq("id", it.id)
-              .then(function (r2_) {
-                if (r2_.error) {
-                  alert("Could not remove the line.");
-                  return;
-                }
-                setEstTotal(e, estTotal(r2(isub - Number(it.amount)), e.adjustments), function () {
-                  openEstimate(e.id);
-                });
-              });
-          });
-          rm.setAttribute("aria-label", "Remove line");
-          rm.style.cssText = "font-size:1.2rem;text-decoration:none;color:var(--red)";
-          x.appendChild(rm);
-          tr.appendChild(x);
-        }
-        t.appendChild(tr);
-      });
-      body.appendChild(t);
-      var ac = estAdjCalc(isub, e.adjustments);
-      if (ac.rows.length)
-        body.appendChild(
-          el(
-            "div",
-            "note",
-            "Subtotal " +
-              money(isub) +
-              ac.rows
-                .map(function (x) {
-                  return " · " + adjName(x) + " " + (x.kind === "discount" ? "−" : "") + money(x.amt);
-                })
-                .join("")
-          )
-        );
-      body.appendChild(el("div", "invtotal", "Total " + money(e.total)));
+      if (ac.rows.length) {
+        trow("Subtotal", money(isub));
+        ac.rows.forEach(function (x) {
+          trow(adjName(x), (x.kind === "discount" ? "−" : "") + money(x.amt));
+        });
+      }
+      trow("Total", money(e.total), "big");
       var da = depAmount(e.deposit, Number(e.total));
-      if (da > 0)
-        body.appendChild(
-          el("div", "note", "Deposit required " + money(da) + " · balance on completion " + money(r2(Number(e.total) - da)))
-        );
-      if (edit) {
-        var add = el("div", "pcard"),
-          g = el("div", "grid4"),
-          ttl = fld("Add a line: title", "text", ""),
-          dsc = fld("Description", "text", ""),
-          qy = fld("QTY", "text", ""),
-          amt = fld("Total ($)", "number", "");
-        amt.input.step = "0.01";
-        amt.input.inputMode = "decimal";
-        g.appendChild(ttl);
-        g.appendChild(dsc);
-        g.appendChild(qy);
-        g.appendChild(amt);
-        add.appendChild(g);
-        var ab = btn("Add line", "btn alt sm", function () {
-          var a2 = parseFloat(amt.input.value);
-          if ((!ttl.input.value.trim() && !dsc.input.value.trim()) || isNaN(a2)) {
-            alert("Enter a title or description, and a total.");
-            return;
-          }
-          var line = { estimate_id: e.id, description: dsc.input.value.trim(), amount: a2 };
-          if (ttl.input.value.trim()) line.title = ttl.input.value.trim();
-          if (qy.input.value.trim()) line.qty = qy.input.value.trim();
-          sb.from("estimate_items")
-            .insert(line)
-            .then(function (r2_) {
-              if (r2_.error) {
-                alert(line.title || line.qty ? "Could not add the line. Did you run the Stage 33 SQL?" : "Could not add the line.");
-                return;
-              }
-              setEstTotal(e, estTotal(r2(isub + a2), e.adjustments), function () {
-                openEstimate(e.id);
-              });
-            });
-        });
-        ab.style.marginTop = "8px";
-        add.appendChild(ab);
-        body.appendChild(add);
+      if (da > 0) {
+        trow("Deposit due", money(da));
+        trow("Remaining balance", money(r2(Number(e.total) - da)));
       }
-      var acts = el("div", "contact");
-      acts.style.marginTop = "14px";
-      var msg = estMessage(e, c);
-      if (c && c.email) {
-        var a2 = el("a", "btn", "Email " + estWord(e));
-        a2.href = mailHref(
-          c.email,
-          estWord(e, true) + " " + estNum(e.number, e.doc_type) + " from " + bizv("name", "Latta Corp"),
-          msg
-        );
-        a2.addEventListener("click", function () {
-          markEstSent(e);
-        });
-        acts.appendChild(a2);
+      card.appendChild(tot);
+      if (e.scope) {
+        card.appendChild(el("div", "qnh", "Notes & Terms"));
+        card.appendChild(el("div", "qnotes", e.scope));
       }
-      acts.appendChild(
-        copyBtn("Copy message", msg, false, function () {
-          markEstSent(e);
-        })
-      );
-      acts.appendChild(
-        copyBtn("Copy link", docUrl(e.share_token), false, function () {
-          markEstSent(e);
-        })
-      );
-      if (isOwner() && c && c.phone) {
-        var a1 = el("a", "btn alt", "Text");
-        a1.href = smsHref(c.phone, msg);
-        a1.addEventListener("click", function () {
-          markEstSent(e);
-        });
-        acts.appendChild(a1);
+    });
+}
+function copyText(text, b) {
+  function done() {
+    var o = b.textContent;
+    b.textContent = "Copied ✓";
+    setTimeout(function () {
+      b.textContent = o;
+    }, 1400);
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done, function () {});
+  else {
+    var t = document.createElement("textarea");
+    t.value = text;
+    document.body.appendChild(t);
+    t.select();
+    try {
+      document.execCommand("copy");
+      done();
+    } catch (x) {}
+    document.body.removeChild(t);
+  }
+}
+// Edit opens the same window as New quote (with the live preview), filled in with this quote
+function openEstimateEditor(e) {
+  sb.from("estimate_items")
+    .select("*")
+    .eq("estimate_id", e.id)
+    .order("id", { ascending: true })
+    .limit(500)
+    .then(function (r) {
+      if (r.error) {
+        alert("Could not load the lines.");
+        return;
       }
-      var pv = el("a", "btn alt", "Preview / Print");
-      pv.href = docUrl(e.share_token, true);
-      pv.target = "_blank";
-      pv.rel = "noopener";
-      acts.appendChild(pv);
-      body.appendChild(acts);
-      if (e.viewed_at)
-        body.appendChild(el("div", "note", "✓ Client opened the link " + ago(e.viewed_at) + "."));
-      else if (e.sent_at) body.appendChild(el("div", "note", "The client hasn't opened the link yet."));
-      var dz = el("div", "actions");
-      dz.style.marginTop = "14px";
-      function setStatus(s2, extra) {
-        var row = { status: s2 };
-        Object.keys(extra || {}).forEach(function (k) {
-          row[k] = extra[k];
-        });
-        sb.from("estimates")
-          .update(row)
-          .eq("id", e.id)
-          .then(function (r2_) {
-            if (r2_.error) {
-              alert("Could not save.");
-              return;
-            }
-            Object.keys(row).forEach(function (k) {
-              e[k] = row[k];
-            });
-            render();
-            openEstimate(e.id);
-          });
-      }
-      if (edit) {
-        var sp = el("span");
-        sp.appendChild(
-          btn("Client said yes", "btn alt sm", function () {
-            setStatus("accepted", {
-              responded_at: new Date().toISOString(),
-              response_name: "Recorded by our team"
-            });
-          })
-        );
-        sp.appendChild(document.createTextNode(" "));
-        sp.appendChild(
-          btn("Client said no", "btn alt sm", function () {
-            setStatus("declined", {
-              responded_at: new Date().toISOString(),
-              response_name: "Recorded by our team"
-            });
-          })
-        );
-        dz.appendChild(sp);
-      } else
-        dz.appendChild(
-          btn("Reopen", "btn alt sm", function () {
-            setStatus("sent", { responded_at: null, response_name: "", response_note: "" });
-          })
-        );
-      dz.appendChild(
-        btn("Delete", "btn danger", function () {
-          if (!confirm("Delete this estimate for good? Its link stops working.")) return;
-          sb.from("estimates")
-            .delete()
-            .eq("id", e.id)
-            .then(function (r2_) {
-              if (r2_.error) {
-                alert("Could not delete.");
-                return;
-              }
-              estimates = estimates.filter(function (z) {
-                return z.id !== e.id;
-              });
-              closeDetail();
-              render();
-            });
-        })
-      );
-      body.appendChild(dz);
-      if (e.status === "accepted")
-        body.appendChild(
-          el("div", "note", "Next: add the work under Jobs for this client so it lands on the schedule.")
-        );
+      openEstimateForm(e.client_id, e.lead_id || null, { e: e, items: r.data || [] });
     });
 }
 /* ---- Quote or Estimate: picked on the form, with a "?" beside each that tells office staff which to use. */

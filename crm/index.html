@@ -61,6 +61,38 @@ textarea{min-height:110px;resize:vertical}
 .row:hover{box-shadow:0 4px 14px rgba(27,85,43,.12)}
 .row.new{border-left-color:var(--gold)}
 /* Leads page cards (website requests and quotes alike) */
+/* one quote in the side panel: readable summary, few buttons */
+.qpanel h2{margin-bottom:4px}
+.qhead{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:2px 0 12px}
+.qhead .qnum{font-weight:700;font-size:1rem}
+.qhead .qst{border-radius:999px;padding:3px 11px;font-size:.85rem;font-weight:800;background:#e3eefc;color:#1d4f91}
+.qhead .qst.ok{background:#d6f2da;color:#14532d}.qhead .qst.no{background:#fde2e0;color:#8c1d18}
+.qhead .qst.draft{background:#fff;color:#8a5a00;border:1.5px dashed #c99a2e}
+.qban{border-radius:12px;padding:12px 14px;margin:0 0 12px;font-size:.95rem;line-height:1.45}
+.qban b{display:block;font-size:1.15rem;margin-bottom:2px}
+.qban.ok{background:#e4f5e1;color:#123d1e;border:2px solid var(--leaf)}.qban.no{background:#fdeceb;color:#7a1a15;border:2px solid #f2c4bf}
+.qban img{display:block;height:56px;width:auto;margin-top:8px;background:#fff;border-radius:6px;border-bottom:1.5px solid #1d2a20}
+.qacts{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
+.qsend{display:flex;flex-wrap:wrap;gap:8px;margin:-2px 0 12px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12)}
+.qsend[hidden]{display:none}
+.qcard{padding:14px 16px;margin:4px 0 12px;font-size:1rem}
+.qcard .qtitle{margin:0 0 10px;font-size:1.2rem;color:var(--forest)}
+.qfacts{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;margin-bottom:12px}
+.qfacts span{display:block;font-size:.75rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.qfacts b{font-size:.95rem;font-weight:600}
+.qlines{border-top:1px solid var(--line)}
+.ql{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line)}
+.ql b{font-size:1rem}.ql div div{color:var(--muted);font-size:.92rem;margin-top:2px}.ql .qamt{text-align:right;white-space:nowrap}
+.qtot{margin-top:8px}.qtot>div{display:flex;justify-content:space-between;padding:3px 0;font-size:.95rem}
+.qtot>div.big{font-size:1.2rem;font-weight:800;color:var(--forest);border-top:2px solid var(--forest);margin-top:4px;padding-top:6px}
+.qnh{margin-top:12px;font-size:.75rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.qnotes{white-space:pre-wrap;font-size:.95rem;line-height:1.5}
+.qmore summary{cursor:pointer;font-weight:700;margin:4px 0 8px}
+body.dock #detail:not(.full) .panel .qban.ok,body.dock #detail:not(.full) .panel .qban.ok *{color:#123d1e}body.dock #detail:not(.full) .panel .qban.no,body.dock #detail:not(.full) .panel .qban.no *{color:#7a1a15}
+body.dock #detail:not(.full) .panel .qcard .qtitle{color:var(--forest)}body.dock #detail:not(.full) .panel .qcard .qfacts span,body.dock #detail:not(.full) .panel .qcard .qnh,body.dock #detail:not(.full) .panel .ql div div{color:var(--muted)}
+body.dock #detail:not(.full) .panel .qcard .qtot>div.big span{color:var(--forest)}
+body.dock #detail:not(.full) .panel .qsend{background:rgba(255,255,255,.12)}
+body.dock #detail:not(.full) .panel .qhead .qst.draft{color:#8a5a00}
 /* Leads board: one column per stage */
 .fbar.lbar{display:flex;font-size:17px}
 #list .board{display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,1fr));gap:14px;align-items:start}
@@ -495,7 +527,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=165"></script>
+<script src="app.js?v=167"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
