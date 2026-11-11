@@ -161,7 +161,7 @@ function render() {
     shownView = view;
   }
   // list screens show their cards side by side (as many per line as fit)
-  $("list").classList.toggle("cards", ["leads", "clients", "jobs", "schedule"].indexOf(view) > -1);
+  $("list").classList.toggle("cards", ["clients", "jobs", "schedule"].indexOf(view) > -1);
   $("list").className = $("list").className.replace(/\bv-\w+/g, "").trim() + " v-" + view;
   if (view === "leads") renderLeads();
   else if (view === "clients") renderClients();

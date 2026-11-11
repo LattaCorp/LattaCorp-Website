@@ -61,7 +61,19 @@ textarea{min-height:110px;resize:vertical}
 .row:hover{box-shadow:0 4px 14px rgba(27,85,43,.12)}
 .row.new{border-left-color:var(--gold)}
 /* Leads page cards (website requests and quotes alike) */
-#list .pghead{grid-column:1/-1;font-weight:800;color:var(--forest);font-size:.95rem;margin:10px 0 0}
+/* Leads board: one column per stage */
+.fbar.lbar{display:flex;font-size:17px}
+#list .board{display:grid;grid-template-columns:repeat(var(--n,3),minmax(0,1fr));gap:14px;align-items:start}
+#list .board.n1{--n:1}#list .board.n2{--n:2}#list .board.n3{--n:3}#list .board.n4{--n:4}
+#list .pcol{background:#eef3ec;border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:10px;min-width:0;border-top:4px solid var(--line)}
+#list .pcol.c-new{border-top-color:var(--gold)}#list .pcol.c-quoted{border-top-color:#7aa7d6}#list .pcol.c-approved{border-top-color:var(--leaf)}#list .pcol.c-lost{border-top-color:#bbb}
+#list .pchead{display:flex;justify-content:space-between;align-items:center;padding:2px 4px}#list .pchead b{color:var(--forest);font-size:1rem}
+#list .pchead span{background:#fff;border-radius:999px;padding:0 9px;font-weight:800;font-size:.85rem;color:var(--forest)}
+#list .pempty{color:var(--muted);font-size:.9rem;padding:8px 4px}
+#list .pcol .row.pipe{margin:0;min-width:0;grid-template-columns:minmax(0,1fr)}
+#list .pcol .row.pipe>div:nth-child(2){text-align:left!important;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px}
+#list .pcol .row.pipe>div:nth-child(2)>div{display:flex;gap:4px}#list .pcol .row.pipe>div:nth-child(2) .sub{margin-left:auto}#list .pcol .row.pipe b,#list .pcol .row.pipe .sub{overflow:hidden;text-overflow:ellipsis}
+@media(max-width:900px){#list .board{grid-template-columns:1fr}}
 #list .row.pipe{position:relative}#list .row.pipe .mkjob{grid-column:1/-1;display:flex;gap:6px;margin-top:6px}
 .mkjob .btn.sm{padding:5px 12px;font-size:.85rem}
 .row.pipe.st-new{border-left-color:var(--gold)}.row.pipe.st-quoted{border-left-color:#7aa7d6}.row.pipe.st-approved{border-left-color:var(--leaf);background:#f3faf0}
@@ -460,7 +472,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=158"></script>
+<script src="app.js?v=161"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

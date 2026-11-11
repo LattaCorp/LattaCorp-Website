@@ -50,7 +50,7 @@
       "leads lead quote request inquiry website new",
       function () {
         view = "leads";
-        lfilter = "all";
+        LF = [];
       }
     ],
     [
@@ -110,7 +110,7 @@
       "estimates estimate quote proposal",
       function () {
         view = "leads";
-        lfilter = "open";
+        LF = [];
       }
     ],
     [
@@ -148,7 +148,7 @@
       "price prices pricing calculator estimate quote rate rates mow mowing lawn sqft square feet",
       function () {
         view = "leads";
-        lfilter = "open";
+        LF = [];
         setTimeout(openCalc, 0);
       }
     ],
@@ -367,7 +367,7 @@
       },
       function () {
         view = "leads";
-        lfilter = "open";
+        LF = [];
         render();
       }
     );

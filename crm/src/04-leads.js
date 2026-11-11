@@ -1,14 +1,17 @@
 /* Leads tab: requests from the website, their status, and turning a lead into a client. */
 
-/* Leads page: website requests AND the quotes / estimates you send, as one list of the same cards.
-   Each card is at one stage: New request -> Quote sent (waiting on the client) -> Approved (make the job) -> Won (job made),
-   or Lost (declined, expired or marked lost). A quote made from a website request is one card, not two.
-   Three filters: Open (everything still in play, grouped by stage), Won and Lost. */
-var PIPE_GROUPS = [
-  ["new", "New requests"],
-  ["approved", "Approved: ready to make the job"],
-  ["quoted", "Quotes waiting on the client"]
+/* Leads page: website requests AND the quotes / estimates you send, as one board of the same cards, in columns:
+   New Requests | Pending Quotes | Approved by Client. A quote made from a website request is one card, not two.
+   Filter pills (tap to turn on, tap again to turn off): New, Pending, Approved, Declined. No pills on = the three
+   working columns. Making the job from an approved card keeps it under Approved for two weeks with a "View job"
+   link (all of them show when the Approved pill is on). Declined holds declined, expired and lost ones. */
+var PIPE_COLS = [
+  ["new", "New Requests", "New"],
+  ["quoted", "Pending Quotes", "Pending"],
+  ["approved", "Approved by Client", "Approved"],
+  ["lost", "Declined", "Declined"]
 ];
+var LF = [];
 function pipeItems() {
   var byLead = {},
     items = [];
@@ -43,7 +46,7 @@ function pipeStage(it) {
   if (l.status === "quoted") return "quoted";
   return "new";
 }
-var STAGE_CHIP = { new: ["New", "new"], quoted: ["Quote sent", "quoted"], approved: ["Approved", "won"], won: ["Job made", "won"], lost: ["Lost", "lost"] };
+var STAGE_CHIP = { new: ["New", "new"], quoted: ["Pending", "quoted"], approved: ["Approved", "won"], won: ["Job made", "won"], lost: ["Declined", "lost"] };
 function pipeWhen(it) {
   var e = it.est,
     l = it.lead;
@@ -61,32 +64,55 @@ function pipeAddr(it) {
   var ps = cid ? clientProps(cid) : [];
   return ps[0] ? ps[0].address : "";
 }
+function pipeCol(it) {
+  return it.stage === "won" ? "approved" : it.stage;
+}
+function recentJob(it) {
+  var j = pipeJob(it);
+  return j && j.created_at && String(j.created_at).slice(0, 10) >= addDays(today(), -14);
+}
 function renderLeads() {
   var tabs = $("tabs");
   tabs.textContent = "";
-  if (["open", "won", "lost"].indexOf(lfilter) < 0) lfilter = "open";
   var items = pipeItems();
   items.forEach(function (it) {
     it.stage = pipeStage(it);
   });
-  var counts = { open: 0, won: 0, lost: 0 };
+  var counts = { new: 0, quoted: 0, approved: 0, lost: 0 };
   items.forEach(function (it) {
-    counts[it.stage === "won" || it.stage === "lost" ? it.stage : "open"]++;
+    counts[pipeCol(it)]++;
   });
-  [
-    ["open", "Open"],
-    ["won", "Won"],
-    ["lost", "Lost"]
-  ].forEach(function (f) {
-    var b = el("button", "tab" + (lfilter === f[0] ? " on" : ""), f[1]);
-    b.type = "button";
-    b.appendChild(el("span", null, "(" + counts[f[0]] + ")"));
-    b.addEventListener("click", function () {
-      lfilter = f[0];
+  var bar = el("div", "fbar lbar"),
+    grp = el("div", "fgrp");
+  PIPE_COLS.slice()
+    .sort(function (x, y) {
+      return ["approved", "lost", "new", "quoted"].indexOf(x[0]) - ["approved", "lost", "new", "quoted"].indexOf(y[0]);
+    })
+    .forEach(function (c) {
+      var on = LF.indexOf(c[0]) > -1,
+        b = el("button", "tab fpill" + (on ? " on" : ""), c[2]);
+      b.type = "button";
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      b.appendChild(el("span", null, "(" + counts[c[0]] + ")"));
+      b.addEventListener("click", function () {
+        var k = LF.indexOf(c[0]);
+        if (k > -1) LF.splice(k, 1);
+        else LF.push(c[0]);
+        render();
+      });
+      grp.appendChild(b);
+    });
+  if (LF.length) {
+    var clr = el("button", "tab fpill fclear", "Clear");
+    clr.type = "button";
+    clr.addEventListener("click", function () {
+      LF = [];
       render();
     });
-    tabs.appendChild(b);
-  });
+    grp.appendChild(clr);
+  }
+  bar.appendChild(grp);
+  tabs.appendChild(bar);
   $("topbtns").appendChild(
     btn("+ New quote", "btn", function () {
       openEstimateForm(null);
@@ -96,10 +122,11 @@ function renderLeads() {
   $("topbtns").appendChild(btn("Price calculator", "btn alt", openCalc));
   var list = $("list");
   list.textContent = "";
+  var cols = PIPE_COLS.filter(function (c) {
+    return LF.length ? LF.indexOf(c[0]) > -1 : c[0] !== "lost";
+  });
   var shown = items
     .filter(function (it) {
-      var st = it.stage === "won" || it.stage === "lost" ? it.stage : "open";
-      if (st !== lfilter) return false;
       if (!query) return true;
       var l = it.lead || {},
         e = it.est || {};
@@ -111,38 +138,41 @@ function renderLeads() {
     .sort(function (a, b) {
       return pipeWhen(b).localeCompare(pipeWhen(a));
     });
-  if (!shown.length) {
-    list.appendChild(
-      el(
-        "div",
-        "empty",
-        query
-          ? "Nothing matches that."
-          : lfilter === "open"
-            ? "Nothing open. New website requests and the quotes you send show up here."
-            : lfilter === "won"
-              ? "Nothing won yet. Use Make job on an approved quote or request."
-              : "Nothing lost."
-      )
-    );
-    return;
-  }
-  if (lfilter === "open") {
-    PIPE_GROUPS.forEach(function (g) {
-      var set = shown.filter(function (it) {
-        return it.stage === g[0];
-      });
-      if (!set.length) return;
-      list.appendChild(el("div", "pghead", g[1] + " (" + set.length + ")"));
-      set.forEach(function (it) {
-        list.appendChild(pipeCard(it));
-      });
+  var board = el("div", "board n" + cols.length);
+  cols.forEach(function (c) {
+    var set = shown.filter(function (it) {
+      if (pipeCol(it) !== c[0]) return false;
+      // with no pills on, a job made more than two weeks ago drops off the Approved column
+      if (it.stage === "won" && !LF.length && !recentJob(it)) return false;
+      return true;
     });
-  } else
-    shown.forEach(function (it) {
-      list.appendChild(pipeCard(it));
+    if (c[0] === "approved")
+      set.sort(function (a, b) {
+        return (a.stage === "won") - (b.stage === "won");
+      });
+    var col = el("div", "pcol c-" + c[0]),
+      hd = el("div", "pchead");
+    hd.appendChild(el("b", null, c[1]));
+    hd.appendChild(el("span", null, String(set.length)));
+    col.appendChild(hd);
+    if (!set.length)
+      col.appendChild(
+        el(
+          "div",
+          "pempty",
+          query
+            ? "Nothing matches."
+            : { new: "No new requests.", quoted: "No quotes waiting.", approved: "Nothing approved right now.", lost: "Nothing declined." }[c[0]]
+        )
+      );
+    set.forEach(function (it) {
+      col.appendChild(pipeCard(it));
     });
+    board.appendChild(col);
+  });
+  list.appendChild(board);
 }
+
 // one card, the same for a website request and a quote
 function pipeCard(it) {
   var e = it.est,
