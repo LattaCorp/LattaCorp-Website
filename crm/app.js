@@ -2870,7 +2870,13 @@ function renderJobs() {
   shown.forEach(function (j) {
     // lawn maintenance jobs are green; any other work (trimming, cleanups, installs...) is blue
     var lawn = /^lawn\s*maint/i.test(j.title || ""),
-      tier = lawn ? ((j.title.split(/\s+-\s+/)[1] || "").toLowerCase().match(/basic|plus|premier|hoa|commercial/) || [""])[0] : "",
+      tier = lawn
+        ? ((j.title.split(/\s+-\s+/)[1] || "").toLowerCase().match(/basic|plus|premier|elite/) || [""])[0]
+        : /^hoa\b/i.test(j.title || "")
+          ? "hoa"
+          : /^commercial\b/i.test(j.title || "")
+            ? "commercial"
+            : "",
       b = el("button", "row client job " + (lawn ? "lawn" : "other") + (tier ? " t-" + tier : ""));
     b.type = "button";
     var left = el("div");
@@ -3120,9 +3126,20 @@ function openJobForm(client, job) {
   }
   cs.input.addEventListener("change", fillProps);
   fillProps();
-  var svcs = services.filter(function (s) {
-    return s.active !== false;
-  });
+  // lawn tiers in order (Basic, Plus, Premier, Elite), then HOA and Commercial, then everything else A-Z
+  var SVC_ORDER = ["lawn maintenance - basic", "lawn maintenance - plus", "lawn maintenance - premier", "lawn maintenance - elite", "hoa", "commercial"];
+  var svcs = services
+    .filter(function (s) {
+      return s.active !== false;
+    })
+    .slice()
+    .sort(function (a, b) {
+      var x = SVC_ORDER.indexOf(String(a.name).toLowerCase()),
+        y = SVC_ORDER.indexOf(String(b.name).toLowerCase());
+      if (x < 0) x = 99;
+      if (y < 0) y = 99;
+      return x - y || String(a.name).localeCompare(String(b.name));
+    });
   var sv = fld(
     "Service",
     "select",

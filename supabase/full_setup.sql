@@ -146,7 +146,7 @@ create policy "staff all visits"   on public.visits   for all to authenticated u
 
 -- Starter services (rename, re-price or remove them in the CRM any time)
 insert into public.services (name) values
-  ('Lawn maintenance - Basic'), ('Lawn maintenance - Plus'), ('Lawn maintenance - Premier'),
+  ('Lawn maintenance - Basic'), ('Lawn maintenance - Plus'), ('Lawn maintenance - Premier'), ('Lawn maintenance - Elite'), ('HOA'), ('Commercial'),
   ('Tree and hedge trimming'), ('Mulching'), ('Yard cleanup')
 on conflict (name) do nothing;
 
