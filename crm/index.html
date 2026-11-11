@@ -175,18 +175,18 @@ body.dock #rightcol #topbtns>.on{background:var(--forest);color:#fff;border-colo
 .row.client.pastdue{background:#fdeceb;border-color:#f2c4bf;border-left-color:var(--red)}
 .row.client.pastdue:hover{background:#fbe1df}
 /* Jobs filter pills: groups of on/off pills (a check mark when on), Clear all, and Sort by */
-.fbar{display:grid;grid-template-columns:max-content max-content 1fr;grid-template-areas:"st cl so" "pl fr cr";gap:8px 18px;align-items:center;width:100%}
+.fbar{display:grid;grid-template-columns:max-content max-content 1fr;grid-template-areas:"st cl so" "pl fr cr";gap:.5em 1.1em;align-items:center;width:100%;font-size:min(16px,.98cqi)}
 .fbar .fa-st{grid-area:st}.fbar .fa-cl{grid-area:cl}.fbar .fa-pl{grid-area:pl}.fbar .fa-fr{grid-area:fr}.fbar .fa-so{grid-area:so;justify-self:end}.fbar .fa-cr{grid-area:cr;justify-self:end}
-.fbar .fgrp{display:flex;flex-wrap:nowrap;gap:5px;align-items:center}
-.fbar .flbl{display:inline-block;white-space:nowrap;min-width:86px;text-align:center;box-sizing:border-box;font-size:.7rem;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#fff;background:#2f3b33;border-radius:6px;padding:5px 8px;margin-right:3px}
+.fbar .fgrp{display:flex;flex-wrap:nowrap;gap:.32em;align-items:center}
+.fbar .flbl{display:inline-block;white-space:nowrap;min-width:7.6em;text-align:center;box-sizing:border-box;font-size:.7em;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:#fff;background:#2f3b33;border-radius:6px;padding:.45em .7em;margin-right:.2em}
 .fbar .fsort .flbl{min-width:0}
-.fbar .fpill{display:inline-flex;align-items:center;gap:4px;padding:4px 11px;font-size:.86rem}
+.fbar .fpill{display:inline-flex;align-items:center;gap:.25em;padding:.28em .75em;font-size:.86em;white-space:nowrap}
 .fbar .fpill span{margin-left:2px}
 .fbar .fclear{border-style:dashed}
-.fbar .fsort{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
-.fbar .fsort select{border-radius:999px;padding:5px 28px 5px 12px;font-size:.88rem;font-weight:600;border:1.5px solid var(--line);background-color:#fff;width:auto}
+.fbar .fsort{display:inline-flex;align-items:center;gap:.4em;white-space:nowrap}
+.fbar .fsort select{border-radius:999px;padding:.32em 2em .32em .8em;font-size:.88em;font-weight:600;border:1.5px solid var(--line);background-color:#fff;width:auto}
 #tabs:has(.fbar){container-type:inline-size}
-@container (max-width:1460px){.fbar .fgrp{flex-wrap:wrap}.fbar{grid-template-columns:1fr auto;grid-template-areas:"so so" "st st" "cl cl" "pl pl" "fr fr" "cr cr"}.fbar .fa-so,.fbar .fa-cr{justify-self:start}}
+@container (max-width:1120px){.fbar{font-size:15px}.fbar .fgrp{flex-wrap:wrap}.fbar{grid-template-columns:1fr auto;grid-template-areas:"so so" "st st" "cl cl" "pl pl" "fr fr" "cr cr"}.fbar .fa-so,.fbar .fa-cr{justify-self:start}}
 /* Right-side layout test (computers 1200px+): list on the left, options and forms on the right */
 #rightcol{display:none}
 body.dock #rightcol{display:flex;flex-direction:column;width:460px;flex:none;position:sticky;top:76px;align-self:flex-start;height:calc(100vh - 76px);background:#fff;border-left:1px solid var(--line);overflow:hidden;order:3}
@@ -418,7 +418,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=144"></script>
+<script src="app.js?v=145"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
