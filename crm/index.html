@@ -360,7 +360,13 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 #side button svg{width:26px;height:26px;flex:none;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 #side button:hover{background:var(--mint);color:var(--forest)}
 #side button.on{background:#2f7d3f;color:#fff;border-left-color:#14461f}
-#side .badge{margin-left:auto;background:var(--gold);color:#4a3800;border-radius:999px;padding:1px 9px;font-size:.82rem;font-weight:800}
+#side .badge{margin-left:auto;background:var(--gold);color:#4a3800;border-radius:999px;padding:1px 9px;font-size:.82rem;font-weight:800}#side .badge+.badge{margin-left:4px}#side .badge.resp{background:var(--leaf);color:#fff}#side button.on .badge.resp{background:#fff;color:var(--forest)}
+.tab .tnew{font-style:normal;margin-left:6px;background:var(--leaf);color:#fff;border-radius:999px;padding:0 7px;font-size:.75rem;font-weight:800}
+#list .row.fresh{box-shadow:0 0 0 2px var(--leaf);background:#f1faee}.chip.newresp{background:var(--leaf);color:#fff;margin-left:4px}
+#resptoasts{position:fixed;right:18px;bottom:18px;z-index:60;display:flex;flex-direction:column;gap:10px;max-width:min(380px,calc(100vw - 36px))}
+.rtoast{position:relative;background:#fff;border:1px solid var(--line);border-left:6px solid var(--leaf);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.2);padding:12px 40px 12px 14px;font-size:.92rem;color:var(--ink)}
+.rtoast.no{border-left-color:var(--red)}.rtoast b{display:block;color:var(--forest);margin-bottom:2px}.rtoast.no b{color:var(--red)}
+.rtoast .btn{margin-top:8px}.rtoast .rx{position:absolute;top:6px;right:8px;background:none;border:0;font-size:1.3rem;color:var(--muted);cursor:pointer}
 .layout main{flex:1;min-width:0}
 @media(max-width:700px){
   header{flex-wrap:wrap;gap:8px 10px;padding-right:12px;min-height:64px}
@@ -373,6 +379,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
   #side button.on{border-left-color:transparent;border-top-color:var(--forest)}
   #side button svg{width:24px;height:24px}
   #side .badge{position:absolute;top:2px;right:calc(50% - 26px);margin:0;padding:0 6px;font-size:.7rem}
+  #side .badge.resp{right:auto;left:calc(50% - 26px);margin:0}
   .layout main{padding-bottom:96px}
   /* Bottom bar: five equal slots, nothing to scroll sideways */
   #side{overflow:visible}
@@ -445,7 +452,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=153"></script>
+<script src="app.js?v=155"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

@@ -97,7 +97,7 @@ function render() {
     ["clients", "Clients", 0],
     ["jobs", "Jobs", 0],
     ["schedule", "Schedule", stops],
-    ["billing", "Billing", invoices.filter(isOverdue).length],
+    ["billing", "Billing", invoices.filter(isOverdue).length, newResponses().length],
     ["expenses", "Expenses", 0],
     ["reports", "Reports", 0],
     ["photos", "Photos", 0],
@@ -127,11 +127,17 @@ function render() {
       });
       b.innerHTML = ICONS[v[0]];
       b.appendChild(el("span", null, v[1]));
+      b.dataset.v = v[0];
       if (v[2]) b.appendChild(el("span", "badge", String(v[2])));
+      if (v[3]) {
+        var rb = el("span", "badge resp", String(v[3]));
+        rb.title = v[3] + (v[3] === 1 ? " new quote response" : " new quote responses");
+        b.appendChild(rb);
+      }
       b.setAttribute("aria-current", v[0] === view ? "page" : "false");
       if (NAV_MAIN.indexOf(v[0]) >= 0) b.classList.add("pri");
       else {
-        moreBadge += v[2] || 0;
+        moreBadge += (v[2] || 0) + (v[3] || 0);
         moreItems.push(v);
       }
       nav.appendChild(b);

@@ -28,6 +28,7 @@ function renderBilling() {
     var b = el("button", "tab" + (bfilter === s[0] ? " on" : ""), s[1]);
     b.type = "button";
     b.appendChild(el("span", null, "(" + s[2] + ")"));
+    if (s[0] === "estimates" && newResponses().length) b.appendChild(el("i", "tnew", newResponses().length + " new"));
     b.addEventListener("click", function () {
       bfilter = s[0];
       render();
@@ -1058,8 +1059,9 @@ function markEstSent(e) {
     });
 }
 function estRow(e) {
-  var b = el("button", "row client");
+  var b = el("button", "row client" + (e.response_seen === false ? " fresh" : ""));
   b.type = "button";
+  b.dataset.eid = e.id;
   var l = el("div");
   l.appendChild(el("b", null, estNum(e.number, e.doc_type) + " · " + cname(e.client_id)));
   l.appendChild(
@@ -1083,6 +1085,7 @@ function estRow(e) {
   r.appendChild(el("b", null, money(e.total)));
   r.appendChild(el("div"));
   r.appendChild(estChip(e));
+  if (e.response_seen === false) r.appendChild(el("span", "chip newresp", "New"));
   b.appendChild(l);
   b.appendChild(r);
   b.addEventListener("click", function () {
@@ -1240,4 +1243,101 @@ function openBizSettings() {
   });
   s.style.marginTop = "14px";
   p.appendChild(s);
+}
+
+/* ---- Quote responses: when a client accepts or declines a quote online it's "new" until you open it.
+   Billing gets a green badge, the Estimates tab says how many are new, and while Foreman is open it checks every
+   minute and pops up a note when a new answer comes in. (Approvals are also emailed to the business email.) ---- */
+function newResponses() {
+  return estimates.filter(function (e) {
+    return e.response_seen === false && (e.status === "accepted" || e.status === "declined");
+  });
+}
+function respBadge() {
+  var b = document.querySelector('#side button[data-v="billing"]');
+  if (!b) return;
+  var n = newResponses().length,
+    x = b.querySelector(".badge.resp");
+  if (!n) {
+    if (x) x.parentNode.removeChild(x);
+    return;
+  }
+  if (!x) {
+    x = el("span", "badge resp");
+    b.appendChild(x);
+  }
+  x.textContent = String(n);
+  x.title = n + (n === 1 ? " new quote response" : " new quote responses");
+}
+function markRespSeen(e) {
+  if (!e || e.response_seen !== false) return;
+  e.response_seen = true;
+  sb.from("estimates")
+    .update({ response_seen: true })
+    .eq("id", e.id)
+    .then(function () {});
+  [].forEach.call(document.querySelectorAll('[data-eid="' + e.id + '"]'), function (r) {
+    r.classList.remove("fresh");
+    var c = r.querySelector(".chip.newresp");
+    if (c) c.parentNode.removeChild(c);
+  });
+  var t = document.querySelector("#tabs .tnew");
+  if (t) {
+    var n = newResponses().length;
+    if (n) t.textContent = n + " new";
+    else t.parentNode.removeChild(t);
+  }
+  respBadge();
+}
+var respTimer = null;
+function respToast(e) {
+  var box = $("resptoasts");
+  if (!box) {
+    box = el("div");
+    box.id = "resptoasts";
+    document.body.appendChild(box);
+  }
+  var ok = e.status === "accepted",
+    t = el("div", "rtoast" + (ok ? "" : " no"));
+  t.appendChild(el("b", null, (ok ? "\u2713 " : "") + cname(e.client_id) + (ok ? " approved " : " declined ") + estNum(e.number, e.doc_type)));
+  t.appendChild(el("div", null, [e.title, money(e.total), e.response_name ? "signed by " + e.response_name : ""].filter(Boolean).join(" · ")));
+  var open = btn("Open", "btn sm", function () {
+    box.removeChild(t);
+    openEstimate(e.id);
+  });
+  var x = btn("\u00d7", "rx", function () {
+    if (t.parentNode) box.removeChild(t);
+  });
+  x.setAttribute("aria-label", "Dismiss");
+  t.appendChild(open);
+  t.appendChild(x);
+  box.appendChild(t);
+}
+function checkResponses() {
+  if (estErr || document.hidden) return;
+  sb.from("estimates")
+    .select("*")
+    .eq("response_seen", false)
+    .then(function (r) {
+      if (!r || r.error || !r.data) return;
+      var fresh = [];
+      r.data.forEach(function (row) {
+        var e = byId(estimates, row.id);
+        if (e && e.response_seen === false && e.status === row.status) return;
+        if (e) Object.assign(e, row);
+        else estimates.unshift(row);
+        fresh.push(e || row);
+      });
+      if (!fresh.length) return;
+      fresh.forEach(respToast);
+      respBadge();
+      if (view === "billing" && bfilter === "estimates" && !$("panel").querySelector("input,textarea,select")) render();
+    });
+}
+function startRespWatch() {
+  if (respTimer) return;
+  respTimer = setInterval(checkResponses, 60000);
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden) checkResponses();
+  });
 }

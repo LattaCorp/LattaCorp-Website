@@ -576,6 +576,7 @@ function openEstimateForm(cid) {
 function openEstimate(id) {
   var e = byId(estimates, id);
   if (!e) return;
+  markRespSeen(e);
   var c = byId(clients, e.client_id),
     p = panel();
   p.appendChild(el("h2", null, estNum(e.number, e.doc_type) + " · " + cname(e.client_id)));

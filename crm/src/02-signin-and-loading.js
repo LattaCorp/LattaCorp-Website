@@ -186,5 +186,6 @@ function load() {
     topUp().then(function (n) {
       if (n) render();
     });
+    startRespWatch();
   });
 }
