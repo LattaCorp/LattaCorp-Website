@@ -6463,7 +6463,7 @@ function openPerson(p, tab) {
   tab = tab || "bio";
   pn.appendChild(el("h2", null, p ? p.full_name : "Add person"));
   if (p) pn.appendChild(el("div", "note", empId(p) + " · " + pstatLabel(p.status)));
-  var bar = el("div", "tabs");
+  var bar = el("div", "ctabs");
   bar.style.margin = "8px 0 12px";
   pn.appendChild(bar);
   var body = el("div");
@@ -6474,7 +6474,7 @@ function openPerson(p, tab) {
     ["ben", "Benefits"],
     ["docs", "Documents"]
   ].forEach(function (t) {
-    var b = el("button", "tab" + (tab === t[0] ? " on" : ""), t[1]);
+    var b = el("button", tab === t[0] ? "on" : "", t[1]);
     b.type = "button";
     if (!p && t[0] !== "bio") {
       b.disabled = true;
@@ -9417,7 +9417,7 @@ function openExpense(e, pre, scanFile) {
     keep = null;
   if (!photoErr) {
     var rc = el("div", "sec"),
-      rh = el("h3", null, scanFile && !e ? "Receipt photo" : "Receipt photos (optional)");
+      rh = el("h3", null, scanFile && !e ? "Receipt photo" : "Receipt photos");
     rc.appendChild(rh);
     if (scanFile && !e) {
       var lb = el("label");
@@ -11285,7 +11285,7 @@ function openCrew() {
   var intro = el(
     "p",
     "note",
-    "Temp (text only): no login. You text them the day's route. Full-time (login): they sign in at this same address and see only their own stops: address, notes and a Done button. They never see prices, client names, phone numbers, income or anything else. Leave this empty if you work alone."
+    "Temp: no login, you text them the day's route. Full-time: they sign in and see only their own stops (address, notes, Done). They never see prices or client details."
   );
   p.appendChild(intro);
   var holder = el("div");
@@ -19410,13 +19410,14 @@ function openInvCatForm() {
       "A category is a sheet, like a tab in Excel. You can add, rename and reorder columns afterwards."
     )
   );
-  var nm = fld("Category name (for example: Equipment, Chemicals, Fuel & Oil)", "text", ""),
+  var nm = fld("Name", "text", ""),
     st = fld(
       "Start with",
       "select",
       "3",
       INV_PRESETS.map(function (x, i) {
         return [String(i), x[0] + " (" + x[1].join(", ") + ")"];
+  nm.input.placeholder = "e.g. Equipment, Chemicals, Fuel & Oil";
       })
     );
   p.appendChild(nm);
@@ -19455,7 +19456,7 @@ function openInvCatForm() {
 function openInvCat(c) {
   var p = panel();
   p.appendChild(el("h2", null, c.name + " · sheet settings"));
-  var nm = fld("Category name", "text", c.name);
+  var nm = fld("Name", "text", c.name);
   p.appendChild(nm);
   var sv = btn("Rename", "btn alt sm", function () {
     var n = nm.input.value.trim();

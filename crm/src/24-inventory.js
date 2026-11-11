@@ -1036,13 +1036,14 @@ function openInvCatForm() {
       "A category is a sheet, like a tab in Excel. You can add, rename and reorder columns afterwards."
     )
   );
-  var nm = fld("Category name (for example: Equipment, Chemicals, Fuel & Oil)", "text", ""),
+  var nm = fld("Name", "text", ""),
     st = fld(
       "Start with",
       "select",
       "3",
       INV_PRESETS.map(function (x, i) {
         return [String(i), x[0] + " (" + x[1].join(", ") + ")"];
+  nm.input.placeholder = "e.g. Equipment, Chemicals, Fuel & Oil";
       })
     );
   p.appendChild(nm);
@@ -1081,7 +1082,7 @@ function openInvCatForm() {
 function openInvCat(c) {
   var p = panel();
   p.appendChild(el("h2", null, c.name + " · sheet settings"));
-  var nm = fld("Category name", "text", c.name);
+  var nm = fld("Name", "text", c.name);
   p.appendChild(nm);
   var sv = btn("Rename", "btn alt sm", function () {
     var n = nm.input.value.trim();

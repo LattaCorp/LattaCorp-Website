@@ -44,7 +44,7 @@ function openCrew() {
   var intro = el(
     "p",
     "note",
-    "Temp (text only): no login. You text them the day's route. Full-time (login): they sign in at this same address and see only their own stops: address, notes and a Done button. They never see prices, client names, phone numbers, income or anything else. Leave this empty if you work alone."
+    "Temp: no login, you text them the day's route. Full-time: they sign in and see only their own stops (address, notes, Done). They never see prices or client details."
   );
   p.appendChild(intro);
   var holder = el("div");

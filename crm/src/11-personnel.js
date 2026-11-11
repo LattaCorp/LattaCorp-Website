@@ -272,7 +272,7 @@ function openPerson(p, tab) {
   tab = tab || "bio";
   pn.appendChild(el("h2", null, p ? p.full_name : "Add person"));
   if (p) pn.appendChild(el("div", "note", empId(p) + " · " + pstatLabel(p.status)));
-  var bar = el("div", "tabs");
+  var bar = el("div", "ctabs");
   bar.style.margin = "8px 0 12px";
   pn.appendChild(bar);
   var body = el("div");
@@ -283,7 +283,7 @@ function openPerson(p, tab) {
     ["ben", "Benefits"],
     ["docs", "Documents"]
   ].forEach(function (t) {
-    var b = el("button", "tab" + (tab === t[0] ? " on" : ""), t[1]);
+    var b = el("button", tab === t[0] ? "on" : "", t[1]);
     b.type = "button";
     if (!p && t[0] !== "bio") {
       b.disabled = true;

@@ -906,7 +906,7 @@ function openExpense(e, pre, scanFile) {
     keep = null;
   if (!photoErr) {
     var rc = el("div", "sec"),
-      rh = el("h3", null, scanFile && !e ? "Receipt photo" : "Receipt photos (optional)");
+      rh = el("h3", null, scanFile && !e ? "Receipt photo" : "Receipt photos");
     rc.appendChild(rh);
     if (scanFile && !e) {
       var lb = el("label");
