@@ -651,3 +651,26 @@ footer .brand.fbrand img.wword{width:100%;max-width:280px;min-width:170px}
 #hoa .elite{background:linear-gradient(135deg,var(--forest),#1f5e3a);color:#fff;border-radius:12px;padding:22px 24px;margin:0 0 22px;box-shadow:0 6px 20px rgba(0,0,0,.12)}#hoa .elite h2{color:#fff;margin:.2em 0 .4em!important}#hoa .elite p,#hoa .elite li{color:#eef7f0}#hoa .elite ul{margin:0 0 .8em}#hoa .elite .ek{display:inline-block;background:#f4c542;color:#1d2b1f;font-weight:700;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:3px 10px}#hoa .elite .ef{font-weight:600;color:#fff}#hoa .elite .btn{background:#fff;color:var(--forest);border-color:#fff;margin:4px 8px 0 0}#hoa .elite .btn.alt{background:transparent;color:#fff;border:2px solid rgba(255,255,255,.7)}
 #portal .band{border-bottom:3px solid var(--leaf)}
 #portal .psi{border:2px solid var(--forest)}
+/* Portal: phones flank the sign-in box; invoice before/after */
+.psrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,440px) minmax(0,1fr);gap:clamp(20px,3vw,48px);align-items:center;max-width:1180px}
+.psrow .psi{width:100%;max-width:440px}
+.pside .pframe{max-width:250px}.pside .phone figcaption{max-width:250px;margin-left:auto;margin-right:auto}
+.pside.pl .phone{transform:rotate(-3deg)}.pside.pr .phone{transform:rotate(3deg)}
+@media (max-width:980px){.psrow{grid-template-columns:1fr 1fr;max-width:640px}.psrow .psi{grid-column:1/-1;order:-1;margin:0 auto}.pside.pl .phone,.pside.pr .phone{transform:none}.pside .pframe{max-width:230px}}
+@media (max-width:520px){.psrow{gap:14px}.pside .pframe{border-radius:26px;padding:7px}.pside .pframe img{border-radius:20px}.pside .phone figcaption b{font-size:.95rem}.pside .phone figcaption span{font-size:.82rem}}
+.pinv{padding:46px 0 10px}
+.invcmp{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);gap:22px;align-items:start;max-width:1060px;margin:0 auto}
+.invc{margin:0;text-align:center}
+.itag{display:inline-block;font-weight:700;font-size:.85rem;letter-spacing:.06em;text-transform:uppercase;border-radius:999px;padding:4px 14px;margin-bottom:12px;background:#e9ece9;color:#55605a}
+.invc.new .itag{background:var(--forest);color:#fff}
+.ipaper{background:#fff;border-radius:6px;box-shadow:0 14px 34px rgba(27,85,43,.16);overflow:hidden;border:1px solid #dfe5dd}
+.invc.new .ipaper{border:2px solid var(--forest)}
+.invc.old .ipaper img{filter:grayscale(.35);opacity:.92}
+.ipaper img{display:block;width:100%;height:auto}
+.invc ul{text-align:left;max-width:380px;margin:16px auto 0;padding-left:1.2em;color:var(--muted)}.invc.new ul{color:var(--ink)}
+.invc.new li::marker{color:var(--leaf)}
+.iarrow{align-self:center;font-size:3rem;line-height:1;color:var(--leaf);font-weight:700}
+@media (max-width:760px){.invcmp{grid-template-columns:1fr;gap:10px}.iarrow{transform:rotate(90deg);justify-self:center}}
+.pmore{display:grid;grid-template-columns:minmax(0,290px) minmax(0,1fr);gap:40px;align-items:center;max-width:1060px;margin:0 auto}
+.pmore .pdesk{margin:0}
+@media (max-width:860px){.pmore{grid-template-columns:1fr}}

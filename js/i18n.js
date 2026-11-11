@@ -1,5 +1,16 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"Meet our new invoice": "Conozca nuestra nueva factura",
+"We redesigned our invoices to be easier to read. Here is the same account, before and after.": "Rediseñamos nuestras facturas para que sean más fáciles de leer. Aquí está la misma cuenta, antes y después.",
+"Now": "Ahora",
+"One line for the whole month": "Una sola línea para todo el mes",
+"A slip to cut off and mail back": "Un talón para recortar y enviar por correo",
+"Paper only": "Solo en papel",
+"Every visit listed with its date and what we did": "Cada visita con su fecha y lo que hicimos",
+"A clear summary of your balance, payments and total due": "Un resumen claro de su saldo, pagos y total a pagar",
+"Pay by Zelle or cash, with nothing to mail": "Pague por Zelle o en efectivo, sin nada que enviar por correo",
+"Open, download or print it any time in your portal": "Ábrala, descárguela o imprímala cuando quiera en su portal",
+"Everything about your service, on your phone or computer.": "Todo sobre su servicio, en su teléfono o computadora.",
 "HOA Property Maintenance": "Mantenimiento de propiedades de HOA",
 "HOA Property Maintenance in Kissimmee, FL": "Mantenimiento de propiedades de HOA en Kissimmee, FL",
 "Rental Property Maintenance": "Mantenimiento de propiedades de alquiler",
