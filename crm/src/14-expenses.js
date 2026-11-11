@@ -588,7 +588,19 @@ function openExpense(e, pre, scanFile, todo) {
     splitIds = pre.splitIds || {};
   var p = panel();
   p.appendChild(el("h2", null, e ? "Expense" : "Add expense"));
-  if (todo && !e) {
+  if (todo && !e && docked()) {
+    // on a computer the receipt opens big, beside the form, and stays there while you type
+    showReceiptViewer(todo);
+    var rn = el("div", "pcard rtodo");
+    rn.appendChild(el("div", "note", (todo.caption ? '"' + todo.caption + '" \u00b7 ' : "") + "The receipt is open on the left. It's deleted once you Save (Save and add another item keeps it for the next line)."));
+    p.appendChild(rn);
+    setTimeout(function () {
+      var ab = [].filter.call($("topbtns").children, function (x) {
+        return /add expense/i.test(x.dataset.lbl || x.textContent);
+      })[0];
+      if (ab) optMark(ab);
+    }, 0);
+  } else if (todo && !e) {
     // the uploaded receipt, right above the form, so it can be typed in
     var rbox = el("div", "pcard rtodo");
     var rim = document.createElement("img");
@@ -1667,6 +1679,12 @@ function receiptInbox(list) {
     });
     c.appendChild(el("b", null, ph.caption || "Receipt"));
     c.appendChild(el("div", "note", dshort(String(ph.created_at).slice(0, 10)) + (ph.created_by ? " \u00b7 " + ph.created_by.split("@")[0] : "")));
+    // tap the receipt itself (or Enter it) to open Add expense with the receipt beside it
+    c.addEventListener("click", function (ev) {
+      if (ev.target.closest("button")) return;
+      openExpense(null, {}, null, ph);
+    });
+    c.style.cursor = "pointer";
     var a = el("div", "qacts");
     a.appendChild(
       btn("Enter it", "btn sm", function () {
@@ -1685,4 +1703,34 @@ function receiptInbox(list) {
   // computers: in the right column under the options; phones: at the top of the list
   if (docked() && $("rightcol")) $("rightcol").appendChild(box);
   else list.insertBefore(box, list.firstChild);
+}
+
+// big receipt viewer beside the expense form (computers): tap the photo to zoom in and out
+function showReceiptViewer(ph) {
+  hideReceiptViewer();
+  var v = el("div");
+  v.id = "rviewer";
+  var hd = el("div", "rvh");
+  hd.appendChild(el("b", null, ph.caption || "Receipt"));
+  var x = btn("\u00d7", "rvx", hideReceiptViewer);
+  x.setAttribute("aria-label", "Close the receipt");
+  hd.appendChild(x);
+  v.appendChild(hd);
+  var wrap = el("div", "rvimg"),
+    im = document.createElement("img");
+  im.alt = "Receipt";
+  wrap.appendChild(im);
+  im.addEventListener("click", function () {
+    wrap.classList.toggle("zoom");
+  });
+  v.appendChild(wrap);
+  v.appendChild(el("div", "rvnote", "Tap the receipt to zoom in or out."));
+  document.body.appendChild(v);
+  signPaths([ph.path]).then(function () {
+    if (pcache[ph.path]) im.src = pcache[ph.path].url;
+  });
+}
+function hideReceiptViewer() {
+  var v = document.getElementById("rviewer");
+  if (v) v.parentNode.removeChild(v);
 }

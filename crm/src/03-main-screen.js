@@ -259,6 +259,7 @@ $("topbtns").addEventListener(
 
 /* ---- panel helpers ---- */
 function panel() {
+  if (typeof hideReceiptViewer === "function") hideReceiptViewer();
   var p = $("panel");
   p.textContent = "";
   p.classList.remove("withprev");
@@ -338,6 +339,7 @@ function panel() {
   });
 })();
 function closeDetail() {
+  if (typeof hideReceiptViewer === "function") hideReceiptViewer();
   $("detail").classList.remove("on");
   optMark(null);
 }

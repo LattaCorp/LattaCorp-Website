@@ -401,6 +401,12 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 /* on a computer, drag stops to reorder; the arrows are for phones */
 @media(hover:hover) and (pointer:fine){.vcard .acts .mv{display:none}}
 .tab .tnew.red{background:#b3261e}.subtabs{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px;grid-column:1/-1}.tab.warn{border-color:#b3261e;color:#b3261e}.tab.warn.on{background:#b3261e;color:#fff}
+#rviewer{position:fixed;top:76px;right:460px;width:min(620px,calc(100vw - 460px - 240px));height:calc(100vh - 76px);background:#1d2a20;z-index:14;display:flex;flex-direction:column;box-shadow:-6px 0 20px rgba(0,0,0,.25)}
+#rviewer .rvh{display:flex;justify-content:space-between;align-items:center;padding:10px 14px;color:#fff}#rviewer .rvx{background:none;border:0;color:#fff;font-size:1.6rem;cursor:pointer}
+#rviewer .rvimg{flex:1;overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:0 12px}
+#rviewer .rvimg img{max-width:100%;max-height:100%;object-fit:contain;cursor:zoom-in;background:#fff;border-radius:6px;min-height:120px;min-width:120px}
+#rviewer .rvimg.zoom img{max-width:none;max-height:none;width:180%;cursor:zoom-out}
+#rviewer .rvnote{color:#cfe3c9;font-size:.8rem;padding:6px 14px 10px}
 body.dock #rightcol>.rinbox{order:4;margin:6px 12px 14px;padding:10px}
 body.dock #rightcol>.rinbox .rgrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 body.dock #rightcol>.rinbox .rcard{padding:6px}body.dock #rightcol>.rinbox .rcard img{height:110px}
@@ -582,7 +588,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=183"></script>
+<script src="app.js?v=184"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
