@@ -1018,7 +1018,8 @@ function estChip(e) {
   if (e.status === "accepted") return el("span", "chip won", "Accepted");
   if (e.status === "declined") return el("span", "chip lost", "Declined");
   if (estExpired(e)) return el("span", "chip od", "Expired");
-  return el("span", "chip", e.status === "sent" ? (e.viewed_at ? "Viewed" : "Sent") : "Draft");
+  if (e.status !== "sent") return el("span", "chip draft", "DRAFT");
+  return el("span", "chip", e.viewed_at ? "Viewed" : "Sent");
 }
 function estMessage(e, c) {
   return (

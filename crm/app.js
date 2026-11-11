@@ -1031,6 +1031,11 @@ function pipeCard(it) {
   var chip = STAGE_CHIP[st];
   right.appendChild(el("div")).appendChild(el("span", "chip " + chip[1], chip[0]));
   if (fresh) right.lastChild.appendChild(el("span", "chip newresp", "New"));
+  // a quote that hasn't been sent to the client yet
+  if (e && e.status === "draft" && st === "quoted") {
+    right.lastChild.appendChild(el("span", "chip draft", "DRAFT"));
+    b.classList.add("isdraft");
+  }
   var w = pipeWhen(it);
   if (w) right.appendChild(el("div", "sub", ago(w)));
   b.appendChild(left);
@@ -15163,7 +15168,8 @@ function estChip(e) {
   if (e.status === "accepted") return el("span", "chip won", "Accepted");
   if (e.status === "declined") return el("span", "chip lost", "Declined");
   if (estExpired(e)) return el("span", "chip od", "Expired");
-  return el("span", "chip", e.status === "sent" ? (e.viewed_at ? "Viewed" : "Sent") : "Draft");
+  if (e.status !== "sent") return el("span", "chip draft", "DRAFT");
+  return el("span", "chip", e.viewed_at ? "Viewed" : "Sent");
 }
 function estMessage(e, c) {
   return (

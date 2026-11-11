@@ -78,7 +78,8 @@ textarea{min-height:110px;resize:vertical}
 .mkjob .btn.sm{padding:5px 12px;font-size:.85rem}
 .row.pipe.st-new{border-left-color:var(--gold)}.row.pipe.st-quoted{border-left-color:#7aa7d6}.row.pipe.st-approved{border-left-color:var(--leaf);background:#f3faf0}
 .row.pipe.st-won{border-left-color:var(--forest)}.row.pipe.st-lost{border-left-color:#bbb;opacity:.8}
-.chip.quoted{background:#e3eefc;color:#1d4f91}
+.chip.quoted{background:#e3eefc;color:#1d4f91}.chip.draft{background:#fff;color:#8a5a00;border:1.5px dashed #c99a2e;letter-spacing:.06em;font-weight:800}
+#list .row.pipe.isdraft{border-style:dashed;border-left-style:solid}
 #panel>.mkjob{display:flex;gap:8px;margin:10px 0 4px}
 .row b{font-size:1.02rem}.row .sub{color:var(--muted);font-size:.9rem}
 .calcrow{display:flex;gap:12px;flex-wrap:wrap;margin:10px 0}.calccard{flex:1;min-width:140px;border:1px solid var(--line);border-radius:10px;padding:12px;background:#fff;text-align:center}.calcbig{font-size:2rem;font-weight:800;color:var(--forest);margin:2px 0 6px}.calcbox details summary{cursor:pointer;font-weight:700;color:var(--forest)}
@@ -244,8 +245,30 @@ body.dock #detail:not(.full) .panel input:is([type=checkbox],[type=radio]){accen
 body.dock #detail:not(.full) .panel .btn{background:#fff;color:var(--forest);border:1px solid #fff}
 body.dock #detail:not(.full) .panel .btn.alt{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.75)}
 body.dock #detail:not(.full) .panel :is(hr,.sep){border-color:rgba(255,255,255,.25)}
-body.dock #detail:not(.full) .panel :is(.row,.pcard,.card,.empty,table){color:var(--ink)}
-body.dock #detail:not(.full) .panel :is(.row,.pcard,.card) :is(h3,b,label,.f span){color:inherit}
+/* white boxes inside the green panel (property/job cards, the add-a-line box, history tables, help pop-ups) keep dark text and green buttons */
+body.dock #detail:not(.full) .panel :is(.pcard,.card,.row,.empty,.invwrap,.ptable,.qhelp){color:var(--ink)}
+body.dock #detail:not(.full) .panel :is(.pcard,.card,.row,.invwrap,.ptable,.qhelp) :is(h3,h4,b,label,th,td,dt,.f span){color:inherit}
+body.dock #detail:not(.full) .panel :is(.pcard,.card,.row,.invwrap,.qhelp) :is(.note,.muted,small,.sub,.hint){color:var(--muted)}
+body.dock #detail:not(.full) .panel :is(.pcard,.card,.row,.invwrap,.qhelp) a:not(.btn){color:var(--forest)}
+body.dock #detail:not(.full) .panel :is(.pcard,.card,.row,.invwrap,.qhelp) .btn{background:var(--forest);color:#fff;border:1px solid var(--forest)}
+body.dock #detail:not(.full) .panel :is(.pcard,.card,.row,.invwrap,.qhelp) :is(.btn.alt,button.alt){background:#fff;color:var(--forest);border:1px solid var(--forest)}
+body.dock #detail:not(.full) .panel :is(.pcard,.card,.row,.invwrap) :is(input:not([type=checkbox]):not([type=radio]),select,textarea){border-color:#c9d6c6}
+/* one button size everywhere in the side panel */
+body.dock #detail:not(.full) .panel .btn,body.dock #detail:not(.full) .panel .btn.sm{padding:7px 13px;font-size:.9rem;line-height:1.2}
+/* Quote / Estimate choice: white cards, dark text; the picked one gets a light-green ring */
+body.dock #detail:not(.full) .panel .qe label.o{background:#fff;border:2px solid #fff;box-shadow:none;color:var(--ink)}
+body.dock #detail:not(.full) .panel .qe label.o.on{background:#fff;border-color:var(--leaf);box-shadow:0 0 0 2px var(--leaf)}
+body.dock #detail:not(.full) .panel .qe label.o .t b{color:var(--ink)}body.dock #detail:not(.full) .panel .qe label.o .t small{color:var(--muted);opacity:1}
+body.dock #detail:not(.full) .panel .qe .qtip{background:var(--forest);color:#fff;border:0}
+/* summary box (optional row, sales tax, deposit) */
+body.dock #detail:not(.full) .panel .adjbox{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.08)}
+body.dock #detail:not(.full) .panel .adjbox .fxbox{background:rgba(255,255,255,.14);color:#fff;font-size:.88rem;line-height:1.15;text-align:center;padding:2px 4px}
+body.dock #detail:not(.full) .panel .adjbox :is(input,select):disabled{background:rgba(255,255,255,.22)!important;border-color:transparent!important;opacity:1}
+/* status choices (New / Contacted / Lost) */
+body.dock #detail:not(.full) .panel .status button{background:transparent;color:#fff;border:1px solid rgba(255,255,255,.7)}
+body.dock #detail:not(.full) .panel .status button.on{background:#fff;color:var(--forest);border-color:#fff}
+/* tables that sit right on the green: light text and lines */
+body.dock #detail:not(.full) .panel table:not(.ptable),body.dock #detail:not(.full) .panel table:not(.ptable) td{color:#fff}body.dock #detail:not(.full) .panel table:not(.ptable) td:first-child:not(:only-child){color:#cfe3c9}body.dock #detail:not(.full) .panel .ptable th{color:#fff!important}body.dock #detail:not(.full) .panel table:not(.ptable) :is(td,th){border-color:rgba(255,255,255,.25)}
 body.dock #detail.full{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;overflow:auto;flex:none}
 body.dock #detail.full .panel{margin:40px auto;border-radius:14px}body.dock #detail.full .panel.withprev{max-width:min(1200px,calc(100vw - 80px))}
 body.dock #app{max-width:none}
@@ -472,7 +495,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=161"></script>
+<script src="app.js?v=164"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
