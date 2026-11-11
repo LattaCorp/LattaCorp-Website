@@ -377,6 +377,23 @@ function openEstimateForm(cid) {
   p.appendChild(el("h3", null, "Lines"));
   var box = el("div"),
     rows = [];
+  function blankRow(x) {
+    return !x.t.input.value.trim() && !x.d.input.value.trim() && !x.q.input.value.trim() && !x.a.input.value.trim();
+  }
+  // keeps exactly one empty line at the bottom; a line left blank is removed once you move off it
+  function syncRows() {
+    if (!rows.length || !blankRow(rows[rows.length - 1])) addRow();
+    for (var i = rows.length - 2; i >= 0; i--) {
+      if (blankRow(rows[i]) && !rows[i].el.contains(document.activeElement)) {
+        box.removeChild(rows[i].el);
+        rows.splice(i, 1);
+      }
+    }
+  }
+  box.addEventListener("input", syncRows);
+  box.addEventListener("focusout", function () {
+    setTimeout(syncRows, 0);
+  });
   function addRow() {
     var r = el("div", "grid4"),
       tt = fld("Title", "text", ""),
@@ -390,30 +407,27 @@ function openEstimateForm(cid) {
     r.appendChild(q);
     r.appendChild(a);
     box.appendChild(r);
-    rows.push({ t: tt, d: d, q: q, a: a });
+    rows.push({ el: r, t: tt, d: d, q: q, a: a });
   }
   var cd = document.createElement("details");
   cd.style.margin = "0 0 10px";
   cd.appendChild(el("summary", null, "Price calculator (lawn maintenance)"));
   cd.appendChild(
     calcWidget(function (desc, amt) {
-      var t = rows.filter(function (x) {
-        return !x.t.input.value.trim() && !x.d.input.value.trim() && !x.q.input.value.trim() && x.a.input.value === "";
-      })[0];
+      var t = rows.filter(blankRow)[0];
       if (!t) {
         addRow();
         t = rows[rows.length - 1];
       }
       t.d.input.value = desc;
       t.a.input.value = String(amt);
+      syncRows();
       cd.open = false;
     })
   );
   p.appendChild(cd);
   p.appendChild(box);
   addRow();
-  var more = btn("+ Add another line", "btn alt sm", addRow);
-  p.appendChild(more);
   function linesSub() {
     return r2(
       rows.reduce(function (s2, x) {
@@ -748,7 +762,7 @@ function openEstimate(id) {
               money(isub) +
               ac.rows
                 .map(function (x) {
-                  return " · " + ADJ_NAMES[x.kind] + " " + (x.kind === "discount" ? "−" : "") + money(x.amt);
+                  return " · " + adjName(x) + " " + (x.kind === "discount" ? "−" : "") + money(x.amt);
                 })
                 .join("")
           )
@@ -970,11 +984,30 @@ function qeChoice(val) {
 /* ---- Estimate Summary: one optional row (Discount or Fee, a % of the subtotal), then Sales tax, which is always there
    and is figured on everything above it (so a discount lowers the tax). Same rules as the client's page (d/index.html).
    Type a % or a dollar amount; the other fills in. Whichever was typed last is kept, so a % follows line changes. */
-var ADJ_NAMES = { discount: "Discount", tax: "Sales tax", fee: "Fee" };
+var ADJ_NAMES = {
+  discount: "Discount",
+  trip: "Trip charge",
+  disposal: "Disposal fee",
+  permit: "Permit fee",
+  rush: "Rush fee",
+  other: "Other",
+  fee: "Fee",
+  tax: "Sales tax"
+};
+// what the optional row can be; "fee" is only kept for quotes saved before these choices existed
+var OPT_KINDS = ["discount", "trip", "disposal", "permit", "rush", "other", "fee"];
+function adjName(x) {
+  return x.kind === "other" ? x.label || "Other" : ADJ_NAMES[x.kind] || "";
+}
+// reads "5", "5%", "$1,250.50" the same way
+function numv(v) {
+  var n = parseFloat(String(v == null ? "" : v).replace(/[^0-9.\-]/g, ""));
+  return isNaN(n) ? NaN : n;
+}
 function estAdjCalc(sub, list) {
   list = Array.isArray(list) ? list : [];
   var o = list.filter(function (a) {
-      return a && (a.kind === "discount" || a.kind === "fee");
+      return a && OPT_KINDS.indexOf(a.kind) > -1;
     })[0],
     x = list.filter(function (a) {
       return a && a.kind === "tax";
@@ -987,7 +1020,7 @@ function estAdjCalc(sub, list) {
       amt = isNaN(amt) ? 0 : amt;
       pct = base ? (amt / base) * 100 : 0;
     }
-    return { kind: a.kind, pct: pct, amt: amt };
+    return { kind: a.kind, label: a.label || "", pct: pct, amt: amt };
   }
   var opt = o ? one(o, sub) : null,
     run = sub + (opt ? (opt.kind === "discount" ? -opt.amt : opt.amt) : 0),
@@ -1001,44 +1034,68 @@ function adjEditor(list, getSub) {
   list = Array.isArray(list) ? list : [];
   var box = el("div", "adjbox");
   box.appendChild(el("b", null, "Summary: optional row and sales tax"));
-  box.appendChild(el("div", "note", "Type a % or a dollar amount; the other fills in. Sales tax is figured after any discount or fee."));
+  box.appendChild(
+    el("div", "note", "Type a % or a dollar amount and the other fills in. Sales tax is figured on everything above it.")
+  );
   function slot(a, isTax) {
     a = a || {};
+    var opts = [
+      ["", "None (blank row)"],
+      ["discount", "Discount"],
+      ["trip", "Trip charge"],
+      ["disposal", "Disposal fee"],
+      ["permit", "Permit fee"],
+      ["rush", "Rush fee"],
+      ["other", "Other (type a name)"]
+    ];
+    if (a.kind === "fee") opts.push(["fee", "Fee"]);
     var r = el("div", "grid3"),
-      k = isTax
-        ? el("div", "fixed", "Sales tax")
-        : fld("Optional row", "select", a.kind || "", [
-            ["", "None (blank row)"],
-            ["discount", "Discount"],
-            ["fee", "Fee"]
-          ]),
-      pc = fld("%", "number", a.mode === "pct" && a.pct != null ? String(a.pct) : ""),
-      am = fld("Amount ($)", "number", a.kind && a.mode !== "pct" && a.amt != null ? String(a.amt) : "");
-    pc.input.step = am.input.step = "0.01";
+      cell = el("div"),
+      k = isTax ? el("div", "fixed", "Sales tax") : fld("Optional row", "select", a.kind || "", opts),
+      nm = fld("Name shown to the client", "text", a.label || ""),
+      pc = fld("%", "text", a.mode === "pct" && a.pct != null ? String(a.pct) : ""),
+      am = fld("Amount ($)", "text", a.kind && a.mode !== "pct" && a.amt != null ? String(a.amt) : "");
     pc.input.inputMode = am.input.inputMode = "decimal";
-    r.appendChild(k);
+    pc.input.autocomplete = am.input.autocomplete = "off";
+    cell.appendChild(k);
+    if (!isTax) cell.appendChild(nm);
+    r.appendChild(cell);
     r.appendChild(pc);
     r.appendChild(am);
     box.appendChild(r);
-    var s = { tax: isTax, k: k, pc: pc, am: am, mode: a.mode === "pct" ? "pct" : "amt" };
+    var s = { tax: isTax, k: k, nm: nm, pc: pc, am: am, mode: a.mode === "pct" ? "pct" : "amt" };
     s.kind = function () {
-      return isTax ? (pc.input.value !== "" || am.input.value !== "" ? "tax" : "") : k.input.value;
+      return isTax ? (pc.input.value.trim() !== "" || am.input.value.trim() !== "" ? "tax" : "") : k.input.value;
     };
-    pc.input.addEventListener("input", function () {
-      s.mode = "pct";
-      refresh();
+    // recalculate on every keystroke, paste or change
+    ["input", "change", "keyup"].forEach(function (ev) {
+      pc.input.addEventListener(ev, function () {
+        s.mode = "pct";
+        refresh();
+      });
+      am.input.addEventListener(ev, function () {
+        s.mode = "amt";
+        refresh();
+      });
     });
-    am.input.addEventListener("input", function () {
-      s.mode = "amt";
-      refresh();
+    am.input.addEventListener("blur", function () {
+      var v = numv(am.input.value);
+      if (!isNaN(v)) am.input.value = v.toFixed(2);
     });
-    if (!isTax) k.input.addEventListener("change", refresh);
+    pc.input.addEventListener("blur", function () {
+      var v = numv(pc.input.value);
+      if (!isNaN(v)) pc.input.value = String(Math.round(v * 100) / 100);
+    });
+    if (!isTax) {
+      k.input.addEventListener("change", refresh);
+      nm.input.addEventListener("input", refresh);
+    }
     return s;
   }
   var slots = [
     slot(
       list.filter(function (a) {
-        return a && (a.kind === "discount" || a.kind === "fee");
+        return a && OPT_KINDS.indexOf(a.kind) > -1;
       })[0],
       false
     ),
@@ -1055,10 +1112,10 @@ function adjEditor(list, getSub) {
         return s.kind();
       })
       .map(function (s) {
-        var v = parseFloat(s.mode === "pct" ? s.pc.input.value : s.am.input.value);
-        return s.mode === "pct"
-          ? { kind: s.kind(), mode: "pct", pct: isNaN(v) ? 0 : v }
-          : { kind: s.kind(), mode: "amt", amt: isNaN(v) ? 0 : r2(v) };
+        var v = numv(s.mode === "pct" ? s.pc.input.value : s.am.input.value),
+          o = s.mode === "pct" ? { kind: s.kind(), mode: "pct", pct: isNaN(v) ? 0 : v } : { kind: s.kind(), mode: "amt", amt: isNaN(v) ? 0 : r2(v) };
+        if (o.kind === "other") o.label = s.nm.input.value.trim();
+        return o;
       });
   }
   function refresh() {
@@ -1066,11 +1123,12 @@ function adjEditor(list, getSub) {
     slots.forEach(function (s) {
       var on = s.tax || !!s.k.input.value;
       s.pc.style.visibility = s.am.style.visibility = on ? "" : "hidden";
+      if (!s.tax) s.nm.hidden = s.k.input.value !== "other";
       var x = s.tax ? c.tax : c.opt;
       if (!x) return;
       if (s.mode === "pct" && document.activeElement !== s.am.input) s.am.input.value = x.amt.toFixed(2);
       if (s.mode === "amt" && document.activeElement !== s.pc.input)
-        s.pc.input.value = s.am.input.value === "" ? "" : String(Math.round(x.pct * 100) / 100);
+        s.pc.input.value = s.am.input.value.trim() === "" ? "" : String(Math.round(x.pct * 100) / 100);
     });
   }
   refresh();
@@ -1081,8 +1139,10 @@ function adjEditor(list, getSub) {
       // store both numbers so the client page and lists never have to guess
       var c = estAdjCalc(getSub(), raw());
       return raw().map(function (a) {
-        var x = a.kind === "tax" ? c.tax : c.opt;
-        return { kind: a.kind, mode: a.mode, pct: Math.round(x.pct * 100) / 100, amt: x.amt };
+        var x = a.kind === "tax" ? c.tax : c.opt,
+          o = { kind: a.kind, mode: a.mode, pct: Math.round(x.pct * 100) / 100, amt: x.amt };
+        if (a.kind === "other") o.label = a.label || "";
+        return o;
       });
     }
   };
