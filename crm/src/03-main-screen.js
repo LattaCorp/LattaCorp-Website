@@ -148,6 +148,8 @@ function render() {
   });
   nav.appendChild(mb);
   $("topbtns").textContent = "";
+  // list screens show their cards side by side (as many per line as fit)
+  $("list").classList.toggle("cards", ["leads", "clients", "jobs", "schedule"].indexOf(view) > -1);
   if (view === "leads") renderLeads();
   else if (view === "clients") renderClients();
   else if (view === "jobs") renderJobs();

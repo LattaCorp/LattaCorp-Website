@@ -142,6 +142,13 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .panel.withprev .pform{overflow-y:auto;min-height:0;align-self:stretch;padding:0 10px 0 6px;margin:0 -4px 0 -6px;scrollbar-gutter:stable}
 .panel.withprev .pprev{position:static;display:flex;flex-direction:column;min-height:0;padding-top:30px}
 .panel.withprev .ppwrap{flex:1;min-height:0}}
+/* list screens: cards side by side, each no wider than it needs; headings, notes and tools still run full width */
+#list.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:10px;align-items:start}
+#list.cards>*{grid-column:1/-1}
+#list.cards>.row,#list.cards>.pcard{grid-column:auto;margin:0;min-width:0}
+/* a client with an overdue balance is tinted red */
+.row.client.pastdue{background:#fdeceb;border-color:#f2c4bf;border-left-color:var(--red)}
+.row.client.pastdue:hover{background:#fbe1df}
 /* Right-side layout test (computers 1200px+): list on the left, options and forms on the right */
 #rightcol{display:none}
 body.dock #rightcol{display:flex;flex-direction:column;width:460px;flex:none;position:sticky;top:76px;align-self:flex-start;height:calc(100vh - 76px);background:#fff;border-left:1px solid var(--line);overflow:hidden;order:3}
@@ -373,7 +380,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=126"></script>
+<script src="app.js?v=127"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

@@ -616,6 +616,8 @@ function render() {
   });
   nav.appendChild(mb);
   $("topbtns").textContent = "";
+  // list screens show their cards side by side (as many per line as fit)
+  $("list").classList.toggle("cards", ["leads", "clients", "jobs", "schedule"].indexOf(view) > -1);
   if (view === "leads") renderLeads();
   else if (view === "clients") renderClients();
   else if (view === "jobs") renderJobs();
@@ -1217,7 +1219,7 @@ function renderClients() {
     return;
   }
   shown.forEach(function (c) {
-    var b = el("button", "row client" + (c.archived ? " archived" : ""));
+    var b = el("button", "row client" + (c.archived ? " archived" : "") + (!c.archived && acctStatus(c).key === "past_due" ? " pastdue" : ""));
     b.type = "button";
     var ps = clientProps(c.id),
       left = el("div");

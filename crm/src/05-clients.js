@@ -177,7 +177,7 @@ function renderClients() {
     return;
   }
   shown.forEach(function (c) {
-    var b = el("button", "row client" + (c.archived ? " archived" : ""));
+    var b = el("button", "row client" + (c.archived ? " archived" : "") + (!c.archived && acctStatus(c).key === "past_due" ? " pastdue" : ""));
     b.type = "button";
     var ps = clientProps(c.id),
       left = el("div");
