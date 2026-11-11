@@ -16309,7 +16309,7 @@ function openEstimateForm(cid) {
   p.appendChild(ttl);
   p.appendChild(scp);
   p.appendChild(vd);
-  p.appendChild(el("h3", null, "Lines"));
+  p.appendChild(el("h3", null, "Proposed Work"));
   var box = el("div"),
     rows = [];
   function blankRow(x) {
@@ -16989,12 +16989,17 @@ function adjEditor(list, getSub) {
     if (a.kind === "fee") opts.push(["fee", "Fee"]);
     var r = el("div", "grid3"),
       cell = el("div"),
-      k = isTax ? el("div", "fixed", "Sales tax") : fld("Optional row", "select", a.kind || "", opts),
+      k = isTax ? fld("\u00a0", "text", "Sales tax") : fld("Optional row", "select", a.kind || "", opts),
       nm = fld("Name shown to the client", "text", a.label || ""),
       pc = fld("%", "text", a.mode === "pct" && a.pct != null ? String(a.pct) : ""),
       am = fld("Amount ($)", "text", a.kind && a.mode !== "pct" && a.amt != null ? String(a.amt) : "");
     pc.input.inputMode = am.input.inputMode = "decimal";
     pc.input.autocomplete = am.input.autocomplete = "off";
+    if (isTax) {
+      k.classList.add("fixed");
+      k.input.readOnly = true;
+      k.input.tabIndex = -1;
+    }
     cell.appendChild(k);
     if (!isTax) cell.appendChild(nm);
     r.appendChild(cell);

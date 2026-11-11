@@ -119,7 +119,7 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .pprev{position:sticky;top:0;padding-top:30px}.pphd{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
 .ppwrap{overflow:hidden;border-radius:8px;background:#e9efe6;border:1px solid var(--line)}.ppwrap iframe{display:block;border:0;width:860px;transform-origin:0 0;background:transparent}
 /* the fill-in side of New quote / New invoice is green, so the white boxes stand out */
-.panel.withprev .pform{background:var(--forest);color:#fff;border-radius:14px;padding:20px 22px 24px;align-self:start}
+.panel.withprev{background:var(--forest);color:#fff}.panel.withprev .pform{align-self:start}.panel.withprev .pphd{color:#cfe5cb}.panel.withprev .close{color:#fff}.panel.withprev .ppwrap{border-color:rgba(255,255,255,.25)}
 .panel.withprev .pform h2,.panel.withprev .pform h3,.panel.withprev .pform>b,.panel.withprev .pform .adjbox>b{color:#fff}.panel.withprev .pform .qe label.o .t b{color:var(--forest)}
 .panel.withprev .pform .f span,.panel.withprev .pform .qe>span{color:#e4f2e1}
 .panel.withprev .pform .note{color:#cfe5cb}
@@ -159,12 +159,12 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 .itable td.qty{text-align:center;white-space:nowrap;color:var(--muted)}
 .adjbox{margin:12px 0 4px;padding:10px 12px;border:1px solid var(--line,#d9e3d6);border-radius:10px}
 .adjbox>b{display:block;margin-bottom:2px}
-.adjbox .fixed{display:flex;align-items:flex-end;padding-bottom:12px;font-weight:600;height:100%;box-sizing:border-box}
+.adjbox .fixed input{background:transparent!important;border-color:transparent!important;font-weight:700;padding-left:0;pointer-events:none;box-shadow:none}.panel.withprev .pform .adjbox .fixed input{color:#fff}
 .qe{margin:4px 0 12px}.qe>span{display:block;font-size:.85rem;font-weight:600;margin-bottom:4px}
 .qe .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.qe label.o .t{flex:1;line-height:1.2;text-align:left}.qe label.o .t b{display:block;font-size:1rem;color:inherit}.qe label.o .t small{display:block;font-weight:500;font-size:.8rem;opacity:.75}
 .qe label.o{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid var(--line,#d9e3d6);border-radius:10px;cursor:pointer;font-weight:600}
 .qe label.o.on{border-color:var(--forest,#1f5130);background:#eef6ec}
-.qe label.o input{margin:0}
+.qe label.o input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}.qe label.o{position:relative;padding:10px 12px}.qe label.o:focus-within{outline:2px solid var(--leaf);outline-offset:2px}
 .qtip{width:22px;height:22px;border-radius:50%;border:0;background:var(--forest,#1f5130);color:#fff;font-weight:800;font-size:.8rem;line-height:22px;padding:0;cursor:pointer;flex:none}
 .qhelp{margin-top:8px;padding:10px 12px;border-radius:10px;background:#eef6ec;border-left:4px solid var(--forest,#1f5130);font-size:.88rem;line-height:1.45}
 .qhelp b{display:block;margin-bottom:2px}
@@ -344,7 +344,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=107"></script>
+<script src="app.js?v=108"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
