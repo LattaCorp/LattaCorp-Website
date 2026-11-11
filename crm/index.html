@@ -358,6 +358,34 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 .top:has(#topbtns:empty){display:none}
 .calnav{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:6px 0}.calnav b{font-size:1.1rem;color:var(--forest);flex:0 1 auto}
 .daysum{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0 10px}
+/* Schedule: visits look like job cards (lawn tiers darker Basic -> Elite, other work blue, HOA / Commercial tinted) */
+.jl{border-left:5px solid var(--leaf)}.jl .jtype{display:inline-block;white-space:nowrap;margin:3px 0 4px;padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:700;background:#e2f3df;color:#1b552b;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.jl.t-basic{border-left-color:#9dd497}.jl.t-basic .jtype{background:#eaf6e7;color:#2b6a37}
+.jl.t-plus{border-left-color:#5bb565}.jl.t-plus .jtype{background:#b9e2b3;color:#0f3a1b}
+.jl.t-premier{border-left-color:#2e7d3c}.jl.t-premier .jtype{background:#3f8f4b;color:#fff}
+.jl.t-elite{border-left-color:#0b2a14}.jl.t-elite .jtype{background:#123d1e;color:#fff}
+.jl.other{border-left-color:#2f6fb0}.jl.other .jtype{background:#e3eef9;color:#1f4f86}
+.jl.ct-hoa{background:#f2f6fd;border-color:#c9d8f0;border-left-color:#1d4f91}.jl.ct-hoa .jtype{background:#1d4f91;color:#fff}
+.jl.ct-commercial{background:#f8f2fc;border-color:#dccbea;border-left-color:#5b2a86}.jl.ct-commercial .jtype{background:#5b2a86;color:#fff}
+.vcard{border-radius:12px;padding:12px 14px;margin-bottom:10px}.vcard .vname{display:flex;align-items:center;gap:8px;font-size:1.08rem}
+.vcard .vnum{display:inline-grid;place-items:center;min-width:24px;height:24px;border-radius:50%;background:var(--forest);color:#fff;font-size:.8rem}
+.vcard.vs-done,.vmini.vs-done{opacity:.6}.vcard.vs-skipped,.vmini.vs-skipped{opacity:.5}
+.vmini{display:block;border:1px solid var(--line);border-radius:7px;background:#fff;padding:5px 7px;margin-bottom:5px;font-size:.8rem;cursor:pointer;text-align:left;overflow:hidden;color:var(--ink)}
+.vmini b{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:.84rem}.vmini .jtype{margin:2px 0 1px;font-size:.7rem;padding:1px 7px}.vmini .vsub{display:block;color:var(--muted);font-size:.74rem}
+.vmini.vs-done b{text-decoration:line-through}
+.mcell .vmini{padding:2px 5px;margin:0;border-left-width:4px;font-size:.74rem}.mcell .vmini b{font-size:.74rem;font-weight:600}.mcell .mmore{font-size:.72rem;color:var(--muted)}
+@media(min-width:901px){.mcell .mc{display:none}}@media(max-width:900px){.mcell .vmini,.mcell .mmore{display:none}}
+/* your own events: dashed outline, colored by type */
+.evlist{margin:6px 0 4px}.evcard{border:1.5px dashed #9aa8c7;border-left:5px solid #6b7fb3;background:#f6f7fc;border-radius:12px;padding:10px 14px;margin-bottom:10px}
+.evcard .jtype,.evmini .jtype{background:#e6e9f6;color:#3b4a7a}
+.evmini{border:1.5px dashed #9aa8c7;border-left:4px solid #6b7fb3;background:#f6f7fc}.evmini span{display:block;color:#3b4a7a;font-size:.72rem}
+.ek-walkthrough{border-left-color:#c98a1b!important}.ek-supplies{border-left-color:#6b7fb3!important}.ek-reminder{border-left-color:#8a5ab0!important}.ek-timeoff{border-left-color:#b3261e!important}
+.evdone{opacity:.55}.evdone b{text-decoration:line-through}
+.evcard .jtype{display:inline-block;margin:3px 0 4px;padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:700}
+.dragable{cursor:grab}.dragging{opacity:.4}.dropover{outline:3px dashed var(--leaf);outline-offset:2px;background:#eef8eb!important}
+.weekgrid .daycol{min-height:160px}
+/* on a computer, drag stops to reorder; the arrows are for phones */
+@media(hover:hover) and (pointer:fine){.vcard .acts .mv{display:none}}
 .weekgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:8px}
 .daycol{background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;min-height:120px}.daycol.today{border-color:var(--forest);box-shadow:0 0 0 2px rgba(27,85,43,.18)}.daycol.wkend{background:#fafcf9}
 .dayhd{display:block;width:100%;text-align:left;background:var(--mint);border:0;border-radius:7px;padding:6px 8px;margin-bottom:6px;cursor:pointer;color:var(--forest)}.dayhd b{display:block}.dayhd span{font-size:.78rem;color:var(--muted)}
@@ -527,7 +555,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=167"></script>
+<script src="app.js?v=171"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

@@ -130,8 +130,11 @@ function load() {
     sb.from("personnel_benefits").select("*").order("created_at", { ascending: false }).limit(5000),
     sb.from("personnel_docs").select("*").order("created_at", { ascending: false }).limit(5000),
     sb.from("invoice_payments").select("*").order("paid_on", { ascending: false }).limit(20000),
-    sb.from("client_contacts").select("*").order("created_at", { ascending: true }).limit(20000)
+    sb.from("client_contacts").select("*").order("created_at", { ascending: true }).limit(20000),
+    sb.from("cal_events").select("*").gte("event_date", addDays(today(), -120)).order("event_date", { ascending: true }).limit(5000)
   ]).then(function (rs) {
+    calErr = !!rs[22].error;
+    calEvents = rs[22].error ? [] : rs[22].data || [];
     ccErr = !!rs[21].error;
     ccontacts = rs[21].error ? [] : rs[21].data || [];
     payErr = !!rs[20].error;

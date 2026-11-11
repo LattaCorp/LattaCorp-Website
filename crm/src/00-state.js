@@ -57,7 +57,15 @@ var view = "leads",
   lfilter = "open",
   cfilter = "active",
   jfilter = "active",
-  smode = "day",
+  smode = (function () {
+    try {
+      return localStorage.getItem("lc_sched_view") || "day";
+    } catch (e) {
+      return "day";
+    }
+  })(),
+  calEvents = [],
+  calErr = false,
   selDate = today(),
   crewF = "all",
   query = "";

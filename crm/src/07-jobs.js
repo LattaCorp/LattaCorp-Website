@@ -233,6 +233,33 @@ function jobsFilterBar(tabs) {
   tabs.appendChild(bar);
 }
 
+/* How a job looks everywhere (Jobs list and Schedule): lawn tiers shade darker Basic -> Elite, other work is blue,
+   HOA / Commercial accounts are tinted and named in the tag. */
+function jobLook(j, clientId) {
+  var title = (j && j.title) || "",
+    lawn = /^lawn\s*maint/i.test(title),
+    tier = lawn
+      ? ((title.split(/\s+-\s+/)[1] || "").toLowerCase().match(/basic|plus|premier|elite/) || [""])[0]
+      : /^hoa\b/i.test(title)
+        ? "hoa"
+        : /^commercial\b/i.test(title)
+          ? "commercial"
+          : "",
+    jc = byId(clients, (j && j.client_id) || clientId),
+    ctype = jc && (jc.type === "hoa" || jc.type === "commercial") ? jc.type : "",
+    plan = lawn ? "Lawn maintenance" + (title.split(/\s+-\s+/)[1] ? " \u00b7 " + title.split(/\s+-\s+/)[1] : "") : title || "Visit";
+  return {
+    cls: "jl " + (lawn ? "lawn" : "other") + (tier ? " t-" + tier : "") + (ctype ? " ct-" + ctype : ""),
+    tag: (ctype === "hoa" ? "HOA \u00b7 " : ctype === "commercial" ? "Commercial \u00b7 " : "") + plan,
+    short: lawn ? (title.split(/\s+-\s+/)[1] || "Lawn") : title,
+    mini: ctype
+      ? (ctype === "hoa" ? "HOA \u00b7 " : "Comm. \u00b7 ") + (lawn ? title.split(/\s+-\s+/)[1] || "Lawn" : title || "Visit")
+      : lawn
+        ? "Lawn \u00b7 " + (title.split(/\s+-\s+/)[1] || "")
+        : title || "Visit"
+  };
+}
+
 /* ---- Jobs list ---- */
 function renderJobs() {
   var tabs = $("tabs");

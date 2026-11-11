@@ -63,7 +63,15 @@ var view = "leads",
   lfilter = "open",
   cfilter = "active",
   jfilter = "active",
-  smode = "day",
+  smode = (function () {
+    try {
+      return localStorage.getItem("lc_sched_view") || "day";
+    } catch (e) {
+      return "day";
+    }
+  })(),
+  calEvents = [],
+  calErr = false,
   selDate = today(),
   crewF = "all",
   query = "";
@@ -406,8 +414,11 @@ function load() {
     sb.from("personnel_benefits").select("*").order("created_at", { ascending: false }).limit(5000),
     sb.from("personnel_docs").select("*").order("created_at", { ascending: false }).limit(5000),
     sb.from("invoice_payments").select("*").order("paid_on", { ascending: false }).limit(20000),
-    sb.from("client_contacts").select("*").order("created_at", { ascending: true }).limit(20000)
+    sb.from("client_contacts").select("*").order("created_at", { ascending: true }).limit(20000),
+    sb.from("cal_events").select("*").gte("event_date", addDays(today(), -120)).order("event_date", { ascending: true }).limit(5000)
   ]).then(function (rs) {
+    calErr = !!rs[22].error;
+    calEvents = rs[22].error ? [] : rs[22].data || [];
     ccErr = !!rs[21].error;
     ccontacts = rs[21].error ? [] : rs[21].data || [];
     payErr = !!rs[20].error;
@@ -3150,6 +3161,33 @@ function jobsFilterBar(tabs) {
   tabs.appendChild(bar);
 }
 
+/* How a job looks everywhere (Jobs list and Schedule): lawn tiers shade darker Basic -> Elite, other work is blue,
+   HOA / Commercial accounts are tinted and named in the tag. */
+function jobLook(j, clientId) {
+  var title = (j && j.title) || "",
+    lawn = /^lawn\s*maint/i.test(title),
+    tier = lawn
+      ? ((title.split(/\s+-\s+/)[1] || "").toLowerCase().match(/basic|plus|premier|elite/) || [""])[0]
+      : /^hoa\b/i.test(title)
+        ? "hoa"
+        : /^commercial\b/i.test(title)
+          ? "commercial"
+          : "",
+    jc = byId(clients, (j && j.client_id) || clientId),
+    ctype = jc && (jc.type === "hoa" || jc.type === "commercial") ? jc.type : "",
+    plan = lawn ? "Lawn maintenance" + (title.split(/\s+-\s+/)[1] ? " \u00b7 " + title.split(/\s+-\s+/)[1] : "") : title || "Visit";
+  return {
+    cls: "jl " + (lawn ? "lawn" : "other") + (tier ? " t-" + tier : "") + (ctype ? " ct-" + ctype : ""),
+    tag: (ctype === "hoa" ? "HOA \u00b7 " : ctype === "commercial" ? "Commercial \u00b7 " : "") + plan,
+    short: lawn ? (title.split(/\s+-\s+/)[1] || "Lawn") : title,
+    mini: ctype
+      ? (ctype === "hoa" ? "HOA \u00b7 " : "Comm. \u00b7 ") + (lawn ? title.split(/\s+-\s+/)[1] || "Lawn" : title || "Visit")
+      : lawn
+        ? "Lawn \u00b7 " + (title.split(/\s+-\s+/)[1] || "")
+        : title || "Visit"
+  };
+}
+
 /* ---- Jobs list ---- */
 function renderJobs() {
   var tabs = $("tabs");
@@ -3982,13 +4020,17 @@ function priceFix(v, after) {
 function visitCard(v, after, showJob, opts) {
   opts = opts || {};
   var j = byId(jobs, v.job_id),
-    card = el("div", "pcard"),
+    look = jobLook(j, v.client_id),
+    card = el("div", "pcard vcard " + look.cls + " vs-" + v.status),
     top = el("div");
+  card.dataset.vid = v.id;
   top.style.cssText = "display:flex;justify-content:space-between;gap:8px";
   var l = el("div");
-  l.appendChild(
-    el("b", null, (opts.num ? opts.num + ". " : "") + cname(v.client_id) + (j ? " · " + j.title : ""))
-  );
+  var nm = el("b", "vname");
+  if (opts.num) nm.appendChild(el("span", "vnum", String(opts.num)));
+  nm.appendChild(document.createTextNode(cname(v.client_id)));
+  l.appendChild(nm);
+  l.appendChild(el("span", "jtype", look.tag));
   l.appendChild(el("div", "note", [paddr(v.property_id), money(v.price)].filter(Boolean).join(" · ")));
   if (opts.detail) {
     var pp = byId(props, v.property_id),
@@ -4193,10 +4235,10 @@ function visitCard(v, after, showJob, opts) {
         })
       );
     if (opts.up !== undefined || opts.down !== undefined) {
-      var u = btn("▲", "btn alt sm", opts.up || null);
+      var u = btn("▲", "btn alt sm mv", opts.up || null);
       u.disabled = !opts.up;
       u.setAttribute("aria-label", "Move earlier");
-      var dn2 = btn("▼", "btn alt sm", opts.down || null);
+      var dn2 = btn("▼", "btn alt sm mv", opts.down || null);
       dn2.disabled = !opts.down;
       dn2.setAttribute("aria-label", "Move later");
       a.appendChild(u);
@@ -4351,7 +4393,13 @@ function renderSchedule() {
     });
     tabs.appendChild(b);
   });
+  $("topbtns").appendChild(
+    btn("+ Add event", "btn", function () {
+      openEventForm(null, smode === "day" ? selDate : today());
+    })
+  );
   if (s3 && isOwner()) $("topbtns").appendChild(btn("Crew", "btn alt", openCrew));
+  $("topbtns").appendChild(btn("Schedule settings", "btn alt", openSchedSettings));
   var list = $("list");
   list.textContent = "";
   if (jobsErr) {
@@ -4551,9 +4599,24 @@ function renderDay(list, odCount) {
   var all = onDay(d).filter(crewOk).sort(dayOrder),
     sched = all.filter(function (v) {
       return v.status === "scheduled";
+    }),
+    evs = eventsOn(d);
+  if (evs.length) {
+    var eh = el("div", "evlist");
+    evs.forEach(function (ev) {
+      eh.appendChild(eventCard(ev));
     });
+    list.appendChild(eh);
+  }
   if (!all.length) {
-    list.appendChild(el("div", "empty", "Nothing scheduled for this day."));
+    var em = el("div", "empty", evs.length ? "No job visits this day." : "Nothing scheduled for this day.");
+    em.appendChild(el("br"));
+    em.appendChild(
+      btn("+ Add event", "btn alt sm", function () {
+        openEventForm(null, d);
+      })
+    );
+    list.appendChild(em);
     return;
   }
   var done = all.filter(function (v) {
@@ -4606,6 +4669,12 @@ function renderDay(list, odCount) {
       })
     );
   }
+  bt.appendChild(document.createTextNode(" "));
+  bt.appendChild(
+    btn("+ Event", "btn alt sm", function () {
+      openEventForm(null, d);
+    })
+  );
   sum.appendChild(bt);
   list.appendChild(sum);
   if (sched.length > 10)
@@ -4628,16 +4697,23 @@ function renderDay(list, odCount) {
           : null;
       opts.num = idx + 1;
     }
-    list.appendChild(
-      visitCard(
-        v,
-        function () {
-          render();
-        },
-        true,
-        opts
-      )
+    var vc = visitCard(
+      v,
+      function () {
+        render();
+      },
+      true,
+      opts
     );
+    // drag a stop onto another one to put it in that spot (computers; phones use the arrows)
+    if (idx > -1) dragSource(vc, { type: "visit", id: v.id, order: true });
+    if (idx > -1)
+      dropTarget(vc, function (dd) {
+        if (dd.type !== "visit" || dd.id === v.id) return false;
+        reorderDay(d, dd.id, v.id);
+        return true;
+      });
+    list.appendChild(vc);
   });
 }
 
@@ -4695,20 +4771,15 @@ function renderWeek(list) {
         render();
       });
       col.appendChild(h);
-      vs.slice(0, 8).forEach(function (v) {
-        var b = el("button", "vline " + v.status);
-        b.type = "button";
-        b.textContent =
-          cname(v.client_id) +
-          (v.crew_id && crewName(v.crew_id) ? " (" + crewName(v.crew_id).split(" ")[0] + ")" : "");
-        b.addEventListener("click", function () {
-          selDate = d;
-          smode = "day";
-          render();
-        });
-        col.appendChild(b);
+      eventsOn(d).forEach(function (ev) {
+        col.appendChild(eventMini(ev));
       });
-      if (vs.length > 8) col.appendChild(el("div", "note", "+" + (vs.length - 8) + " more"));
+      vs.forEach(function (v) {
+        col.appendChild(visitMini(v, true));
+      });
+      dropTarget(col, function (dd) {
+        return dropOnDay(dd, d);
+      });
       g.appendChild(col);
     })(addDays(ws, i), i);
   }
@@ -4752,11 +4823,25 @@ function renderMonth(list) {
       if (i >= 35 && d.slice(0, 7) !== first.slice(0, 7)) return;
       var vs = onDay(d).filter(crewOk),
         cell = el(
-          "button",
+          "div",
           "mcell" + (d.slice(0, 7) !== first.slice(0, 7) ? " other" : "") + (d === t ? " today" : "")
         );
-      cell.type = "button";
+      cell.setAttribute("role", "button");
+      cell.tabIndex = 0;
       cell.appendChild(el("span", "mn", String(pd(d).getDate())));
+      var me = eventsOn(d),
+        sv = vs.slice().sort(dayOrder);
+      me.slice(0, 2).forEach(function (ev) {
+        cell.appendChild(eventMini(ev, true));
+      });
+      sv.slice(0, Math.max(0, 3 - Math.min(2, me.length))).forEach(function (v) {
+        cell.appendChild(visitMini(v, false));
+      });
+      var hidden = me.length + sv.length - cell.querySelectorAll(".vmini").length;
+      if (hidden > 0) cell.appendChild(el("span", "mmore", "+" + hidden + " more"));
+      dropTarget(cell, function (dd) {
+        return dropOnDay(dd, d);
+      });
       if (vs.length) {
         cell.appendChild(el("span", "mc", vs.length + (vs.length > 1 ? " stops" : " stop")));
         cell.appendChild(
@@ -5140,6 +5225,340 @@ function catchup(moved, key, after) {
   });
   dn.style.marginTop = "8px";
   p.appendChild(dn);
+}
+
+/* ---- Schedule as a work calendar: your own events, drag and drop, and which view it opens on ----
+   Events (walk-throughs, supply runs, reminders, time off) sit beside the job visits. On a computer, drag a visit or
+   event to another day in Week or Month, or drag stops up and down in the day to change the route order. */
+var EV_KINDS = [
+  ["walkthrough", "Estimate walk-through"],
+  ["supplies", "Supply run"],
+  ["reminder", "Reminder"],
+  ["timeoff", "Time off"],
+  ["other", "Other"]
+];
+function evKind(k) {
+  var x = EV_KINDS.filter(function (z) {
+    return z[0] === k;
+  })[0];
+  return x ? x[1] : "Event";
+}
+function evTime(ev) {
+  if (!ev.start_time) return "";
+  var h = parseInt(ev.start_time.slice(0, 2), 10),
+    m = ev.start_time.slice(3, 5);
+  return (h % 12 || 12) + ":" + m + (h < 12 ? " AM" : " PM");
+}
+function eventsOn(d) {
+  return calEvents
+    .filter(function (ev) {
+      return ev.event_date === d;
+    })
+    .sort(function (a, b) {
+      return (a.start_time || "99").localeCompare(b.start_time || "99") || String(a.title).localeCompare(String(b.title));
+    });
+}
+function eventCard(ev) {
+  var card = el("div", "pcard evcard ek-" + ev.kind + (ev.done ? " evdone" : "")),
+    top = el("div", "evtop"),
+    l = el("div");
+  var nm = el("b", "vname", ev.title);
+  l.appendChild(nm);
+  l.appendChild(el("span", "jtype", evKind(ev.kind) + (evTime(ev) ? " · " + evTime(ev) : "")));
+  var bits = [ev.client_id ? cname(ev.client_id) : "", ev.notes].filter(Boolean);
+  if (bits.length) l.appendChild(el("div", "note", bits.join(" · ")));
+  top.appendChild(l);
+  card.appendChild(top);
+  var a = el("div", "acts");
+  a.appendChild(
+    btn(ev.done ? "Undo" : "Done", ev.done ? "btn alt sm" : "btn sm", function () {
+      saveEvent(ev, { done: !ev.done });
+    })
+  );
+  a.appendChild(
+    btn("Edit", "btn alt sm", function () {
+      openEventForm(ev);
+    })
+  );
+  card.appendChild(a);
+  dragSource(card, { type: "event", id: ev.id });
+  return card;
+}
+function eventMini(ev, tiny) {
+  var b = el("div", "vmini evmini ek-" + ev.kind + (ev.done ? " evdone" : ""));
+  b.appendChild(el("b", null, (evTime(ev) ? evTime(ev).replace(":00", "") + " " : "") + ev.title));
+  if (!tiny) b.appendChild(el("span", null, evKind(ev.kind)));
+  b.title = ev.title + " (" + evKind(ev.kind) + ")";
+  b.addEventListener("click", function (e) {
+    e.stopPropagation();
+    openEventForm(ev);
+  });
+  dragSource(b, { type: "event", id: ev.id });
+  return b;
+}
+function visitMini(v, full) {
+  var j = byId(jobs, v.job_id),
+    look = jobLook(j, v.client_id),
+    b = el("div", "vmini " + look.cls + " vs-" + v.status);
+  b.appendChild(el("b", null, cname(v.client_id)));
+  if (full) {
+    b.appendChild(el("span", "jtype", look.mini));
+    var sub = [money(v.price), v.crew_id && crewName(v.crew_id) ? crewName(v.crew_id).split(" ")[0] : "", v.status === "done" ? "Done" : v.status === "skipped" ? "Skipped" : ""].filter(Boolean).join(" · ");
+    if (sub) b.appendChild(el("span", "vsub", sub));
+  }
+  b.title = cname(v.client_id) + " · " + look.tag;
+  b.addEventListener("click", function (e) {
+    e.stopPropagation();
+    selDate = v.scheduled_date;
+    smode = "day";
+    render();
+  });
+  if (v.status === "scheduled") dragSource(b, { type: "visit", id: v.id });
+  return b;
+}
+// drag and drop (mouse / trackpad)
+var dragNow = null;
+function dragSource(node, data) {
+  node.draggable = true;
+  node.classList.add("dragable");
+  node.addEventListener("dragstart", function (e) {
+    dragNow = data;
+    node.classList.add("dragging");
+    try {
+      e.dataTransfer.setData("text/plain", data.type + ":" + data.id);
+      e.dataTransfer.effectAllowed = "move";
+    } catch (x) {}
+    e.stopPropagation();
+  });
+  node.addEventListener("dragend", function () {
+    node.classList.remove("dragging");
+    dragNow = null;
+    [].forEach.call(document.querySelectorAll(".dropover"), function (x) {
+      x.classList.remove("dropover");
+    });
+  });
+}
+function dropTarget(node, onDrop) {
+  node.addEventListener("dragover", function (e) {
+    if (!dragNow) return;
+    e.preventDefault();
+    e.stopPropagation();
+    node.classList.add("dropover");
+  });
+  node.addEventListener("dragleave", function (e) {
+    if (!node.contains(e.relatedTarget)) node.classList.remove("dropover");
+  });
+  node.addEventListener("drop", function (e) {
+    if (!dragNow) return;
+    e.preventDefault();
+    e.stopPropagation();
+    node.classList.remove("dropover");
+    var dd = dragNow;
+    dragNow = null;
+    onDrop(dd);
+  });
+}
+function dropOnDay(dd, d) {
+  if (dd.type === "event") {
+    var ev = byId(calEvents, dd.id);
+    if (ev && ev.event_date !== d) saveEvent(ev, { event_date: d });
+    return true;
+  }
+  var v = byId(visits, dd.id);
+  if (v && v.status === "scheduled" && v.scheduled_date !== d) moveVisitTo(v, d);
+  return true;
+}
+// same as the Move button on a stop: new date, clears weather / reminder marks, and keeps the job's later visits in step
+function moveVisitTo(v, nd) {
+  var od = v.scheduled_date,
+    pp = { scheduled_date: nd, sort_order: 9999 };
+  if (wxOn()) {
+    pp.weather_from = null;
+    pp.weather_batch = null;
+  }
+  if (remOn()) pp.reminded_at = null;
+  sb.from("visits")
+    .update(pp)
+    .eq("id", v.id)
+    .then(function (r) {
+      if (r.error) {
+        alert("Could not move that visit.");
+        return;
+      }
+      Object.assign(v, pp);
+      if (nd > od)
+        catchup([v], "m|" + Date.now(), function () {
+          render();
+        });
+      else render();
+    });
+}
+function reorderDay(d, movingId, beforeId) {
+  var ds = onDay(d)
+    .filter(function (x) {
+      return x.status === "scheduled";
+    })
+    .sort(dayOrder);
+  var mv = byId(visits, movingId);
+  if (!mv) return;
+  ds = ds.filter(function (x) {
+    return x !== mv;
+  });
+  var at = ds.indexOf(byId(visits, beforeId));
+  ds.splice(at < 0 ? ds.length : at, 0, mv);
+  var todo = [];
+  ds.forEach(function (x, k) {
+    var n = k * 10;
+    if ((x.sort_order || 0) !== n) {
+      x.sort_order = n;
+      todo.push(sb.from("visits").update({ sort_order: n }).eq("id", x.id));
+    }
+  });
+  render();
+  Promise.all(todo).then(function (rs) {
+    if (
+      rs.some(function (r) {
+        return r.error;
+      })
+    )
+      alert("Could not save the new order.");
+  });
+}
+function saveEvent(ev, patch) {
+  sb.from("cal_events")
+    .update(patch)
+    .eq("id", ev.id)
+    .then(function (r) {
+      if (r.error) {
+        alert("Could not save the event.");
+        return;
+      }
+      Object.assign(ev, patch);
+      render();
+    });
+}
+function openEventForm(ev, d) {
+  if (calErr) {
+    alert("Run the Stage 40 SQL in Supabase first, then press Refresh.");
+    return;
+  }
+  var p = panel();
+  p.appendChild(el("h2", null, ev ? "Edit event" : "New event"));
+  var ti = fld("What", "text", ev ? ev.title : ""),
+    kd = fld("Type", "select", ev ? ev.kind : "walkthrough", EV_KINDS),
+    dt = fld("Date", "date", ev ? ev.event_date : d || today()),
+    tm = fld("Time", "time", ev && ev.start_time ? ev.start_time.slice(0, 5) : ""),
+    cl = fld(
+      "Client",
+      "select",
+      (ev && ev.client_id) || "",
+      [["", "None"]].concat(
+        clients
+          .filter(function (c) {
+            return !c.archived;
+          })
+          .map(function (c) {
+            return [c.id, dispName(c)];
+          })
+      )
+    ),
+    nt = fld("Notes", "textarea", ev ? ev.notes : "");
+  ti.input.placeholder = "e.g. Walk-through at Oak Grove HOA";
+  p.appendChild(ti);
+  var g = el("div", "grid2");
+  g.appendChild(kd);
+  g.appendChild(cl);
+  g.appendChild(dt);
+  g.appendChild(tm);
+  p.appendChild(g);
+  p.appendChild(nt);
+  var a = el("div", "actions");
+  var sv = btn("Save", "btn", function () {
+    if (!ti.input.value.trim()) {
+      alert("Say what the event is.");
+      return;
+    }
+    if (!dt.input.value) {
+      alert("Pick a date.");
+      return;
+    }
+    var row = {
+      title: ti.input.value.trim(),
+      kind: kd.input.value,
+      event_date: dt.input.value,
+      start_time: tm.input.value || null,
+      client_id: cl.input.value || null,
+      notes: nt.input.value.trim()
+    };
+    sv.disabled = true;
+    var q = ev ? sb.from("cal_events").update(row).eq("id", ev.id).select().single() : sb.from("cal_events").insert(row).select().single();
+    q.then(function (r) {
+      if (r.error || !r.data) {
+        sv.disabled = false;
+        alert("Could not save. Did you run the Stage 40 SQL?");
+        return;
+      }
+      if (ev) Object.assign(ev, r.data);
+      else calEvents.push(r.data);
+      selDate = r.data.event_date;
+      closeDetail();
+      render();
+    });
+  });
+  a.appendChild(sv);
+  if (ev)
+    a.appendChild(
+      btn("Delete", "btn danger", function () {
+        if (!confirm("Delete this event?")) return;
+        sb.from("cal_events")
+          .delete()
+          .eq("id", ev.id)
+          .then(function (r) {
+            if (r.error) {
+              alert("Could not delete.");
+              return;
+            }
+            calEvents = calEvents.filter(function (x) {
+              return x.id !== ev.id;
+            });
+            closeDetail();
+            render();
+          });
+      })
+    );
+  p.appendChild(a);
+  setTimeout(function () {
+    ti.input.focus();
+  }, 50);
+}
+// which view the Schedule opens on (saved on this device)
+function openSchedSettings() {
+  var p = panel();
+  p.appendChild(el("h2", null, "Schedule settings"));
+  var cur = "day";
+  try {
+    cur = localStorage.getItem("lc_sched_view") || "day";
+  } catch (e) {}
+  var ov = fld("Open the Schedule on", "select", cur, [
+    ["day", "Today"],
+    ["week", "This week"],
+    ["month", "This month"]
+  ]);
+  p.appendChild(ov);
+  p.appendChild(el("p", "note", "Saved on this device, so your phone and computer can open on different views."));
+  var a = el("div", "actions");
+  a.appendChild(
+    btn("Save", "btn", function () {
+      try {
+        localStorage.setItem("lc_sched_view", ov.input.value);
+      } catch (e) {}
+      smode = ov.input.value;
+      selDate = today();
+      closeDetail();
+      render();
+    })
+  );
+  p.appendChild(a);
 }
 
 /* ======================= crm/src/09-reminders.js ======================= */
