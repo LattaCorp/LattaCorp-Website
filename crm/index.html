@@ -129,8 +129,8 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .panel.withprev .pform input,.panel.withprev .pform select,.panel.withprev .pform textarea{background:#fff;color:var(--ink);border-color:#071a0e}
 .panel.withprev .pform .adjbox{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.08)}
 .panel.withprev .pform .adjbox .fxbox{background:rgba(255,255,255,.14);color:#fff}
-.panel.withprev .pform .qe label.o{background:#fff;border-color:transparent;box-shadow:none}
-.panel.withprev .pform .qe label.o.on{background:#d6efd0;border-color:transparent;box-shadow:none}
+.panel.withprev .pform .qe label.o{background:#fff;border:2px solid #fff;box-shadow:none}
+.panel.withprev .pform .qe label.o.on{background:#fff;border-color:var(--leaf);box-shadow:none}
 .panel.withprev .pform .qe label.o .t b{color:var(--ink);font-weight:500;font-size:1.05rem}.panel.withprev .pform .qe label.o .t small{color:var(--muted);opacity:1}
 .panel.withprev .pform .btn{background:#fff;color:var(--forest);border-color:#fff}
 .panel.withprev .pform .pcard{color:var(--ink)}.panel.withprev .pform .pcard b,.panel.withprev .pform .pcard h3{color:var(--forest)}.panel.withprev .pform .pcard .f span,.panel.withprev .pform .pcard .note{color:var(--muted)}
@@ -139,7 +139,7 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .panel.withprev .pprev{border-left:1px solid rgba(255,255,255,.22);padding-left:22px}
 /* on a computer the New quote / New invoice window fits the screen: the form scrolls on its own, the preview fits beside it */
 @media(min-width:1001px){.panel.withprev{height:calc(100vh - 40px);box-sizing:border-box;overflow:hidden;align-items:stretch;grid-template-rows:minmax(0,1fr)}
-.panel.withprev .pform{overflow-y:auto;min-height:0;align-self:stretch;padding-right:10px;margin-right:-4px;scrollbar-gutter:stable}
+.panel.withprev .pform{overflow-y:auto;min-height:0;align-self:stretch;padding:0 10px 0 6px;margin:0 -4px 0 -6px;scrollbar-gutter:stable}
 .panel.withprev .pprev{position:static;display:flex;flex-direction:column;min-height:0;padding-top:30px}
 .panel.withprev .ppwrap{flex:1;min-height:0}}
 @media(max-width:1000px){.panel.withprev{grid-template-columns:minmax(0,1fr)}.panel.withprev>*{min-width:0}.pprev{position:static;padding-top:6px}}
@@ -175,7 +175,7 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 .qe .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.qe label.o .t{flex:1;line-height:1.2;text-align:left}.qe label.o .t b{display:block;font-size:1rem;color:inherit}.qe label.o .t small{display:block;font-weight:500;font-size:.8rem;opacity:.75}
 .qe label.o{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid var(--line,#d9e3d6);border-radius:10px;cursor:pointer;font-weight:600}
 .qe label.o.on{border-color:var(--forest,#1f5130);background:#eef6ec}
-.qe label.o input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}.qe label.o{position:relative;padding:10px 12px}.qe label.o:focus-within{outline:2px solid var(--leaf);outline-offset:2px}
+.qe label.o input{position:absolute;opacity:0;width:1px;height:1px;margin:0;pointer-events:none}.qe label.o{position:relative;padding:10px 12px}.qe label.o:focus-within{outline:none}
 .qtip{width:22px;height:22px;border-radius:50%;border:0;background:var(--forest,#1f5130);color:#fff;font-weight:800;font-size:.8rem;line-height:22px;padding:0;cursor:pointer;flex:none}
 .qhelp{margin-top:8px;padding:10px 12px;border-radius:10px;background:#eef6ec;border-left:4px solid var(--forest,#1f5130);font-size:.88rem;line-height:1.45}
 .qhelp b{display:block;margin-bottom:2px}
@@ -357,7 +357,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=123"></script>
+<script src="app.js?v=124"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
