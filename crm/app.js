@@ -2801,7 +2801,7 @@ function paddr(id) {
 }
 
 /* ---- Jobs list: filters and sorting ---- */
-var JF = { status: [], freq: [], plan: [], client: [] },
+var JF = { status: ["active"], freq: [], plan: [], client: [] },
   JSORT = "name";
 var JF_GROUPS = [
   ["status", "Status", [["active", "Active"], ["paused", "Paused"], ["ended", "Ended"]]],
@@ -2922,7 +2922,7 @@ function jobsFilterBar(tabs) {
 function renderJobs() {
   var tabs = $("tabs");
   tabs.textContent = "";
-  /* Filter pills (tap to turn on, tap again to turn off; dark green shows what's on). No filters = every job.
+  /* Filter pills (tap to turn on, tap again to turn off; dark green shows what's on). Active is on by default; no filters = every job.
      Inside a group any match counts (Weekly OR Every 2 weeks); across groups all must match (Weekly AND Elite). */
   jobsFilterBar(tabs);
   var tb = $("topbtns");
