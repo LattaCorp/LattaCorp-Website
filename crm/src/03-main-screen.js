@@ -155,6 +155,9 @@ function render() {
   nav.appendChild(mb);
   $("topbtns").textContent = "";
   optMark(null);
+  [].forEach.call(document.querySelectorAll(".rinbox"), function (x) {
+    x.parentNode.removeChild(x);
+  });
   // moving to another screen closes whatever is open on the right side
   if (view !== shownView) {
     if (shownView !== null && docked() && $("detail").classList.contains("on") && !$("detail").classList.contains("full")) closeDetail();

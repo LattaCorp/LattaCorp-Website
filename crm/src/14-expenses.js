@@ -1644,9 +1644,10 @@ function openReceiptUpload() {
   p.appendChild(st);
 }
 function receiptInbox(list) {
+  [].forEach.call(document.querySelectorAll(".rinbox"), function (x) {
+    x.parentNode.removeChild(x);
+  });
   if (view !== "expenses" || !list) return;
-  var old = list.querySelector(".rinbox");
-  if (old) old.parentNode.removeChild(old);
   var todo = receiptsToEnter().sort(function (a, b) {
     return String(a.created_at) < String(b.created_at) ? -1 : 1;
   });
@@ -1681,5 +1682,7 @@ function receiptInbox(list) {
     g.appendChild(c);
   });
   box.appendChild(g);
-  list.insertBefore(box, list.firstChild);
+  // computers: in the right column under the options; phones: at the top of the list
+  if (docked() && $("rightcol")) $("rightcol").appendChild(box);
+  else list.insertBefore(box, list.firstChild);
 }

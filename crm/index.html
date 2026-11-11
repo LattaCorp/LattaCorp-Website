@@ -48,7 +48,7 @@ textarea{min-height:110px;resize:vertical}
 #login{max-width:380px;margin:12vh auto 0}
 #login h2{margin:0 0 4px;color:var(--forest)}
 #login label{display:block;font-weight:600;margin-top:12px;font-size:.9rem}
-#loginmsg,#msg{color:var(--red);min-height:1.4em;margin:10px 0 0;font-size:.92rem}
+#loginmsg,#msg{color:var(--red);min-height:1.4em;margin:10px 0 0;font-size:.92rem}#msg:empty{display:none}#tabs:empty{display:none}#tabs:empty~#msg:empty~#list{margin-top:0!important}
 .tabs{display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:12px}
 .tab{background:#fff;border:1px solid var(--line);border-radius:999px;padding:6px 14px;white-space:nowrap;cursor:pointer;font-weight:600;color:var(--muted)}
 .tab.on{background:var(--forest);border-color:var(--forest);color:#fff}
@@ -401,6 +401,12 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 /* on a computer, drag stops to reorder; the arrows are for phones */
 @media(hover:hover) and (pointer:fine){.vcard .acts .mv{display:none}}
 .tab .tnew.red{background:#b3261e}.subtabs{display:flex;gap:6px;flex-wrap:wrap;margin:4px 0 6px;grid-column:1/-1}.tab.warn{border-color:#b3261e;color:#b3261e}.tab.warn.on{background:#b3261e;color:#fff}
+body.dock #rightcol>.rinbox{order:4;margin:6px 12px 14px;padding:10px}
+body.dock #rightcol>.rinbox .rgrid{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+body.dock #rightcol>.rinbox .rcard{padding:6px}body.dock #rightcol>.rinbox .rcard img{height:110px}
+body.dock #rightcol>.rinbox .rcard b{font-size:.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.dock #rightcol>.rinbox .rcard .note{font-size:.75rem}body.dock #rightcol>.rinbox .rcard .qacts{gap:4px}
+body.dock #rightcol>.rinbox .rcard .qacts{flex-direction:column}body.dock #rightcol>.rinbox .rcard .btn{padding:4px 6px;font-size:.8rem;width:100%;text-align:center;white-space:nowrap}
 .rinbox{margin:0 0 14px;padding:12px;border:2px dashed #c99a2e;border-radius:12px;background:#fffaf0}.rinbox h3{margin:0 0 8px;color:#8a5a00}
 .rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:10px}
 .rcard{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px;display:flex;flex-direction:column;gap:4px}
@@ -576,7 +582,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=181"></script>
+<script src="app.js?v=183"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
