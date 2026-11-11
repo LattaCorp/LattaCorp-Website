@@ -172,6 +172,12 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 /* the open option on the right side */
 body.dock #rightcol #topbtns>.on{background:var(--forest);color:#fff;border-color:var(--forest)}
 /* a client with an overdue balance is tinted red */
+/* client cards take the color of their type (Residential / Commercial / HOA); the type tag turns solid */
+#list .row.client.ty-residential{background:#eff8ec;border-color:#cfe3c9;border-left-color:var(--forest)}#list .row.client.ty-residential .chip.residential{background:var(--forest);color:#fff}
+#list .row.client.ty-hoa{background:#e3eefc;border-color:#c3d6f2;border-left-color:#1d4f91}#list .row.client.ty-hoa .chip.hoa{background:#1d4f91;color:#fff}
+#list .row.client.ty-commercial{background:#f1e6fa;border-color:#dccbea;border-left-color:#5b2a86}#list .row.client.ty-commercial .chip.commercial{background:#5b2a86;color:#fff}
+#list .row.client.ty-residential:hover{background:#e4f2df}#list .row.client.ty-hoa:hover{background:#d6e5fa}#list .row.client.ty-commercial:hover{background:#e8d9f5}
+#list .row.client.pastdue{background:#fdeceb;border-color:#f2c4bf;border-left-color:var(--red)}#list .row.client.pastdue:hover{background:#fbe1df}
 .row.client.pastdue{background:#fdeceb;border-color:#f2c4bf;border-left-color:var(--red)}
 .row.client.pastdue:hover{background:#fbe1df}
 /* Jobs filter pills: groups of on/off pills (a check mark when on), Clear all, and Sort by */
@@ -439,7 +445,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=152"></script>
+<script src="app.js?v=153"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
