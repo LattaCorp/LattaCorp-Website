@@ -1002,10 +1002,15 @@ function hideInvoice() {
 }
 
 /* ---- Estimates (clients open a private link and can accept) ---- */
-function estNum(n) {
+function estNum(n, type) {
   var s = String(n || 0);
   while (s.length < 4) s = "0" + s;
-  return "EST-" + s;
+  return (type === "estimate" ? "EST-" : "QTE-") + s;
+}
+// "quote" or "estimate" (older rows have no type yet: they are quotes)
+function estWord(e, cap) {
+  var w = e && e.doc_type === "estimate" ? "estimate" : "quote";
+  return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w;
 }
 function docUrl(tok, peek) {
   return location.origin + "/d/?t=" + tok + (peek ? "&p=1" : "");
@@ -1028,7 +1033,8 @@ function estMessage(e, c) {
     firstName(c) +
     ", this is " +
     bizv("name", "Latta Corp") +
-    ". Here is your estimate" +
+    ". Here is your " +
+    estWord(e) +
     (e.title ? " for " + e.title : "") +
     " (" +
     money(e.total) +
@@ -1055,7 +1061,7 @@ function estRow(e) {
   var b = el("button", "row client");
   b.type = "button";
   var l = el("div");
-  l.appendChild(el("b", null, estNum(e.number) + " · " + cname(e.client_id)));
+  l.appendChild(el("b", null, estNum(e.number, e.doc_type) + " · " + cname(e.client_id)));
   l.appendChild(
     el(
       "div",
@@ -1102,7 +1108,7 @@ function renderEstimates(list) {
   }
   var set = estimates.filter(function (e) {
     if (!query) return true;
-    return [estNum(e.number), cname(e.client_id), e.title].join(" ").toLowerCase().indexOf(query) > -1;
+    return [estNum(e.number, e.doc_type), cname(e.client_id), e.title].join(" ").toLowerCase().indexOf(query) > -1;
   });
   if (!set.length) {
     list.appendChild(
@@ -1152,7 +1158,7 @@ function clientEstimatesSection(c) {
     var r = el("div", "pcard");
     r.style.cssText = "display:flex;justify-content:space-between;gap:10px;align-items:center;cursor:pointer";
     var l = el("div");
-    l.appendChild(el("b", null, estNum(e.number) + " · " + money(e.total)));
+    l.appendChild(el("b", null, estNum(e.number, e.doc_type) + " · " + money(e.total)));
     l.appendChild(el("div", "note", e.title || "Estimate"));
     r.appendChild(l);
     r.appendChild(estChip(e));

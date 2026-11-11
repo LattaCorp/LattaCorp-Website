@@ -2379,7 +2379,7 @@ function openImport() {
             [
               "estimate quote",
               e.status,
-              estNum(e.number),
+              estNum(e.number, e.doc_type),
               String(e.total),
               cname(e.client_id),
               e.title || "",
@@ -2393,7 +2393,7 @@ function openImport() {
       es,
       function (e) {
         return [
-          estNum(e.number) + " · " + cname(e.client_id),
+          estNum(e.number, e.doc_type) + " · " + cname(e.client_id),
           [
             e.title,
             money(e.total),
@@ -14657,10 +14657,15 @@ function hideInvoice() {
 }
 
 /* ---- Estimates (clients open a private link and can accept) ---- */
-function estNum(n) {
+function estNum(n, type) {
   var s = String(n || 0);
   while (s.length < 4) s = "0" + s;
-  return "EST-" + s;
+  return (type === "estimate" ? "EST-" : "QTE-") + s;
+}
+// "quote" or "estimate" (older rows have no type yet: they are quotes)
+function estWord(e, cap) {
+  var w = e && e.doc_type === "estimate" ? "estimate" : "quote";
+  return cap ? w.charAt(0).toUpperCase() + w.slice(1) : w;
 }
 function docUrl(tok, peek) {
   return location.origin + "/d/?t=" + tok + (peek ? "&p=1" : "");
@@ -14683,7 +14688,8 @@ function estMessage(e, c) {
     firstName(c) +
     ", this is " +
     bizv("name", "Latta Corp") +
-    ". Here is your estimate" +
+    ". Here is your " +
+    estWord(e) +
     (e.title ? " for " + e.title : "") +
     " (" +
     money(e.total) +
@@ -14710,7 +14716,7 @@ function estRow(e) {
   var b = el("button", "row client");
   b.type = "button";
   var l = el("div");
-  l.appendChild(el("b", null, estNum(e.number) + " · " + cname(e.client_id)));
+  l.appendChild(el("b", null, estNum(e.number, e.doc_type) + " · " + cname(e.client_id)));
   l.appendChild(
     el(
       "div",
@@ -14757,7 +14763,7 @@ function renderEstimates(list) {
   }
   var set = estimates.filter(function (e) {
     if (!query) return true;
-    return [estNum(e.number), cname(e.client_id), e.title].join(" ").toLowerCase().indexOf(query) > -1;
+    return [estNum(e.number, e.doc_type), cname(e.client_id), e.title].join(" ").toLowerCase().indexOf(query) > -1;
   });
   if (!set.length) {
     list.appendChild(
@@ -14807,7 +14813,7 @@ function clientEstimatesSection(c) {
     var r = el("div", "pcard");
     r.style.cssText = "display:flex;justify-content:space-between;gap:10px;align-items:center;cursor:pointer";
     var l = el("div");
-    l.appendChild(el("b", null, estNum(e.number) + " · " + money(e.total)));
+    l.appendChild(el("b", null, estNum(e.number, e.doc_type) + " · " + money(e.total)));
     l.appendChild(el("div", "note", e.title || "Estimate"));
     r.appendChild(l);
     r.appendChild(estChip(e));
@@ -16277,7 +16283,9 @@ function openEstimateForm(cid) {
     return;
   }
   var p = panel();
-  p.appendChild(el("h2", null, "New estimate"));
+  p.appendChild(el("h2", null, "New quote or estimate"));
+  var qe = qeChoice("quote");
+  p.appendChild(qe);
   var list = clients.filter(function (c) {
     return !c.archived || c.id === cid;
   });
@@ -16291,7 +16299,7 @@ function openEstimateForm(cid) {
       })
     )
   );
-  var ttl = fld("Job Title (shows under ESTIMATE / QUOTE, for example: Spring cleanup and mulch)", "text", ""),
+  var ttl = fld("Job Title (shows under QUOTE or ESTIMATE, for example: Spring cleanup and mulch)", "text", ""),
     scp = fld("Details the client will see (optional)", "textarea", ""),
     vd = fld("Valid for (days)", "number", "30");
   p.appendChild(cs);
@@ -16351,7 +16359,7 @@ function openEstimateForm(cid) {
   }
   var adj = adjEditor([], linesSub);
   p.appendChild(adj.el);
-  var go = btn("Save estimate", "btn", function () {
+  var go = btn("Save", "btn", function () {
     if (!cs.input.value) {
       alert("Choose a client.");
       return;
@@ -16394,6 +16402,7 @@ function openEstimateForm(cid) {
       };
     if (pid) erow.property_id = pid;
     if (adjs.length) erow.adjustments = adjs;
+    erow.doc_type = qe.value();
     sb.from("estimates")
       .insert(erow)
       .select()
@@ -16401,7 +16410,7 @@ function openEstimateForm(cid) {
       .then(function (r) {
         if (r.error || !r.data) {
           go.disabled = false;
-          alert(adjs.length ? "Could not save. Did you run the Stage 33 SQL?" : pid ? "Could not save. Did you run the Stage 31 SQL?" : "Could not save. Did you run the Stage 11 SQL?");
+          alert(erow.doc_type ? "Could not save. Did you run the Stage 34 SQL?" : adjs.length ? "Could not save. Did you run the Stage 33 SQL?" : pid ? "Could not save. Did you run the Stage 31 SQL?" : "Could not save. Did you run the Stage 11 SQL?");
           return;
         }
         var e = r.data;
@@ -16459,6 +16468,7 @@ function openEstimateForm(cid) {
         status: "draft",
         total: estTotal(r2(total), adj.value()),
         adjustments: adj.value(),
+        doc_type: qe.value(),
         property_address: pps.input.value ? paddr(pps.input.value) : c ? lpMainAddress(c.id) : ""
       },
       items: items,
@@ -16478,7 +16488,7 @@ function openEstimate(id) {
   if (!e) return;
   var c = byId(clients, e.client_id),
     p = panel();
-  p.appendChild(el("h2", null, estNum(e.number) + " · " + cname(e.client_id)));
+  p.appendChild(el("h2", null, estNum(e.number, e.doc_type) + " · " + cname(e.client_id)));
   var st =
     e.status === "accepted"
       ? "Accepted"
@@ -16558,6 +16568,8 @@ function openEstimate(id) {
           return isub;
         });
       if (edit) {
+        var eqe = qeChoice(e.doc_type);
+        body.appendChild(eqe);
         if (eps.length > 1 || e.property_id) body.appendChild(pf);
         body.appendChild(ttl);
         body.appendChild(scp);
@@ -16569,6 +16581,7 @@ function openEstimate(id) {
             scope: scp.input.value.trim(),
             valid_until: vu.input.value || null
           };
+          if (eqe.value() !== (e.doc_type || "quote")) row.doc_type = eqe.value();
           var na = eadj.value();
           if (JSON.stringify(na) !== JSON.stringify(e.adjustments || [])) {
             row.adjustments = na;
@@ -16581,7 +16594,9 @@ function openEstimate(id) {
             .then(function (r2_) {
               if (r2_.error) {
                 alert(
-                  "adjustments" in row
+                  "doc_type" in row
+                    ? "Could not save. Did you run the Stage 34 SQL?"
+                    : "adjustments" in row
                     ? "Could not save. Did you run the Stage 33 SQL?"
                     : "property_id" in row
                       ? "Could not save. Did you run the Stage 31 SQL?"
@@ -16590,6 +16605,13 @@ function openEstimate(id) {
                 return;
               }
               if ("property_id" in row) e.property_id = row.property_id;
+              if ("doc_type" in row) {
+                e.doc_type = row.doc_type;
+                if (!("adjustments" in row)) {
+                  openEstimate(e.id);
+                  return;
+                }
+              }
               if ("adjustments" in row) {
                 e.adjustments = row.adjustments;
                 e.total = row.total;
@@ -16609,6 +16631,7 @@ function openEstimate(id) {
         sv.style.marginBottom = "10px";
         body.appendChild(sv);
       } else {
+        body.appendChild(el("div", "note", estWord(e, true) + (e.doc_type === "estimate" ? " (price may change)" : " (fixed price)")));
         if (e.property_id && paddr(e.property_id)) body.appendChild(el("div", "note", "Property: " + paddr(e.property_id)));
         if (e.title) body.appendChild(el("b", null, e.title));
         if (e.scope) {
@@ -16708,10 +16731,10 @@ function openEstimate(id) {
       acts.style.marginTop = "14px";
       var msg = estMessage(e, c);
       if (c && c.email) {
-        var a2 = el("a", "btn", "Email estimate");
+        var a2 = el("a", "btn", "Email " + estWord(e));
         a2.href = mailHref(
           c.email,
-          "Estimate " + estNum(e.number) + " from " + bizv("name", "Latta Corp"),
+          estWord(e, true) + " " + estNum(e.number, e.doc_type) + " from " + bizv("name", "Latta Corp"),
           msg
         );
         a2.addEventListener("click", function () {
@@ -16820,59 +16843,121 @@ function openEstimate(id) {
         );
     });
 }
-/* ---- Estimate Summary options: the two open rows can be a Discount, Sales tax or Fee, as a % or a dollar amount.
-   Same rules as the client's page (d/index.html): discount and fee are a % of the subtotal,
-   sales tax a % of the subtotal after any discount. Whichever box was typed in last (% or $) is kept; the other follows. */
+/* ---- Quote or Estimate: picked on the form, with a "?" beside each that tells office staff which to use. */
+var QE_HELP = {
+  quote:
+    "<b>Use a Quote when the price is fixed.</b>You know the whole job and stand behind the number: lawn and HOA maintenance contracts, mulch, pine straw, hedge trimming, shrub or plant removal, measured sod, seasonal cleanups. Once the client signs, that is the price they pay.",
+  estimate:
+    "<b>Use an Estimate when the final cost depends on what we find.</b>Tree or stump removal with unknown roots, drainage, grading, irrigation repairs, storm cleanup, or work you haven't fully seen yet. The client's copy says the final price may change, and we contact them before any change."
+};
+function qeChoice(val) {
+  var w = el("div", "qe"),
+    cur = val === "estimate" ? "estimate" : "quote",
+    help = el("div", "qhelp"),
+    shown = "";
+  help.hidden = true;
+  w.appendChild(el("span", null, "Quote or Estimate?"));
+  var opts = el("div", "opts"),
+    labels = {};
+  ["quote", "estimate"].forEach(function (k) {
+    var l = el("label", "o"),
+      r = document.createElement("input");
+    r.type = "radio";
+    r.name = "qe" + Math.random().toString(36).slice(2, 7);
+    r.checked = k === cur;
+    r.addEventListener("change", function () {
+      cur = k;
+      paint();
+      w.dispatchEvent(new Event("change", { bubbles: true }));
+    });
+    l.appendChild(r);
+    l.appendChild(document.createTextNode(k === "quote" ? "Quote (fixed price)" : "Estimate (price may change)"));
+    var q = el("button", "qtip", "?");
+    q.type = "button";
+    q.setAttribute("aria-label", "When to use a " + k);
+    q.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      shown = shown === k ? "" : k;
+      help.innerHTML = shown ? QE_HELP[k] : "";
+      help.hidden = !shown;
+    });
+    l.appendChild(q);
+    opts.appendChild(l);
+    labels[k] = l;
+    l.radio = r;
+  });
+  // keep all radios of this picker in one group
+  labels.estimate.radio.name = labels.quote.radio.name;
+  function paint() {
+    labels.quote.className = "o" + (cur === "quote" ? " on" : "");
+    labels.estimate.className = "o" + (cur === "estimate" ? " on" : "");
+  }
+  paint();
+  w.appendChild(opts);
+  w.appendChild(help);
+  w.value = function () {
+    return cur;
+  };
+  return w;
+}
+
+/* ---- Estimate Summary: one optional row (Discount or Fee, a % of the subtotal), then Sales tax, which is always there
+   and is figured on everything above it (so a discount lowers the tax). Same rules as the client's page (d/index.html).
+   Type a % or a dollar amount; the other fills in. Whichever was typed last is kept, so a % follows line changes. */
 var ADJ_NAMES = { discount: "Discount", tax: "Sales tax", fee: "Fee" };
 function estAdjCalc(sub, list) {
-  var disc = 0,
-    add = 0,
-    rows = (Array.isArray(list) ? list : [])
-      .slice(0, 2)
-      .filter(function (a) {
-        return a && ADJ_NAMES[a.kind];
-      })
-      .map(function (a) {
-        var base = a.kind === "tax" ? sub - disc : sub,
-          pct = Number(a.pct),
-          amt = Number(a.amt);
-        if (a.mode === "pct" && !isNaN(pct)) amt = Math.round(base * pct) / 100;
-        else {
-          amt = isNaN(amt) ? 0 : amt;
-          pct = base ? (amt / base) * 100 : 0;
-        }
-        if (a.kind === "discount") disc += amt;
-        else add += amt;
-        return { kind: a.kind, pct: pct, amt: amt };
-      });
-  return { rows: rows, total: r2(sub - disc + add) };
+  list = Array.isArray(list) ? list : [];
+  var o = list.filter(function (a) {
+      return a && (a.kind === "discount" || a.kind === "fee");
+    })[0],
+    x = list.filter(function (a) {
+      return a && a.kind === "tax";
+    })[0];
+  function one(a, base) {
+    var pct = Number(a.pct),
+      amt = Number(a.amt);
+    if (a.mode === "pct" && !isNaN(pct)) amt = Math.round(base * pct) / 100;
+    else {
+      amt = isNaN(amt) ? 0 : amt;
+      pct = base ? (amt / base) * 100 : 0;
+    }
+    return { kind: a.kind, pct: pct, amt: amt };
+  }
+  var opt = o ? one(o, sub) : null,
+    run = sub + (opt ? (opt.kind === "discount" ? -opt.amt : opt.amt) : 0),
+    tax = x ? one(x, run) : null;
+  return { opt: opt, tax: tax, rows: [opt, tax].filter(Boolean), total: r2(run + (tax ? tax.amt : 0)) };
 }
 function estTotal(sub, list) {
   return estAdjCalc(sub, list).total;
 }
 function adjEditor(list, getSub) {
+  list = Array.isArray(list) ? list : [];
   var box = el("div", "adjbox");
-  box.appendChild(el("b", null, "Estimate Summary options"));
-  box.appendChild(el("div", "note", "Use the two open rows for a discount, sales tax or fee. Type a % or a dollar amount; the other fills in."));
-  var slots = [0, 1].map(function (i) {
-    var a = (list || [])[i] || {},
-      r = el("div", "grid3"),
-      k = fld("Row " + (i + 1), "select", a.kind || "", [
-        ["", "None (blank row)"],
-        ["discount", "Discount"],
-        ["tax", "Sales tax"],
-        ["fee", "Fee"]
-      ]),
+  box.appendChild(el("b", null, "Summary: optional row and sales tax"));
+  box.appendChild(el("div", "note", "Type a % or a dollar amount; the other fills in. Sales tax is figured after any discount or fee."));
+  function slot(a, isTax) {
+    a = a || {};
+    var r = el("div", "grid3"),
+      k = isTax
+        ? el("div", "fixed", "Sales tax")
+        : fld("Optional row", "select", a.kind || "", [
+            ["", "None (blank row)"],
+            ["discount", "Discount"],
+            ["fee", "Fee"]
+          ]),
       pc = fld("%", "number", a.mode === "pct" && a.pct != null ? String(a.pct) : ""),
       am = fld("Amount ($)", "number", a.kind && a.mode !== "pct" && a.amt != null ? String(a.amt) : "");
-    pc.input.step = "0.01";
-    am.input.step = "0.01";
+    pc.input.step = am.input.step = "0.01";
     pc.input.inputMode = am.input.inputMode = "decimal";
     r.appendChild(k);
     r.appendChild(pc);
     r.appendChild(am);
     box.appendChild(r);
-    var s = { k: k, pc: pc, am: am, mode: a.mode === "pct" ? "pct" : "amt" };
+    var s = { tax: isTax, k: k, pc: pc, am: am, mode: a.mode === "pct" ? "pct" : "amt" };
+    s.kind = function () {
+      return isTax ? (pc.input.value !== "" || am.input.value !== "" ? "tax" : "") : k.input.value;
+    };
     pc.input.addEventListener("input", function () {
       s.mode = "pct";
       refresh();
@@ -16881,29 +16966,42 @@ function adjEditor(list, getSub) {
       s.mode = "amt";
       refresh();
     });
-    k.input.addEventListener("change", refresh);
+    if (!isTax) k.input.addEventListener("change", refresh);
     return s;
-  });
+  }
+  var slots = [
+    slot(
+      list.filter(function (a) {
+        return a && (a.kind === "discount" || a.kind === "fee");
+      })[0],
+      false
+    ),
+    slot(
+      list.filter(function (a) {
+        return a && a.kind === "tax";
+      })[0],
+      true
+    )
+  ];
   function raw() {
     return slots
       .filter(function (s) {
-        return s.k.input.value;
+        return s.kind();
       })
       .map(function (s) {
         var v = parseFloat(s.mode === "pct" ? s.pc.input.value : s.am.input.value);
         return s.mode === "pct"
-          ? { kind: s.k.input.value, mode: "pct", pct: isNaN(v) ? 0 : v }
-          : { kind: s.k.input.value, mode: "amt", amt: isNaN(v) ? 0 : r2(v) };
+          ? { kind: s.kind(), mode: "pct", pct: isNaN(v) ? 0 : v }
+          : { kind: s.kind(), mode: "amt", amt: isNaN(v) ? 0 : r2(v) };
       });
   }
   function refresh() {
-    var c = estAdjCalc(getSub(), raw()),
-      n = 0;
+    var c = estAdjCalc(getSub(), raw());
     slots.forEach(function (s) {
-      var on = !!s.k.input.value;
+      var on = s.tax || !!s.k.input.value;
       s.pc.style.visibility = s.am.style.visibility = on ? "" : "hidden";
-      if (!on) return;
-      var x = c.rows[n++];
+      var x = s.tax ? c.tax : c.opt;
+      if (!x) return;
       if (s.mode === "pct" && document.activeElement !== s.am.input) s.am.input.value = x.amt.toFixed(2);
       if (s.mode === "amt" && document.activeElement !== s.pc.input)
         s.pc.input.value = s.am.input.value === "" ? "" : String(Math.round(x.pct * 100) / 100);
@@ -16916,8 +17014,9 @@ function adjEditor(list, getSub) {
     value: function () {
       // store both numbers so the client page and lists never have to guess
       var c = estAdjCalc(getSub(), raw());
-      return raw().map(function (a, i) {
-        return { kind: a.kind, mode: a.mode, pct: Math.round(c.rows[i].pct * 100) / 100, amt: c.rows[i].amt };
+      return raw().map(function (a) {
+        var x = a.kind === "tax" ? c.tax : c.opt;
+        return { kind: a.kind, mode: a.mode, pct: Math.round(x.pct * 100) / 100, amt: x.amt };
       });
     }
   };

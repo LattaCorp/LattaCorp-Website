@@ -330,7 +330,7 @@
             [
               "estimate quote",
               e.status,
-              estNum(e.number),
+              estNum(e.number, e.doc_type),
               String(e.total),
               cname(e.client_id),
               e.title || "",
@@ -344,7 +344,7 @@
       es,
       function (e) {
         return [
-          estNum(e.number) + " · " + cname(e.client_id),
+          estNum(e.number, e.doc_type) + " · " + cname(e.client_id),
           [
             e.title,
             money(e.total),
