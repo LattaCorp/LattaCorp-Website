@@ -16300,7 +16300,7 @@ function openEstimateForm(cid) {
     )
   );
   var ttl = fld("Job Title (shows under QUOTE or ESTIMATE, for example: Spring cleanup and mulch)", "text", ""),
-    scp = fld("Details the client will see (optional)", "textarea", ""),
+    scp = fld("Notes & Terms the client will see (optional, shows near the bottom)", "textarea", ""),
     vd = fld("Valid for (days)", "number", "30");
   p.appendChild(cs);
   // which property the work is for (shows as the service address on the estimate); blank = their Main address
@@ -16533,6 +16533,7 @@ function openEstimate(id) {
                 : " by " + e.response_name
               : "") +
             (e.responded_at ? " on " + dshort(String(e.responded_at).slice(0, 10)) : "") +
+            (e.response_po ? " · PO / approval # " + e.response_po : "") +
             (e.response_note ? '. Note: "' + e.response_note + '"' : "")
         );
         ans.style.fontWeight = "700";
@@ -16546,7 +16547,7 @@ function openEstimate(id) {
         body.appendChild(ans);
       }
       var ttl = fld("Job Title", "text", e.title || ""),
-        scp = fld("Details the client will see", "textarea", e.scope || ""),
+        scp = fld("Notes & Terms the client will see", "textarea", e.scope || ""),
         vu = fld("Valid until", "date", e.valid_until || ""),
         eps = clientProps(e.client_id),
         pf = fld(
