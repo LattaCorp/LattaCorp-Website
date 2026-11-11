@@ -1218,6 +1218,20 @@ function renderClients() {
     );
     return;
   }
+  // HOA accounts first, then Commercial, then Residential (alphabetical within each)
+  var TYPE_ORDER = { hoa: 0, commercial: 1, residential: 2 };
+  shown = shown
+    .map(function (c, i) {
+      return { c: c, i: i };
+    })
+    .sort(function (x, y) {
+      var a = TYPE_ORDER[x.c.type] != null ? TYPE_ORDER[x.c.type] : 3,
+        b = TYPE_ORDER[y.c.type] != null ? TYPE_ORDER[y.c.type] : 3;
+      return a - b || x.i - y.i;
+    })
+    .map(function (x) {
+      return x.c;
+    });
   shown.forEach(function (c) {
     var b = el("button", "row client" + (c.archived ? " archived" : "") + (!c.archived && acctStatus(c).key === "past_due" ? " pastdue" : ""));
     b.type = "button";
