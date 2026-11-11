@@ -148,6 +148,12 @@ function render() {
   });
   nav.appendChild(mb);
   $("topbtns").textContent = "";
+  optMark(null);
+  // moving to another screen closes whatever is open on the right side
+  if (view !== shownView) {
+    if (shownView !== null && docked() && $("detail").classList.contains("on") && !$("detail").classList.contains("full")) closeDetail();
+    shownView = view;
+  }
   // list screens show their cards side by side (as many per line as fit)
   $("list").classList.toggle("cards", ["leads", "clients", "jobs", "schedule"].indexOf(view) > -1);
   if (view === "leads") renderLeads();
@@ -202,6 +208,38 @@ function detailFull(full) {
 }
 window.addEventListener("resize", dockLayout);
 dockLayout();
+var shownView = null,
+  optOpen = null;
+function optMark(b) {
+  if (optOpen && optOpen !== b) {
+    optOpen.classList.remove("on");
+    if (optOpen.dataset.lbl) optOpen.textContent = optOpen.dataset.lbl;
+  }
+  optOpen = b;
+  if (!b) return;
+  b.classList.add("on");
+  if (!b.dataset.lbl) b.dataset.lbl = b.textContent;
+  if (/^\+\s/.test(b.dataset.lbl)) b.textContent = "\u2212 " + b.dataset.lbl.replace(/^\+\s*/, "");
+}
+$("topbtns").addEventListener(
+  "click",
+  function (e) {
+    if (!docked()) return;
+    var b = e.target.closest("#topbtns > *");
+    if (!b) return;
+    if (b === optOpen && $("detail").classList.contains("on")) {
+      e.preventDefault();
+      e.stopPropagation();
+      closeDetail();
+      return;
+    }
+    setTimeout(function () {
+      var d = $("detail");
+      if (d.classList.contains("on") && !d.classList.contains("full")) optMark(b);
+    }, 0);
+  },
+  true
+);
 
 /* ---- panel helpers ---- */
 function panel() {
@@ -209,6 +247,7 @@ function panel() {
   p.textContent = "";
   p.classList.remove("withprev");
   detailFull(false);
+  optMark(null);
   lpFrame = null;
   p.appendChild(btn("×", "close", closeDetail)).setAttribute("aria-label", "Close");
   $("detail").classList.add("on");
@@ -284,6 +323,7 @@ function panel() {
 })();
 function closeDetail() {
   $("detail").classList.remove("on");
+  optMark(null);
 }
 /* Clicking the dim area outside a panel closes it, but not while a form is open (so a stray click or a drag that ends outside never loses what you typed). Use the X or Esc to close a form. */
 var dnDown = null;

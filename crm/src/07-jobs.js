@@ -183,10 +183,14 @@ function renderJobs() {
     return;
   }
   shown.forEach(function (j) {
-    var b = el("button", "row client");
+    // lawn maintenance jobs are green; any other work (trimming, cleanups, installs...) is blue
+    var lawn = /^lawn\s*maint/i.test(j.title || ""),
+      b = el("button", "row client job " + (lawn ? "lawn" : "other"));
     b.type = "button";
     var left = el("div");
-    left.appendChild(el("b", null, cname(j.client_id) + " · " + j.title));
+    left.appendChild(el("b", null, cname(j.client_id)));
+    var plan = lawn ? "Lawn maintenance" + ((j.title.split(/\s+-\s+/)[1] || "") ? " \u00b7 " + j.title.split(/\s+-\s+/)[1] : "") : j.title;
+    left.appendChild(el("span", "jtype", plan));
     left.appendChild(
       el(
         "div",

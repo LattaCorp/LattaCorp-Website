@@ -151,6 +151,14 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 #list.cards>.row{height:100px;overflow:hidden;align-content:start}
 #list.cards>.row>div:first-child{min-width:0}
 #list.cards>.row b,#list.cards>.row .sub{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* job cards: taller so the whole name, plan and address show (no "…"); lawn maintenance green, other work blue */
+#list.cards>.row.job{height:142px}
+#list.cards>.row.job b,#list.cards>.row.job .sub{white-space:normal;overflow:visible;text-overflow:clip}
+.row.job .jtype{display:inline-block;margin:3px 0 4px;padding:2px 9px;border-radius:999px;font-size:.78rem;font-weight:700}
+.row.job.lawn{border-left-color:var(--leaf)}.row.job.lawn .jtype{background:#e2f3df;color:#1b552b}
+.row.job.other{border-left-color:#2f6fb0}.row.job.other .jtype{background:#e3eef9;color:#1f4f86}
+/* the open option on the right side */
+body.dock #rightcol #topbtns>.on{background:var(--forest);color:#fff;border-color:var(--forest)}
 /* a client with an overdue balance is tinted red */
 .row.client.pastdue{background:#fdeceb;border-color:#f2c4bf;border-left-color:var(--red)}
 .row.client.pastdue:hover{background:#fbe1df}
@@ -385,7 +393,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=129"></script>
+<script src="app.js?v=130"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
