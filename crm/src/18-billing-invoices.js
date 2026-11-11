@@ -231,6 +231,13 @@ function openInvoiceForm(cid) {
     )
   );
   p.appendChild(cs);
+  // laid out like the New quote form: who it's for, the job title and notes, then the dates, then the lines
+  var pps = propPicker(cs);
+  p.appendChild(pps);
+  var ttl = fld("Job Title", "text", ""),
+    nt = fld("Notes & Terms (optional, the client sees these)", "textarea", "");
+  p.appendChild(ttl);
+  p.appendChild(nt);
   var terms = Number(bizv("terms_days", 10));
   terms = isNaN(terms) ? 10 : terms;
   var g = el("div", "grid2"),
@@ -270,32 +277,47 @@ function openInvoiceForm(cid) {
   gp.appendChild(pbeg);
   gp.appendChild(pend);
   p.appendChild(gp);
-  var pps = propPicker(cs);
-  p.appendChild(pps);
   var ref = fld("Reference / PO number (optional, shows on the invoice)", "text", "");
   p.appendChild(ref);
-  p.appendChild(el("h3", null, "Lines"));
+  p.appendChild(el("h3", null, "Work Billed"));
   var box = el("div"),
     rows = [];
+  function blankRow(x) {
+    return !x.t.input.value.trim() && !x.d.input.value.trim() && !x.q.input.value.trim() && !x.a.input.value.trim();
+  }
+  // keeps exactly one empty line at the bottom; a line left blank is removed once you move off it
+  function syncRows() {
+    if (!rows.length || !blankRow(rows[rows.length - 1])) addRow();
+    for (var i = rows.length - 2; i >= 0; i--) {
+      if (blankRow(rows[i]) && !rows[i].el.contains(document.activeElement)) {
+        box.removeChild(rows[i].el);
+        rows.splice(i, 1);
+      }
+    }
+  }
+  box.addEventListener("input", syncRows);
+  box.addEventListener("focusout", function () {
+    setTimeout(syncRows, 0);
+  });
   function addRow() {
-    var r = el("div", "grid3"),
+    var r = el("div", "grid4"),
       tt = fld("Title", "text", ""),
       d = fld("Description", "text", ""),
-      a = fld("Total ($, negative = discount, 0 = no charge)", "number", "");
+      q = fld("QTY", "text", ""),
+      a = fld("Total ($)", "number", "");
     a.input.step = "0.01";
     a.input.inputMode = "decimal";
+    a.input.title = "Negative = discount, 0 = no charge";
     r.appendChild(tt);
     r.appendChild(d);
+    r.appendChild(q);
     r.appendChild(a);
     box.appendChild(r);
-    rows.push({ t: tt, d: d, a: a });
+    rows.push({ el: r, t: tt, d: d, q: q, a: a });
   }
   p.appendChild(box);
   addRow();
-  p.appendChild(btn("+ Add another line", "btn alt sm", addRow));
-  var nt = fld("Notes (optional)", "textarea", "");
-  nt.style.marginTop = "10px";
-  p.appendChild(nt);
+  p.appendChild(el("p", "note", "A negative total is a discount; 0 is a no-charge line."));
   var go = btn("Create invoice", "btn", function () {
     if (!cs.input.value) {
       alert("Choose a client.");
@@ -309,14 +331,17 @@ function openInvoiceForm(cid) {
     for (var i = 0; i < rows.length; i++) {
       var tt = rows[i].t.input.value.trim(),
         d = rows[i].d.input.value.trim(),
+        q = rows[i].q.input.value.trim(),
         raw = rows[i].a.input.value.trim(),
         a = raw === "" ? 0 : parseFloat(raw);
-      if (!tt && !d && raw === "") continue;
+      if (!tt && !d && !q && raw === "") continue;
       if ((!tt && !d) || isNaN(a)) {
         alert("Each line needs a title or description. (Leave the total empty or 0 for a no-charge line.)");
         return;
       }
-      items.push({ title: tt, description: d, amount: a });
+      var line = { title: tt, description: d, amount: a };
+      if (q) line.qty = q;
+      items.push(line);
     }
     if (!items.length) {
       alert("Add at least one line.");
@@ -340,12 +365,14 @@ function openInvoiceForm(cid) {
         due_date: dd.input.value,
         total: total,
         reference: ref.input.value.trim(),
-        notes: nt.input.value.trim(),
+
         status: zero ? "paid" : "open",
         paid_at: zero ? isd.input.value + "T12:00:00" : null,
         paid_method: zero ? "No charge" : ""
       };
     if (pid) irow.property_id = pid;
+    if (ttl.input.value.trim()) irow.title = ttl.input.value.trim();
+    if (nt.input.value.trim()) irow.terms = nt.input.value.trim();
     if (pbeg.input.value) irow.period_start = pbeg.input.value;
     if (pend.input.value) irow.period_end = pend.input.value;
     sb.from("invoices")
@@ -356,7 +383,9 @@ function openInvoiceForm(cid) {
         if (r.error || !r.data) {
           go.disabled = false;
           alert(
-            pid
+            irow.title || irow.terms
+              ? "Could not create the invoice. Did you run the Stage 37 SQL?"
+              : pid
               ? "Could not create the invoice. Did you run the Stage 20 SQL?"
               : "Could not create the invoice. Did you run the Stage 5 SQL?"
           );
@@ -377,7 +406,7 @@ function openInvoiceForm(cid) {
                 .eq("id", inv.id)
                 .then(function () {
                   go.disabled = false;
-                  alert("Could not save the lines. Did you run the Stage 32 SQL?");
+                  alert("Could not save the lines. Did you run the Stage 37 SQL?");
                 });
               return;
             }
@@ -402,11 +431,12 @@ function openInvoiceForm(cid) {
     rows.forEach(function (r) {
       var tt = r.t.input.value.trim(),
         d = r.d.input.value.trim(),
+        q = r.q.input.value.trim(),
         a = parseFloat(r.a.input.value);
-      if (!tt && !d && isNaN(a)) return;
+      if (!tt && !d && !q && isNaN(a)) return;
       a = isNaN(a) ? 0 : a;
       total += a;
-      items.push({ date: isd.input.value, title: tt, description: d, amount: a, address: pid ? paddr(pid) : "" });
+      items.push({ date: isd.input.value, title: tt, description: d, qty: q, amount: a });
     });
     total = r2(total);
     show({
@@ -418,6 +448,8 @@ function openInvoiceForm(cid) {
         status: "open",
         total: total,
         reference: ref.input.value.trim(),
+        title: ttl.input.value.trim(),
+        terms: nt.input.value.trim(),
         period_start: pbeg.input.value,
         period_end: pend.input.value,
         property_address: pid ? paddr(pid) : c ? lpMainAddress(c.id) : ""

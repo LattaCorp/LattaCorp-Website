@@ -137,11 +137,11 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 .cl .ct{flex:1;display:flex;flex-direction:column;font-size:1rem;line-height:1.5;color:#26412c;padding-top:2px}.cl .ct b{display:block;color:var(--forest);font-size:1.14rem;margin-bottom:1px}
 .cl .ct .blk{border-left:4px solid var(--leaf);padding:2px 0 2px 12px;margin-bottom:14px}.cl .ct .lb{display:block;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .cl .top .bt b.big{font-size:1.7rem;line-height:1.15;margin:2px 0}.cl .top .bt div{white-space:nowrap}
-.cl .stamp{margin-top:12px}
+.cl .stamp{margin-top:12px}.cl .stw{display:block;text-align:left}.cl .stw .stamp{display:inline-block;width:auto}
 @media(max-width:700px){#paper.sheet{min-height:0}.cl .led tr.more{display:none}.cl>.inner{padding:16px 12px 0}.cl .top{padding:16px 14px;grid-template-columns:auto 1fr;row-gap:12px}.cl .top .lg img{height:48px}.cl .top .mid2{display:contents}.cl .top .w{font-size:2.2rem;text-align:right}.cl .top .w.est{font-size:1.45rem;letter-spacing:.04em;justify-self:end}.cl .top .jt{grid-column:1/-1;margin:0;font-size:1.1rem}.cl .top .bt.hc{display:none}.cl .appr .apg{grid-template-columns:1fr 1fr;gap:12px 14px}.cl .appr .apc.sigc{grid-column:1/-1}.cl .asum.est{width:100%}.cl .led td.tt{width:24%}.cl .led td.q,.cl .led th.q{width:40px;padding-left:3px;padding-right:3px;white-space:normal}.cl .led td.a{width:72px}.cl .top .sa{grid-column:1/-1;text-align:left;margin-top:0}.cl .top .bt{grid-column:1/-1;justify-self:start;text-align:left}.cl .ct .wmg{height:44px;margin:16px auto 0}.cl .ct{padding-top:0}.cl .asum{width:100%}.cl .sumwrap{flex-direction:column-reverse;gap:16px}
  .cl .grid thead{display:none}.cl .grid tr{display:grid;grid-template-columns:1fr 1fr}.cl .grid td{display:flex;flex-direction:column;text-align:left;font-size:.95rem}
  .cl .grid td.wide{grid-column:1/-1}.cl .grid td::before{content:attr(data-k);font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
- .cl .led td.l,.cl .led th.l{display:none}.cl .led .lm{display:block}.cl .sect{flex-wrap:wrap;gap:2px 10px}}
+ .cl .led.inv td.d,.cl .led.inv th.d{width:58px;font-size:.76rem;white-space:normal;padding-left:3px;padding-right:3px} .cl .led td.l,.cl .led th.l{display:none}.cl .led .lm{display:block}.cl .sect{flex-wrap:wrap;gap:2px 10px}}
 @media print{.cl .top{padding:18px 22px}.cl>.inner{padding:16px 0 0}#paper.sheet{min-height:0}.cl .led tr.scr{display:none}.cl{padding-bottom:0}}
 .foot{text-align:center;color:var(--leaf);margin-top:24px;font-size:1rem;font-weight:700;font-family:"Playfair Display",Georgia,serif}
 .bar[hidden]{display:none}
@@ -234,7 +234,8 @@ function layoutEst(){var paper=document.getElementById("paper");if(!paper)return
   if(!pageMode()){pageRule("");paper.classList.remove("page","multi");paper.style.transform="";paper.style.marginBottom="";fitRows();return}
   paper.classList.add("page");var tb=paper.querySelector("table.led tbody");if(!tb)return;
   [].slice.call(tb.querySelectorAll("tr.pad")).forEach(function(r){r.parentNode.removeChild(r)});
-  var mk=function(){var r=document.createElement("tr");r.className="pad";r.innerHTML='<td class="tt"></td><td></td><td class="q"></td><td class="a"></td>';return r};
+  var ths=[].slice.call(paper.querySelectorAll("table.led thead th")),cells=ths.map(function(th,i){var k=th.className||(i===ths.length-1?"a":"");return"<td"+(k?' class="'+k+'"':"")+"></td>"}).join("");
+  var mk=function(){var r=document.createElement("tr");r.className="pad";r.innerHTML=cells;return r};
   paper.classList.remove("tight");paper.classList.add("measure");var h=paper.offsetHeight;
   // just a little too long? tighten the spacing before giving up and using a second page
   if(h>PAGE_H-2){paper.classList.add("tight");h=paper.offsetHeight;if(h>PAGE_H-2)paper.classList.remove("tight"),h=paper.offsetHeight}
@@ -254,7 +255,7 @@ function fitScale(){var paper=document.getElementById("paper");if(!paper)return;
   var bar=document.getElementById("bar"),avail=window.innerHeight-(bar&&!bar.hidden?bar.offsetHeight:0)-28,s=Math.max(.62,Math.min(1,avail/PAGE_H));
   if(s<1){paper.style.transform="scale("+s+")";paper.style.marginBottom=(-PAGE_H*(1-s))+"px"}}
 var lastMode=null;
-addEventListener("resize",function(){if(!data)return;var m=pageMode();if(data.kind==="estimate"&&m!==lastMode){lastMode=m;draw();return}lastMode=m;if(data.kind==="estimate")fitScale();else fitRows()});addEventListener("beforeprint",fitRows);addEventListener("afterprint",fitRows);
+addEventListener("resize",function(){if(!data)return;var m=pageMode();if(m!==lastMode){lastMode=m;draw();return}lastMode=m;fitScale()});addEventListener("beforeprint",fitRows);addEventListener("afterprint",fitRows);
 function hdrRight(b,mail){return'<div class="bt hc">'+(b.phone?"<b>"+esc(b.phone)+"</b>":"")+(mail&&b.email?'<div class="em">'+esc(b.email)+"</div>":"")+"<div>"+t("web")+"</div></div>"}
 function who(c){return"<b>"+esc(c.name||"")+"</b>"+(c.company?"<div>"+esc(c.company)+"</div>":"")}
 
@@ -269,42 +270,38 @@ function drawInvoice(){
   var d=data.doc,b=data.business,c=data.client,items=data.items||[],s=data.summary||null,addrs=[];
   items.forEach(function(it){if(it.address&&addrs.indexOf(it.address)<0)addrs.push(it.address)});
   if(!addrs.length&&d.property_address)addrs.push(d.property_address);
-  var n=num(d.number,"LC-"),open=d.status==="open";
+  var n=num(d.number,"LC-"),many=addrs.length>1;
   var stamp=d.status==="paid"?'<div class="stamp">'+t("paid")+" "+esc(d.paid_at?dts(d.paid_at):"")+(d.paid_method?" · "+esc(d.paid_method):"")+"</div>":d.status==="void"?'<div class="stamp bad">'+t("void")+"</div>":"";
-  // top: business on the left, INVOICE and what we accept on the right
-  var h='<div class="cl"><div class="top"><div class="lg"><img src="../images/logo-tree-header.png" alt="'+esc(b.name||"Latta Corp")+'"></div>'
-    +'<div class="mid2"><div class="w">'+t("inv")+"</div>"
-    +"</div>"
-    +hdrRight(b)+'</div><div class="inner">';
-  // the boxed row of invoice facts
-  var cells=[[t("cinv"),n],[t("cacct"),c.account_no?String(c.account_no):"—"],[t("pbeg"),dn(d.period_start)],[t("pend"),dn(d.period_end)],[t("idate"),dn(d.issue_date)],[t("pdue"),dn(d.due_date)],[t("saddr"),addrs.join("; ")||"—",1]];
+  // laid out like the quote: logo, INVOICE (underlined) with the job title, phone / email / website
+  var h='<img class="wmk" src="../images/logo-tree-watermark.png" alt=""><div class="cl qd"><div class="top"><div class="lg"><img src="../images/logo-tree-header.png" alt="'+esc(b.name||"Latta Corp")+'"></div>'
+    +'<div class="mid2"><div class="w est">'+t("inv")+"</div>"+(d.title?'<div class="jt">'+esc(d.title)+"</div>":"")+"</div>"
+    +hdrRight(b,1)+'</div><div class="inner">';
+  var cells=[[t("billto"),(c.name||"")+(c.account_no?" ("+c.account_no+")":""),1],[t("cinv"),n],[t("idate"),dn(d.issue_date)],[t("pdue"),dn(d.due_date)]];
+  if(d.reference)cells.push([t("ref"),d.reference]);
+  cells.push([many?t("addrs"):t("saddr"),addrs.join("; ")||"—",1]);
   h+=gridRow(cells);
-  // bill to + account summary
+  // the lines: date, (location when several properties), title, description, QTY, total
+  var rows=items.map(function(it){var loc=it.address||"";return'<tr><td class="d">'+esc(dn(it.date))+"</td>"+(many?'<td class="l">'+esc(loc)+"</td>":"")+'<td class="tt">'+esc(it.title||"")+"</td><td>"+esc(it.description)+(many&&loc?'<div class="lm">'+esc(loc)+"</div>":"")+'</td><td class="q">'+esc(it.qty||"")+'</td><td class="a">'+esc(money(it.amount))+"</td></tr>"}).join("");
+  for(var i=items.length;i<Math.max(items.length+3,PRINT_ROWS);i++)rows+='<tr class="pad'+(i>=items.length+3?" pr":"")+'"><td class="d"></td>'+(many?'<td class="l"></td>':"")+'<td class="tt"></td><td></td><td class="q"></td><td class="a"></td></tr>';
+  h+='<div class="sect"><b>'+t("activity")+"</b><span>"+t("keep")+"</span></div>"
+    +'<table class="led inv"><thead><tr><th class="d">'+t("date")+"</th>"+(many?'<th class="l">'+t("location")+"</th>":"")+'<th class="tt">'+t("ttl")+"</th><th>"+t("desc")+'</th><th class="q">'+t("qty")+'</th><th class="a">'+t("total")+"</th></tr></thead><tbody>"+rows+"</tbody></table>";
+  // Invoice Summary (the account as of today) beside a Notes & Terms box, like the quote
   var sum="";
   if(s&&d.status!=="void"){
     var pays=Number(s.this_paid||0)+Number(s.credit||0),late=Number(s.previous_past_due||0)+(Number(s.this_balance)>0&&s.today&&d.due_date<s.today?Number(s.this_balance):0);
     var row=function(k,v,cls){return'<tr'+(cls?' class="'+cls+'"':"")+'><td class="k">'+k+'</td><td class="v">'+v+"</td></tr>"};
-    sum='<div class="asum"><table><thead><tr><th>'+t("summary")+'</th><th class="r">'+t("totals")+"</th></tr></thead><tbody>"
+    sum='<div class="asum est inv"><table><thead><tr><th>'+t("summary")+"</th><th>"+t("totals")+"</th></tr></thead><tbody>"
       +row(t("pbeg"),esc(dn(d.period_start)),"per")+row(t("pend"),esc(dn(d.period_end)),"per")
       +row(t("prev"),esc(money(s.previous)))
       +row(t("payments"),pays>0?"−"+esc(money(pays)):esc(money(0)))
       +row(t("overdue"),esc(money(late)),late>0?"late":"")
       +row(t("curr"),esc(money(s.this_total)))
+      +row(t("tad"),esc(money(s.total_due)),"tot")
       +(function(){var nts=[];if(Number(s.total_due)<=0)nts.push(t("paidup"));else if(!(late>0))nts.push(t("dueby")+" "+esc(dt(d.due_date)));if(s.by_property)nts.push(t("forprop"));
         return nts.length?'<tr class="nts"><td colspan="2">'+nts.join(" · ")+"</td></tr>":""})()
-      +row(t("tad"),esc(money(s.total_due)),"tot")+"</tbody></table></div>"}
-  // account activity, with blank lines so a short invoice still reads like a statement
-  var many=addrs.length>1||items.some(function(it){return it.address});
-  var rows=items.map(function(it){var loc=it.address||d.property_address||"";return'<tr><td class="d">'+esc(dn(it.date))+'</td><td class="l">'+esc(loc)+"</td><td class=\"tt\">"+esc(it.title||"")+"</td><td>"+esc(it.description)+(loc?'<div class="lm">'+esc(loc)+"</div>":"")+'</td><td class="a">'+esc(money(it.amount))+"</td></tr>"}).join("");
-  // ruled blank lines fill the sheet, like the old statements (phones only show a few)
-  for(var i=items.length;i<16;i++)rows+='<tr class="pad'+(i>=6?" more":"")+(i>=10?" scr":"")+'"><td class="d"></td><td class="l"></td><td class="tt"></td><td></td><td class="a"></td></tr>';
-  h+='<div class="sect"><b>'+t("activity")+"</b><span>"+t("keep")+"</span></div>"
-    +'<table class="led"><thead><tr><th>'+t("date")+'</th><th class="l">'+t("location")+'</th><th class="tt">'+t("ttl")+"</th><th>"+t("desc")+"</th><th>"+t("total")+"</th></tr></thead><tbody>"+rows
-    +"</tbody></table>";
-  var ct='<div class="ct">'+clientBlock(t("billto"),c,d.reference?"<div>"+t("ref")+": "+esc(d.reference)+"</div>":"")
-    +'<div class="blk"><span class="lb">'+t("questions")+"</span><b>"+esc(b.name||"Latta Corp")+"</b>"+[b.phone,b.email].filter(Boolean).map(function(x){return"<div>"+esc(x)+"</div>"}).join("")+"</div>"
-    +'<div class="gap"></div><img class="wmg" src="../images/logo-wordmark-green.svg" alt=""></div>';
-  h+='<div class="sumwrap">'+ct+(sum||"")+"</div>"+stamp;
+      +"</tbody></table></div>"}
+  var ct='<div class="ct"><div class="nbox"><div class="nbh">'+t("notes")+"</div>"+(d.terms?'<div class="ntx">'+esc(d.terms)+"</div>":'<div class="nlines"></div>')+"</div></div>";
+  h+='<div class="sumwrap">'+ct+sum+"</div>"+(stamp?'<div class="stw">'+stamp+"</div>":"");
   h+=(b.footer?'<div class="thx">'+esc(b.footer)+"</div>":"")+"</div></div>";
   document.title=t("invoice")+" "+n+" · "+(b.name||"Latta Corp");
   return h}
@@ -393,7 +390,7 @@ function draw(){
   document.getElementById("en").className=lang==="en"?"on":"";document.getElementById("es").className=lang==="es"?"on":"";document.getElementById("pr").textContent=t("print");
   document.documentElement.lang=lang;
   AFTER="";root.innerHTML='<div id="paper" class="sheet">'+(data.kind==="invoice"?drawInvoice():drawEstimate())+"</div>"+AFTER;
-  if(data.kind==="estimate")layoutEst();else fitRows();
+  layoutEst();
   var ay=document.getElementById("ay");if(ay){ay.addEventListener("click",function(){respond("accepted")});document.getElementById("an2").addEventListener("click",function(){respond("declined")});sigPad()}
   if(preview)setTimeout(function(){parent.postMessage({type:"lc-doc-h",h:document.documentElement.scrollHeight},location.origin)},30)}
 

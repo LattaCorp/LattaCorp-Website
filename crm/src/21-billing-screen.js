@@ -529,7 +529,7 @@ function openInvoice(id) {
         var tr = document.createElement("tr");
         tr.appendChild(el("td", null, it.service_date ? dshort(it.service_date) : ""));
         tr.appendChild(el("td", "ttl", it.title || ""));
-        var d = el("td", null, (it.description || "") + (it.address ? " · " + it.address : ""));
+        var d = el("td", null, (it.description || "") + (it.qty ? " · QTY " + it.qty : "") + (it.address ? " · " + it.address : ""));
         tr.appendChild(d);
         var a = el("td", "amt", money(it.amount));
         tr.appendChild(a);
