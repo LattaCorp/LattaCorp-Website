@@ -174,7 +174,12 @@ function jobsFilterBar(tabs) {
     any = JF_GROUPS.some(function (g) {
       return JF[g[0]].length;
     });
-  JF_GROUPS.forEach(function (g) {
+  /* Two groups per row: Status + How often (with Sort by on the right), then Plan + Client */
+  var rows = [el("div", "frow"), el("div", "frow")];
+  rows.forEach(function (r) {
+    bar.appendChild(r);
+  });
+  JF_GROUPS.forEach(function (g, gi) {
     var grp = el("div", "fgrp");
     grp.appendChild(el("span", "flbl", g[1]));
     g[2].forEach(function (o) {
@@ -195,7 +200,7 @@ function jobsFilterBar(tabs) {
       });
       grp.appendChild(b);
     });
-    bar.appendChild(grp);
+    rows[gi < 2 ? 0 : 1].appendChild(grp);
   });
   if (any) {
     var clr = el("button", "tab fpill fclear", "Clear all");
@@ -206,9 +211,9 @@ function jobsFilterBar(tabs) {
       });
       render();
     });
-    bar.lastChild.appendChild(clr);
+    rows[1].lastChild.appendChild(clr);
   }
-  /* Sort by sits in the top-right corner, on the first row of pills */
+  /* Sort by sits at the right end of the first row */
   var sl = el("label", "fsort");
   sl.appendChild(el("span", "flbl", "Sort by"));
   var sel = document.createElement("select");
@@ -224,7 +229,7 @@ function jobsFilterBar(tabs) {
     render();
   });
   sl.appendChild(sel);
-  bar.insertBefore(sl, bar.firstChild);
+  rows[0].appendChild(sl);
   tabs.appendChild(bar);
 }
 
