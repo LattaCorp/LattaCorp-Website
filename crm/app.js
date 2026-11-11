@@ -16984,29 +16984,56 @@ function adjEditor(list, getSub) {
       ["disposal", "Disposal fee"],
       ["permit", "Permit fee"],
       ["rush", "Rush fee"],
-      ["other", "Other (type a name)"]
+      ["other", "Other (type your own)"]
     ];
     if (a.kind === "fee") opts.push(["fee", "Fee"]);
     var r = el("div", "grid3"),
       cell = el("div"),
-      k = isTax ? fld("\u00a0", "text", "Sales tax") : fld("Optional row", "select", a.kind || "", opts),
-      nm = fld("Name shown to the client", "text", a.label || ""),
+      k = isTax ? el("label", "f fixed") : fld("Optional row", "select", a.kind || "", opts),
+      ot = document.createElement("input"),
       pc = fld("%", "text", a.mode === "pct" && a.pct != null ? String(a.pct) : ""),
       am = fld("Amount ($)", "text", a.kind && a.mode !== "pct" && a.amt != null ? String(a.amt) : "");
     pc.input.inputMode = am.input.inputMode = "decimal";
     pc.input.autocomplete = am.input.autocomplete = "off";
+    pc.input.classList.add("ofs");
+    am.input.classList.add("ofs");
     if (isTax) {
-      k.classList.add("fixed");
-      k.input.readOnly = true;
-      k.input.tabIndex = -1;
+      // a plain label the same height as the boxes beside it, text centered both ways
+      k.appendChild(el("span", null, "\u00a0"));
+      k.box = el("div", "fxbox", "Sales tax");
+      k.appendChild(k.box);
+    } else {
+      // "Other": the same box turns into a text box for the name the client sees
+      ot.type = "text";
+      ot.maxLength = 40;
+      ot.placeholder = "Type a name, e.g. Irrigation check";
+      ot.value = a.kind === "other" ? a.label || "" : "";
+      ot.hidden = a.kind !== "other";
+      k.input.hidden = a.kind === "other";
+      k.appendChild(ot);
+      k.input.addEventListener("change", function () {
+        if (k.input.value === "other") {
+          k.input.hidden = true;
+          ot.hidden = false;
+          ot.focus();
+        }
+      });
+      ot.addEventListener("blur", function () {
+        if (!ot.value.trim()) {
+          ot.hidden = true;
+          k.input.hidden = false;
+          k.input.value = "";
+          refresh();
+        }
+      });
+      ot.addEventListener("input", refresh);
     }
     cell.appendChild(k);
-    if (!isTax) cell.appendChild(nm);
     r.appendChild(cell);
     r.appendChild(pc);
     r.appendChild(am);
     box.appendChild(r);
-    var s = { tax: isTax, k: k, nm: nm, pc: pc, am: am, mode: a.mode === "pct" ? "pct" : "amt" };
+    var s = { tax: isTax, k: k, ot: ot, pc: pc, am: am, mode: a.mode === "pct" ? "pct" : "amt" };
     s.kind = function () {
       return isTax ? (pc.input.value.trim() !== "" || am.input.value.trim() !== "" ? "tax" : "") : k.input.value;
     };
@@ -17029,10 +17056,7 @@ function adjEditor(list, getSub) {
       var v = numv(pc.input.value);
       if (!isNaN(v)) pc.input.value = String(Math.round(v * 100) / 100);
     });
-    if (!isTax) {
-      k.input.addEventListener("change", refresh);
-      nm.input.addEventListener("input", refresh);
-    }
+    if (!isTax) k.input.addEventListener("change", refresh);
     return s;
   }
   var slots = [
@@ -17057,7 +17081,7 @@ function adjEditor(list, getSub) {
       .map(function (s) {
         var v = numv(s.mode === "pct" ? s.pc.input.value : s.am.input.value),
           o = s.mode === "pct" ? { kind: s.kind(), mode: "pct", pct: isNaN(v) ? 0 : v } : { kind: s.kind(), mode: "amt", amt: isNaN(v) ? 0 : r2(v) };
-        if (o.kind === "other") o.label = s.nm.input.value.trim();
+        if (o.kind === "other") o.label = s.ot.value.trim();
         return o;
       });
   }
@@ -17065,8 +17089,9 @@ function adjEditor(list, getSub) {
     var c = estAdjCalc(getSub(), raw());
     slots.forEach(function (s) {
       var on = s.tax || !!s.k.input.value;
-      s.pc.style.visibility = s.am.style.visibility = on ? "" : "hidden";
-      if (!s.tax) s.nm.hidden = s.k.input.value !== "other";
+      // the boxes always stay; they wait (greyed) until a choice is picked
+      s.pc.input.disabled = s.am.input.disabled = !on;
+      if (s.tax && s.pc.input.offsetHeight) s.k.box.style.height = s.pc.input.offsetHeight + "px";
       var x = s.tax ? c.tax : c.opt;
       if (!x) return;
       if (s.mode === "pct" && document.activeElement !== s.am.input) s.am.input.value = x.amt.toFixed(2);

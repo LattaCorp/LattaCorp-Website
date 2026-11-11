@@ -119,18 +119,16 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .pprev{position:sticky;top:0;padding-top:30px}.pphd{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
 .ppwrap{overflow:hidden;border-radius:8px;background:#e9efe6;border:1px solid var(--line)}.ppwrap iframe{display:block;border:0;width:860px;transform-origin:0 0;background:transparent}
 /* the fill-in side of New quote / New invoice is green, so the white boxes stand out */
-.panel.withprev{background:#3d7f50;color:#fff}.panel.withprev .pform{align-self:start}.panel.withprev .pphd{color:#eef7ec}.panel.withprev .close{color:#fff}.panel.withprev .ppwrap{border-color:rgba(255,255,255,.25)}
-.panel.withprev .pform h2,.panel.withprev .pform h3,.panel.withprev .pform>b,.panel.withprev .pform .adjbox>b{color:#fff}.panel.withprev .pform .qe label.o .t b{color:var(--forest)}
-.panel.withprev .pform .f span,.panel.withprev .pform .qe>span{color:#e4f2e1}
-.panel.withprev .pform .note{color:#eef7ec}
-.panel.withprev .pform input,.panel.withprev .pform select,.panel.withprev .pform textarea{background:#fff;color:var(--ink);border-color:#2a5f3a}
-.panel.withprev .pform details>summary{color:#fff}
-.panel.withprev .pform .adjbox{border-color:rgba(255,255,255,.35);background:rgba(255,255,255,.07)}
-.panel.withprev .pform .qe label.o{background:#fff;color:var(--ink);border-color:#fff}
-.panel.withprev .pform .qe label.o.on{background:#e4f4e0;border-color:var(--leaf);box-shadow:0 0 0 2px var(--leaf)}
-.panel.withprev .pform .qhelp{background:#fff;color:var(--ink);border-left-color:var(--leaf)}.panel.withprev .pform .qhelp b{color:var(--forest)}
-.panel.withprev .pform .btn{background:#fff;color:var(--forest);border-color:#fff}
-.panel.withprev .pform .pcard{color:var(--ink)}.panel.withprev .pform .pcard b,.panel.withprev .pform .pcard h3{color:var(--forest)}.panel.withprev .pform .pcard .f span,.panel.withprev .pform .pcard .note{color:var(--muted)}
+/* New quote / New invoice: very light green window; white boxes with green borders */
+.panel.withprev{background:#eef7ec;color:var(--ink)}.panel.withprev .pform{align-self:start}
+.panel.withprev .pform h2,.panel.withprev .pform h3{color:var(--forest)}
+.panel.withprev .pform .f span,.panel.withprev .pform .qe>span{color:#2f4a36}
+.panel.withprev .pform input,.panel.withprev .pform select,.panel.withprev .pform textarea{background:#fff;color:var(--ink);border-color:#b9d3b4}
+.panel.withprev .pform .adjbox{border-color:#b9d3b4;background:#fff}.panel.withprev .pform .adjbox>b{color:var(--forest)}
+.panel.withprev .pform .qe label.o{background:#fff;border-color:#b9d3b4}
+.panel.withprev .pform .qe label.o.on{background:#d8eed3;border-color:var(--leaf);box-shadow:0 0 0 2px var(--leaf)}
+.panel.withprev .pform .qe label.o .t b{color:var(--forest)}
+.panel.withprev .ppwrap{background:#dfeadb;border-color:#c8dcc3}
 @media(max-width:1000px){.panel.withprev{grid-template-columns:minmax(0,1fr)}.panel.withprev>*{min-width:0}.pprev{position:static;padding-top:6px}}
 .panel h2{margin:0 0 2px;color:var(--forest)}
 .close{position:absolute;right:12px;top:10px;background:none;border:0;font-size:1.8rem;cursor:pointer;color:var(--muted)}
@@ -159,7 +157,7 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 .itable td.qty{text-align:center;white-space:nowrap;color:var(--muted)}
 .adjbox{margin:12px 0 4px;padding:10px 12px;border:1px solid var(--line,#d9e3d6);border-radius:10px}
 .adjbox>b{display:block;margin-bottom:2px}
-.adjbox .fixed input{background:transparent!important;border-color:transparent!important;font-weight:700;padding-left:0;pointer-events:none;box-shadow:none}.panel.withprev .pform .adjbox .fixed input{color:#fff}
+.adjbox .fxbox{display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--forest);border-radius:8px;background:#eef7ec;box-sizing:border-box}.adjbox .ofs:disabled{opacity:.45}
 .qe{margin:4px 0 12px}.qe>span{display:block;font-size:.85rem;font-weight:600;margin-bottom:4px}
 .qe .opts{display:grid;grid-template-columns:1fr 1fr;gap:10px}.qe label.o .t{flex:1;line-height:1.2;text-align:left}.qe label.o .t b{display:block;font-size:1rem;color:inherit}.qe label.o .t small{display:block;font-weight:500;font-size:.8rem;opacity:.75}
 .qe label.o{display:flex;align-items:center;gap:8px;padding:8px 12px;border:1.5px solid var(--line,#d9e3d6);border-radius:10px;cursor:pointer;font-weight:600}
@@ -344,7 +342,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=109"></script>
+<script src="app.js?v=110"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
