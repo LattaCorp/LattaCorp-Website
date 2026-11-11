@@ -16372,7 +16372,14 @@ function openEstimateForm(cid) {
       }, 0)
     );
   }
-  var adj = adjEditor([], linesSub);
+  var adj = adjEditor([], linesSub),
+    dep = depEditor(null, function () {
+      return estTotal(linesSub(), adj.value());
+    });
+  adj.el.appendChild(dep.el);
+  adj.el.addEventListener("input", function () {
+    setTimeout(dep.refresh, 0);
+  });
   p.appendChild(adj.el);
   var go = btn("Save", "btn", function () {
     if (!cs.input.value) {
@@ -16417,6 +16424,7 @@ function openEstimateForm(cid) {
       };
     if (pid) erow.property_id = pid;
     if (adjs.length) erow.adjustments = adjs;
+    if (dep.value()) erow.deposit = dep.value();
     erow.doc_type = qe.value();
     sb.from("estimates")
       .insert(erow)
@@ -16425,7 +16433,7 @@ function openEstimateForm(cid) {
       .then(function (r) {
         if (r.error || !r.data) {
           go.disabled = false;
-          alert(erow.doc_type ? "Could not save. Did you run the Stage 34 SQL?" : adjs.length ? "Could not save. Did you run the Stage 33 SQL?" : pid ? "Could not save. Did you run the Stage 31 SQL?" : "Could not save. Did you run the Stage 11 SQL?");
+          alert(erow.deposit ? "Could not save. Did you run the Stage 36 SQL?" : erow.doc_type ? "Could not save. Did you run the Stage 34 SQL?" : adjs.length ? "Could not save. Did you run the Stage 33 SQL?" : pid ? "Could not save. Did you run the Stage 31 SQL?" : "Could not save. Did you run the Stage 11 SQL?");
           return;
         }
         var e = r.data;
@@ -16472,6 +16480,7 @@ function openEstimateForm(cid) {
       items.push({ title: tt, description: d, qty: q, amount: a });
     });
     adj.refresh();
+    dep.refresh();
     show({
       kind: "estimate",
       doc: {
@@ -16483,6 +16492,7 @@ function openEstimateForm(cid) {
         status: "draft",
         total: estTotal(r2(total), adj.value()),
         adjustments: adj.value(),
+        deposit: dep.value(),
         doc_type: qe.value(),
         property_address: pps.input.value ? paddr(pps.input.value) : c ? lpMainAddress(c.id) : ""
       },
@@ -16582,7 +16592,14 @@ function openEstimate(id) {
         ),
         eadj = adjEditor(e.adjustments || [], function () {
           return isub;
+        }),
+        edep = depEditor(e.deposit, function () {
+          return estTotal(isub, eadj.value());
         });
+      eadj.el.appendChild(edep.el);
+      eadj.el.addEventListener("input", function () {
+        setTimeout(edep.refresh, 0);
+      });
       if (edit) {
         var eqe = qeChoice(e.doc_type);
         body.appendChild(eqe);
@@ -16604,13 +16621,17 @@ function openEstimate(id) {
             row.total = estTotal(isub, na);
           }
           if ((pf.input.value || null) !== (e.property_id || null)) row.property_id = pf.input.value || null;
+          var nd = edep.value();
+          if (JSON.stringify(nd) !== JSON.stringify(e.deposit || null)) row.deposit = nd;
           sb.from("estimates")
             .update(row)
             .eq("id", e.id)
             .then(function (r2_) {
               if (r2_.error) {
                 alert(
-                  "doc_type" in row
+                  "deposit" in row
+                    ? "Could not save. Did you run the Stage 36 SQL?"
+                    : "doc_type" in row
                     ? "Could not save. Did you run the Stage 34 SQL?"
                     : "adjustments" in row
                     ? "Could not save. Did you run the Stage 33 SQL?"
@@ -16621,6 +16642,7 @@ function openEstimate(id) {
                 return;
               }
               if ("property_id" in row) e.property_id = row.property_id;
+              if ("deposit" in row) e.deposit = row.deposit;
               if ("doc_type" in row) {
                 e.doc_type = row.doc_type;
                 if (!("adjustments" in row)) {
@@ -16704,6 +16726,11 @@ function openEstimate(id) {
           )
         );
       body.appendChild(el("div", "invtotal", "Total " + money(e.total)));
+      var da = depAmount(e.deposit, Number(e.total));
+      if (da > 0)
+        body.appendChild(
+          el("div", "note", "Deposit required " + money(da) + " · balance on completion " + money(r2(Number(e.total) - da)))
+        );
       if (edit) {
         var add = el("div", "pcard"),
           g = el("div", "grid4"),
@@ -16988,7 +17015,7 @@ function estTotal(sub, list) {
 function adjEditor(list, getSub) {
   list = Array.isArray(list) ? list : [];
   var box = el("div", "adjbox");
-  box.appendChild(el("b", null, "Summary: optional row and sales tax"));
+  box.appendChild(el("b", null, "Summary: optional row, sales tax and deposit"));
   box.appendChild(
     el("div", "note", "Type a % or a dollar amount and the other fills in. Sales tax is figured on everything above it.")
   );
@@ -17129,6 +17156,69 @@ function adjEditor(list, getSub) {
         if (a.kind === "other") o.label = a.label || "";
         return o;
       });
+    }
+  };
+}
+/* ---- Required deposit: a % of the quoted total or a set amount; shown under the total on the client's copy.
+   It does not change the total. Whichever box was typed in last is kept, so a % follows price changes. */
+function depAmount(dep, total) {
+  if (!dep || !(dep.pct || dep.amt)) return 0;
+  return dep.mode === "pct" ? Math.round(total * Number(dep.pct || 0)) / 100 : r2(Number(dep.amt || 0));
+}
+function depEditor(dep, getTotal) {
+  dep = dep || {};
+  var r = el("div", "grid3 deprow"),
+    k = el("label", "f fixed"),
+    pc = fld("%", "text", dep.mode === "pct" && dep.pct ? String(dep.pct) : ""),
+    am = fld("Amount ($)", "text", dep.mode !== "pct" && dep.amt ? String(dep.amt) : ""),
+    mode = dep.mode === "pct" ? "pct" : "amt";
+  k.appendChild(el("span", null, "\u00a0"));
+  k.box = el("div", "fxbox", "Deposit required");
+  k.appendChild(k.box);
+  pc.input.inputMode = am.input.inputMode = "decimal";
+  pc.input.autocomplete = am.input.autocomplete = "off";
+  pc.input.placeholder = "none";
+  r.appendChild(k);
+  r.appendChild(pc);
+  r.appendChild(am);
+  function val() {
+    var v = numv(mode === "pct" ? pc.input.value : am.input.value);
+    if (isNaN(v) || v <= 0) return null;
+    return mode === "pct" ? { mode: "pct", pct: v } : { mode: "amt", amt: r2(v) };
+  }
+  function refresh() {
+    var t = getTotal(),
+      v = val();
+    if (pc.input.offsetHeight) k.box.style.height = pc.input.offsetHeight + "px";
+    if (!v) {
+      if (mode === "pct" && document.activeElement !== am.input) am.input.value = "";
+      if (mode === "amt" && document.activeElement !== pc.input) pc.input.value = "";
+      return;
+    }
+    var a = depAmount(v, t);
+    if (mode === "pct" && document.activeElement !== am.input) am.input.value = a.toFixed(2);
+    if (mode === "amt" && document.activeElement !== pc.input) pc.input.value = t ? String(Math.round((a / t) * 10000) / 100) : "";
+  }
+  ["input", "change", "keyup"].forEach(function (ev) {
+    pc.input.addEventListener(ev, function () {
+      mode = "pct";
+      refresh();
+    });
+    am.input.addEventListener(ev, function () {
+      mode = "amt";
+      refresh();
+    });
+  });
+  setTimeout(refresh, 0);
+  return {
+    el: r,
+    refresh: refresh,
+    value: function () {
+      var v = val();
+      if (!v) return null;
+      var t = getTotal(),
+        a = depAmount(v, t);
+      return { mode: v.mode, pct: v.mode === "pct" ? v.pct : t ? Math.round((a / t) * 10000) / 100 : 0, amt: a };
     }
   };
 }
