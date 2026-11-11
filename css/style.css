@@ -628,3 +628,22 @@ footer .brand.fbrand img.wword{width:100%;max-width:280px;min-width:170px}
 .qor::before{content:"";position:absolute;top:40px;bottom:40px;left:50%;border-left:2px dashed #b7d3b0}
 .qor span{position:relative;background:var(--forest);color:#fff;font-weight:700;font-family:Lora,Georgia,serif;font-size:1.05rem;width:48px;height:48px;border-radius:50%;display:grid;place-items:center;box-shadow:0 0 0 6px #eef7ec}
 @media (max-width:960px){.qgrid.q2{grid-template-columns:1fr;gap:0}.qor{flex-direction:row;margin:22px 0}.qor::before{top:50%;bottom:auto;left:10%;right:10%;border-left:0;border-top:2px dashed #b7d3b0}}
+
+/* Client portal page: a look inside */
+.ctr{text-align:center}.psub{color:var(--muted);max-width:60ch;margin:0 auto 26px}
+.pshow{padding-top:34px}
+.phones{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:28px;max-width:1000px;margin:0 auto;align-items:start}
+.phone{margin:0;text-align:center}
+.pframe{background:#1d2a20;border-radius:38px;padding:10px;box-shadow:0 18px 40px rgba(27,85,43,.22);max-width:290px;margin:0 auto;position:relative}
+.pframe::before{content:"";position:absolute;top:16px;left:50%;transform:translateX(-50%);width:70px;height:6px;border-radius:6px;background:#3a4a3f;z-index:2}
+.pframe img{display:block;width:100%;height:auto;border-radius:30px;aspect-ratio:390/600;object-fit:cover;object-position:top}
+.phone figcaption{margin-top:14px}.phone figcaption b{display:block;color:var(--forest);font-family:Lora,Georgia,serif;font-size:1.1rem}.phone figcaption span{color:var(--muted);font-size:.95rem}
+.pdesk{max-width:880px;margin:44px auto 10px;text-align:center}.pdesk p{color:var(--muted);margin-top:12px}
+.bframe{border-radius:12px;overflow:hidden;box-shadow:0 18px 40px rgba(27,85,43,.2);border:1px solid #dfe8dc;background:#fff}
+.bbar{background:#eef3ec;padding:8px 12px;display:flex;gap:6px}.bbar i{width:10px;height:10px;border-radius:50%;background:#c9d6c6;display:block}
+.bframe img{display:block;width:100%;height:auto}
+.pfeat{padding:44px 0}.fgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;max-width:1000px;margin:20px auto 0}
+.fcard{background:#fff;border:1px solid var(--line);border-radius:14px;padding:18px}.fcard svg{width:30px;height:30px;color:var(--forest)}
+.fcard h3{margin:8px 0 4px;font-size:1.05rem;color:var(--forest)}.fcard p{margin:0;color:var(--muted);font-size:.95rem}
+@media (max-width:860px){.phones{grid-template-columns:1fr;gap:34px}.fgrid{grid-template-columns:1fr 1fr}}
+@media (max-width:520px){.fgrid{grid-template-columns:1fr}}
