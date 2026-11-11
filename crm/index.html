@@ -138,7 +138,7 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .panel.withprev .ppwrap{background:#eef3ec;border:1px solid rgba(255,255,255,.55);border-radius:12px;box-shadow:inset 0 2px 10px rgba(0,0,0,.12),0 0 0 6px rgba(255,255,255,.08)}
 .panel.withprev .pprev{border-left:1px solid rgba(255,255,255,.22);padding-left:22px}
 /* on a computer the New quote / New invoice window fits the screen: the form scrolls on its own, the preview fits beside it */
-@media(min-width:1001px){.panel.withprev{height:min(calc(100vh - 80px),880px);max-width:min(1200px,calc(100vw - 80px));box-sizing:border-box;overflow:hidden;align-items:stretch;grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,500px) minmax(0,1fr);margin:calc((100vh - min(calc(100vh - 80px),880px)) / 2) auto!important}
+@media(min-width:1001px){.panel.withprev{height:min(calc(100vh - 140px),800px);max-width:min(1200px,calc(100vw - 80px));box-sizing:border-box;overflow:hidden;align-items:stretch;grid-template-rows:minmax(0,1fr);grid-template-columns:minmax(0,500px) minmax(0,1fr);margin:calc((100vh - min(calc(100vh - 140px),800px)) / 2) auto!important}
 .panel.withprev .pform{overflow-y:auto;min-height:0;align-self:stretch;padding:0 10px 0 6px;margin:0 -4px 0 -6px;scrollbar-gutter:stable}
 .panel.withprev .pprev{position:static;display:flex;flex-direction:column;min-height:0;padding-top:30px}
 .panel.withprev .ppwrap{flex:1;min-height:0}}
@@ -395,7 +395,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=131"></script>
+<script src="app.js?v=132"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
