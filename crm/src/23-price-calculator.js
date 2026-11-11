@@ -342,7 +342,7 @@ function openCalc() {
   );
   p.appendChild(calcWidget(null));
 }
-function openEstimateForm(cid) {
+function openEstimateForm(cid, leadId) {
   if (estErr) {
     alert("Run the Stage 11 SQL in Supabase first, then press Refresh.");
     return;
@@ -488,6 +488,7 @@ function openEstimateForm(cid) {
         total: total
       };
     if (pid) erow.property_id = pid;
+    if (leadId) erow.lead_id = leadId;
     if (adjs.length) erow.adjustments = adjs;
     if (dep.value()) erow.deposit = dep.value();
     erow.doc_type = qe.value();
@@ -519,6 +520,11 @@ function openEstimateForm(cid) {
               return;
             }
             estimates.unshift(e);
+            var ld = leadId && byId(leads, leadId);
+            if (ld && (ld.status === "new" || ld.status === "contacted")) {
+              ld.status = "quoted";
+              sb.from("leads").update({ status: "quoted" }).eq("id", ld.id).then(function () {});
+            }
             render();
             openEstimate(e.id);
           });
@@ -577,6 +583,12 @@ function openEstimate(id) {
   var e = byId(estimates, id);
   if (!e) return;
   markRespSeen(e);
+  setTimeout(function () {
+    var p0 = $("panel"),
+      n0 = p0.querySelector(".note");
+    if (!n0 || p0.querySelector(".mkjob")) return;
+    n0.parentNode.insertBefore(makeJobBar({ est: e, lead: (e.lead_id && byId(leads, e.lead_id)) || null }), n0.nextSibling);
+  }, 0);
   var c = byId(clients, e.client_id),
     p = panel();
   p.appendChild(el("h2", null, estNum(e.number, e.doc_type) + " · " + cname(e.client_id)));

@@ -508,7 +508,8 @@ function setJobStatus(j, s) {
 }
 
 /* ---- job form ---- */
-function openJobForm(client, job) {
+// pre (optional, from Make job on a lead or quote): { title, price, frequency, property_id, instructions, onSaved(job) }
+function openJobForm(client, job, pre) {
   if (jobsErr) {
     needSql();
     return;
@@ -618,6 +619,19 @@ function openJobForm(client, job) {
   fq.input.addEventListener("change", function () {
     ed.hidden = fq.input.value === "once";
   });
+  if (pre && !job) {
+    if (pre.property_id && byId(props, pre.property_id)) ps.input.value = pre.property_id;
+    var ms = svcs.filter(function (x) {
+      return pre.title && String(x.name).toLowerCase() === String(pre.title).toLowerCase();
+    })[0];
+    if (ms) sv.input.value = ms.id;
+    lastSvc = sv.input.value;
+    if (pre.title) ti.input.value = pre.title;
+    if (pre.price != null && !isNaN(pre.price)) pr.input.value = pre.price;
+    if (pre.frequency) fq.input.value = pre.frequency;
+    if (pre.instructions) ins.input.value = pre.instructions;
+    p.insertBefore(el("p", "note", pre.from || ""), p.children[2] || null);
+  }
   ed.hidden = fq.input.value === "once";
   p.appendChild(cs);
   p.appendChild(ps);
@@ -676,6 +690,7 @@ function openJobForm(client, job) {
             return;
           }
           jobs.push(r.data);
+          if (pre && pre.onSaved) pre.onSaved(r.data);
           topUp().then(function () {
             render();
             openJob(r.data.id);

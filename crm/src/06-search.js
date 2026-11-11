@@ -106,11 +106,11 @@
       }
     ],
     [
-      "Estimates (Billing)",
+      "Quotes (Leads)",
       "estimates estimate quote proposal",
       function () {
-        view = "billing";
-        bfilter = "estimates";
+        view = "leads";
+        lfilter = "open";
       }
     ],
     [
@@ -147,8 +147,8 @@
       "Price calculator",
       "price prices pricing calculator estimate quote rate rates mow mowing lawn sqft square feet",
       function () {
-        view = "billing";
-        bfilter = "estimates";
+        view = "leads";
+        lfilter = "open";
         setTimeout(openCalc, 0);
       }
     ],
@@ -366,8 +366,8 @@
         ];
       },
       function () {
-        view = "billing";
-        bfilter = "estimates";
+        view = "leads";
+        lfilter = "open";
         render();
       }
     );

@@ -93,11 +93,11 @@ function render() {
       return l.status === "new";
     }).length;
   [
-    ["leads", "Leads", newL],
+    ["leads", "Leads", newL, newResponses().length],
     ["clients", "Clients", 0],
     ["jobs", "Jobs", 0],
     ["schedule", "Schedule", stops],
-    ["billing", "Billing", invoices.filter(isOverdue).length, newResponses().length],
+    ["billing", "Billing", invoices.filter(isOverdue).length],
     ["expenses", "Expenses", 0],
     ["reports", "Reports", 0],
     ["photos", "Photos", 0],

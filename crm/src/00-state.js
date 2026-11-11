@@ -54,7 +54,7 @@ function isOwner() {
   return role === "owner";
 }
 var view = "leads",
-  lfilter = "all",
+  lfilter = "open",
   cfilter = "active",
   jfilter = "active",
   smode = "day",

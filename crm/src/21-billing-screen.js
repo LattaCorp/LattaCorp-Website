@@ -4,6 +4,7 @@
 function renderBilling() {
   var tabs = $("tabs");
   tabs.textContent = "";
+  if (bfilter === "estimates") bfilter = "tobill"; // quotes and estimates now live on the Leads page
   var op = invoices.filter(function (i) {
       return i.status === "open";
     }),
@@ -16,26 +17,18 @@ function renderBilling() {
     ["tobill", "To bill", bg.order.length],
     ["open", "Open", op.length],
     ["paid", "Paid", pd_.length],
-    ["payments", "Payments", invPays.length],
-    [
-      "estimates",
-      "Estimates",
-      estimates.filter(function (e) {
-        return (e.status === "draft" || e.status === "sent") && !estExpired(e);
-      }).length
-    ]
+    ["payments", "Payments", invPays.length]
   ].forEach(function (s) {
     var b = el("button", "tab" + (bfilter === s[0] ? " on" : ""), s[1]);
     b.type = "button";
     b.appendChild(el("span", null, "(" + s[2] + ")"));
-    if (s[0] === "estimates" && newResponses().length) b.appendChild(el("i", "tnew", newResponses().length + " new"));
     b.addEventListener("click", function () {
       bfilter = s[0];
       render();
     });
     tabs.appendChild(b);
   });
-  if (bfilter !== "estimates" && bfilter !== "payments") {
+  if (bfilter !== "payments") {
     $("topbtns").appendChild(
       btn("New invoice", "btn", function () {
         openInvoiceForm(null);
@@ -70,7 +63,6 @@ function renderBilling() {
   $("topbtns").appendChild(btn("Billing settings", "btn alt", openBizSettings));
   var list = $("list");
   list.textContent = "";
-  if (bfilter === "estimates") return renderEstimates(list);
   if (bfilter !== "payments" && !billErr) {
     var bfx = el("div");
     list.appendChild(bfx);
@@ -1246,7 +1238,7 @@ function openBizSettings() {
 }
 
 /* ---- Quote responses: when a client accepts or declines a quote online it's "new" until you open it.
-   Billing gets a green badge, the Estimates tab says how many are new, and while Foreman is open it checks every
+   Leads gets a green badge, and while Foreman is open it checks every
    minute and pops up a note when a new answer comes in. (Approvals are also emailed to the business email.) ---- */
 function newResponses() {
   return estimates.filter(function (e) {
@@ -1254,7 +1246,7 @@ function newResponses() {
   });
 }
 function respBadge() {
-  var b = document.querySelector('#side button[data-v="billing"]');
+  var b = document.querySelector('#side button[data-v="leads"]');
   if (!b) return;
   var n = newResponses().length,
     x = b.querySelector(".badge.resp");
@@ -1281,12 +1273,6 @@ function markRespSeen(e) {
     var c = r.querySelector(".chip.newresp");
     if (c) c.parentNode.removeChild(c);
   });
-  var t = document.querySelector("#tabs .tnew");
-  if (t) {
-    var n = newResponses().length;
-    if (n) t.textContent = n + " new";
-    else t.parentNode.removeChild(t);
-  }
   respBadge();
 }
 var respTimer = null;
@@ -1331,7 +1317,7 @@ function checkResponses() {
       if (!fresh.length) return;
       fresh.forEach(respToast);
       respBadge();
-      if (view === "billing" && bfilter === "estimates" && !$("panel").querySelector("input,textarea,select")) render();
+      if (view === "leads" && !$("panel").querySelector("input,textarea,select")) render();
     });
 }
 function startRespWatch() {
