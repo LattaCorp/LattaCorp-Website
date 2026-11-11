@@ -296,9 +296,128 @@ function makeJobFrom(it) {
   if (e) {
     var c = byId(clients, e.client_id);
     if (!c) return alert("This quote's client is missing.");
-    return go(c);
+    // a quote with several lines: each line can become its own job
+    return sb
+      .from("estimate_items")
+      .select("*")
+      .eq("estimate_id", e.id)
+      .order("id", { ascending: true })
+      .then(function (r) {
+        var items = r.error ? [] : r.data || [];
+        if (items.length > 1) makeJobsFromLines(it, c, items, function () {
+          go(c);
+        });
+        else go(c);
+      });
   }
   leadClient(l, go);
+}
+// Make job on a quote with several lines: one job per line (pick which lines, how often and when each starts)
+function makeJobsFromLines(it, c, items, oneJob) {
+  var e = it.est,
+    l = it.lead,
+    p = panel();
+  p.appendChild(el("h2", null, "Make jobs from " + estNum(e.number, e.doc_type)));
+  p.appendChild(el("p", "note", "Each line of the quote becomes its own job, so it lands on the schedule and bills on its own. Untick any line you don't want as a job."));
+  var eps = clientProps(c.id),
+    pf = fld(
+      "Property",
+      "select",
+      e.property_id || (eps[0] && eps[0].id) || "",
+      eps.map(function (x) {
+        return [x.id, (x.label ? x.label + ": " : "") + x.address];
+      })
+    );
+  p.appendChild(pf);
+  var rows = [];
+  items.forEach(function (x) {
+    var title = x.title || x.description || "Work",
+      lawn = /lawn maintenance/i.test(title),
+      card = el("div", "pcard mjline"),
+      top = el("label", "mjtop"),
+      ck = document.createElement("input");
+    ck.type = "checkbox";
+    ck.checked = true;
+    top.appendChild(ck);
+    top.appendChild(el("b", null, title));
+    card.appendChild(top);
+    if (x.title && x.description) card.appendChild(el("div", "note", x.description + (x.qty ? " \u00b7 QTY " + x.qty : "")));
+    var g = el("div", "grid2"),
+      ti = fld("Job name", "text", title),
+      pr = fld("Price ($)", "number", String(x.amount)),
+      fq = fld("How often", "select", lawn ? "weekly" : "once", FREQ),
+      sd = fld("Start date", "date", today());
+    pr.input.step = "0.01";
+    g.appendChild(ti);
+    g.appendChild(pr);
+    g.appendChild(fq);
+    g.appendChild(sd);
+    card.appendChild(g);
+    ck.addEventListener("change", function () {
+      g.hidden = !ck.checked;
+      card.classList.toggle("off", !ck.checked);
+    });
+    p.appendChild(card);
+    rows.push({ ck: ck, ti: ti, pr: pr, fq: fq, sd: sd, x: x });
+  });
+  var a = el("div", "actions");
+  var go = btn("Create jobs", "btn", function () {
+    var pick = rows.filter(function (r) {
+      return r.ck.checked;
+    });
+    if (!pick.length) return alert("Tick at least one line.");
+    if (!pf.input.value) return alert("This client needs a property first. Add one on the client page.");
+    var bad = pick.filter(function (r) {
+      return !r.ti.input.value.trim() || !r.sd.input.value || isNaN(parseFloat(r.pr.input.value));
+    });
+    if (bad.length) return alert("Each job needs a name, a price and a start date.");
+    go.disabled = true;
+    var rowsIn = pick.map(function (r) {
+      var sv = services.filter(function (s) {
+        return String(s.name).toLowerCase() === r.ti.input.value.trim().toLowerCase();
+      })[0];
+      return {
+        client_id: c.id,
+        property_id: pf.input.value,
+        service_id: sv ? sv.id : null,
+        title: r.ti.input.value.trim(),
+        price: parseFloat(r.pr.input.value),
+        frequency: r.fq.input.value,
+        start_date: r.sd.input.value,
+        end_date: null,
+        instructions: (l && l.notes) || ""
+      };
+    });
+    sb.from("jobs")
+      .insert(rowsIn)
+      .select()
+      .then(function (r) {
+        if (r.error || !r.data || !r.data.length) {
+          go.disabled = false;
+          alert("Could not create the jobs.");
+          return;
+        }
+        r.data.forEach(function (j) {
+          jobs.push(j);
+        });
+        var first = r.data[0];
+        e.job_id = first.id;
+        sb.from("estimates").update({ job_id: first.id }).eq("id", e.id).then(function () {});
+        if (l) {
+          l.job_id = first.id;
+          l.status = "won";
+          sb.from("leads").update({ job_id: first.id, status: "won" }).eq("id", l.id).then(function () {});
+        }
+        topUp().then(function () {
+          render();
+          openClient(c.id);
+          alert("Created " + r.data.length + " job" + (r.data.length > 1 ? "s" : "") + ". They're on the schedule.");
+        });
+      });
+  });
+  a.appendChild(go);
+  a.appendChild(btn("Make one job instead", "btn alt", oneJob));
+  p.appendChild(a);
 }
 
 /* ---- lead detail ---- */
