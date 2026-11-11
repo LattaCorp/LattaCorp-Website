@@ -2810,13 +2810,18 @@ function renderJobs() {
     one = jobs.filter(function (j) {
       return j.status === "active" && j.frequency === "once";
     }),
-    off = jobs.filter(function (j) {
-      return j.status !== "active";
+    paused = jobs.filter(function (j) {
+      return j.status === "paused";
+    }),
+    ended = jobs.filter(function (j) {
+      return j.status !== "active" && j.status !== "paused";
     });
+  if (jfilter === "inactive") jfilter = "paused";
   [
     ["active", "Recurring", rec.length],
     ["once", "One-time", one.length],
-    ["inactive", "Paused / ended", off.length]
+    ["paused", "Paused", paused.length],
+    ["ended", "Ended", ended.length]
   ].forEach(function (s) {
     var b = el("button", "tab" + (jfilter === s[0] ? " on" : ""), s[1]);
     b.type = "button";
@@ -2853,7 +2858,7 @@ function renderJobs() {
     );
     return;
   }
-  var shown = (jfilter === "active" ? rec : jfilter === "once" ? one : off).filter(function (j) {
+  var shown = (jfilter === "active" ? rec : jfilter === "once" ? one : jfilter === "paused" ? paused : ended).filter(function (j) {
     if (!query) return true;
     return [cname(j.client_id), j.title, paddr(j.property_id)].join(" ").toLowerCase().indexOf(query) > -1;
   });
