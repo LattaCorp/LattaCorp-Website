@@ -102,7 +102,7 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 #paper.page .cl .top{padding:16px 24px}#paper.page .cl>.inner{padding:14px 24px 0}#paper.page .cl{padding-bottom:12px}
 #paper.page .cl .asum.est table{height:auto;flex:none}#paper.page .cl .asum.est{justify-content:flex-start}#paper.page .cl .asum.est td{padding:4px 8px}
 #paper.page .cl .ct{font-size:.9rem;line-height:1.4}#paper.page .cl .ct .blk{margin-bottom:8px}#paper.page .cl .ct .wmg{height:44px;margin:6px auto 0}
-#paper.page .cl .notes,#paper.page .cl .appr{margin-top:10px}#paper.page .cl .appr .apg{padding-top:12px}#paper.page .cl .sumwrap{margin-top:10px}
+#paper.page .cl .notes,#paper.page .cl .appr{margin-top:10px}#paper.page .cl .notes{margin:12px 0 0}.cl .ct.mid{justify-content:center}.cl .ct .blk.nt{margin:10px 0 0}.cl .ct .ntx{white-space:pre-wrap;font-size:.86rem;line-height:1.4;color:#26412c}.cl .ct.mid .blk{margin-bottom:0}#paper.page .cl .appr .apg{padding-top:12px}#paper.page .cl .sumwrap{margin-top:10px}
 #paper.page .cl .top .w.est{font-size:2.1rem}#paper.page .cl .top .lg img{height:56px}
 #root>.accept{max-width:710px;margin:14px auto 28px;box-sizing:border-box}
 @media print{#paper.page{margin:0!important;transform:none!important;box-shadow:none;border-radius:0}#paper.page.multi{height:auto}}@media screen{.cl .led tr.pad.fold{display:none}.pronly{display:none!important}}@media print{.cl .led tr.pr{display:table-row}.cl .led tr.pad.foldp{display:none}#paper{overflow:visible!important}.cl .asum.est table{height:auto;flex:none}.cl .asum.est{justify-content:flex-start}.cl .asum.est td{padding:4px 8px}.cl .ct{font-size:.9rem;line-height:1.4}.cl .ct .blk{margin-bottom:8px}.cl .ct .wmg{height:44px;margin:6px auto 0}.cl .notes,.cl .appr{margin-top:10px}.cl .sumwrap,.cl .asum{break-inside:avoid}.cl .notes .nb.lines{height:48px}.cl .appr .apg{padding-top:12px}.cl .sumwrap{margin-top:10px}}.cl .top .bt.hc{font-size:.95rem;line-height:1.45}.cl .top .bt.hc b{font-size:1.15rem}.cl .top .bt.hc .em{font-size:.82rem}.cl .notes,.cl .appr{margin-top:14px;border:1px solid #8fb08f;break-inside:avoid}.cl .notes .nh,.cl .appr .aph{background:var(--forest);color:#fff;font-weight:700;font-size:.85rem;padding:6px 10px;display:flex;justify-content:space-between;align-items:center;gap:10px}.cl .notes .nb{padding:9px 12px;white-space:pre-wrap;font-size:.92rem;line-height:1.5;color:#26412c}.cl .notes .nb.lines{height:72px;padding:0 12px;background:repeating-linear-gradient(#fff 0 23px,#c9dcc6 23px 24px)}.cl .appr .aph .ok{font-size:.8rem;letter-spacing:.04em;background:#fff;color:var(--forest);border-radius:5px;padding:2px 8px}.cl .appr .aph .no{font-size:.8rem;background:#fff;color:var(--red);border-radius:5px;padding:2px 8px}.cl .appr .apg{display:grid;grid-template-columns:2fr 1.4fr .9fr 1.3fr;gap:0 18px;padding:16px 14px 4px}.cl .appr .apv{height:46px;border-bottom:1.5px solid #1d2a20;display:flex;align-items:flex-end;padding-bottom:3px;font-weight:600;color:#1d2a20;font-size:.95rem;overflow:hidden}.cl .appr .apv img{height:44px;width:auto;display:block}.cl .appr .apc span{display:block;margin-top:3px;font-size:.66rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}.cl .appr .apl{font-size:.72rem;color:var(--muted);padding:2px 14px 9px}
@@ -293,7 +293,7 @@ function drawEstimate(){
   h+=gridRow(cells);
   var rows=items.map(function(it){return'<tr><td class="tt">'+esc(it.title||"")+"</td><td>"+esc(it.description)+'</td><td class="q">'+esc(it.qty||"")+'</td><td class="a">'+esc(money(it.amount))+"</td></tr>"}).join("");
   // printed copies fill the page with ruled lines, minus the room the notes take (about 95 characters a line)
-  var noteLines=d.scope?2+String(d.scope).split("\n").reduce(function(a,l){return a+Math.max(1,Math.ceil(l.length/95))},0):0;
+  var noteLines=d.scope?Math.max(0,String(d.scope).split("\n").reduce(function(a,l){return a+Math.max(1,Math.ceil(l.length/45))},0)-2):0;
   var padN=Math.max(3,PRINT_ROWS-noteLines-items.length);
   for(var i=0;i<padN;i++)rows+='<tr class="pad'+(i>=3?" pr":"")+'"><td class="tt"></td><td></td><td class="q"></td><td class="a"></td></tr>';
   h+='<div class="sect"><b>'+t("propwork")+"</b><span>"+t("goodthru")+"</span></div>"
@@ -305,8 +305,9 @@ function drawEstimate(){
   var sum='<div class="asum est"><table><thead><tr><th>'+tq("esum")+'</th><th colspan="2">'+t("totals")+"</th></tr></thead><tbody>"
     +row(t("subtotal"),esc(money(sub)))+orows+row(tq("etotal"),esc(money(d.total)),"tot")
     +(isQ()?"":'<tr class="nts"><td colspan="3">'+t("e_note")+"</td></tr>")+"</tbody></table></div>";
-  var ct='<div class="ct">'+clientBlock(t("prepfor"),c)
-    +'<div class="gap"></div><img class="wmg" src="../images/logo-wordmark-green.svg" alt=""></div>';
+  // Notes & Terms sit under Prepared For, beside the summary, instead of a band of their own
+  var ct='<div class="ct'+(d.scope?"":" mid")+'">'+clientBlock(t("prepfor"),c)
+    +(d.scope?'<div class="blk nt"><span class="lb">'+t("notes")+'</span><div class="ntx">'+esc(d.scope)+"</div></div>":"")+"</div>";
   var notes=d.scope?'<div class="notes"><div class="nh">'+t("notes")+'</div><div class="nb">'+esc(d.scope)+"</div></div>"
     :"";
   var acc=d.status==="accepted",sigOk=acc&&/^data:image\/png;base64,/.test(d.response_signature||"");
@@ -319,7 +320,7 @@ function drawEstimate(){
     +cell("",acc&&d.responded_at?esc(dn(String(d.responded_at).slice(0,10))):"",t("date"))
     +cell("",acc?esc(d.response_po||""):"",t("po"))
     +'</div><div class="apl">'+(isQ()?t("q_ap"):t("e_ap"))+"</div></div>";
-  h+='<div class="sumwrap">'+ct+sum+"</div>"+notes+appr+banner;
+  h+='<div class="sumwrap">'+ct+sum+"</div>"+appr+banner;
   AFTER=(canAct?'<div class="accept sign" id="acc"><div class="ah"><b>'+t("ahead")+"</b><span>"+t("ahelp2")+"</span></div>"
      +'<div class="sgrid"><div><label>'+t("sig")+' <button type="button" class="clr" id="sclr">'+t("clear")+'</button></label><canvas id="spad" width="640" height="150"></canvas></div>'
      +'<div><label for="an">'+t("name")+'</label><input id="an" autocomplete="name" maxlength="120"><label for="apo">'+t("pooptional")+'</label><input id="apo" maxlength="60"><div class="row"><button class="go" id="ay" type="button">'+tq("accept")+'</button><button class="no" id="an2" type="button">'+t("decline")+'</button></div></div></div>'
