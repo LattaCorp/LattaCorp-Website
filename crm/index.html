@@ -175,15 +175,17 @@ body.dock #rightcol #topbtns>.on{background:var(--forest);color:#fff;border-colo
 .row.client.pastdue{background:#fdeceb;border-color:#f2c4bf;border-left-color:var(--red)}
 .row.client.pastdue:hover{background:#fbe1df}
 /* Jobs filter pills: groups of on/off pills (a check mark when on), Clear all, and Sort by */
-.fbar{display:flex;flex-direction:column;gap:8px;width:100%}
-.fbar .frow{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center}
+.fbar{display:grid;grid-template-columns:auto auto 1fr;grid-template-areas:"st cl so" "pl fr cr";gap:10px 26px;align-items:center;width:100%}
+.fbar .fa-st{grid-area:st}.fbar .fa-cl{grid-area:cl}.fbar .fa-pl{grid-area:pl}.fbar .fa-fr{grid-area:fr}.fbar .fa-so{grid-area:so;justify-self:end}.fbar .fa-cr{grid-area:cr;justify-self:end}
 .fbar .fgrp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.fbar .flbl{display:inline-block;font-size:.8rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:var(--forest);background:#dcefd6;border:1.5px solid #9fd09a;border-radius:6px;padding:5px 9px;margin-right:4px}
+.fbar .flbl{display:inline-block;min-width:96px;text-align:center;box-sizing:border-box;font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#fff;background:#2f3b33;border-radius:6px;padding:6px 10px;margin-right:4px}
+.fbar .fsort .flbl{min-width:0}
 .fbar .fpill{display:inline-flex;align-items:center;gap:5px}
-.fbar .fclear{border-style:dashed;margin-left:6px}
-.fbar .fsort{margin-left:auto;display:inline-flex;align-items:center;gap:8px}
+.fbar .fclear{border-style:dashed}
+.fbar .fsort{display:inline-flex;align-items:center;gap:8px}
 .fbar .fsort select{border-radius:999px;padding:7px 30px 7px 14px;font-weight:600;border:1.5px solid var(--line);background-color:#fff;width:auto}
-@media (max-width:700px){.fbar .fsort{margin-left:0}}
+#tabs:has(.fbar){container-type:inline-size}
+@container (max-width:1150px){.fbar{grid-template-columns:1fr auto;grid-template-areas:"so so" "st st" "cl cl" "pl pl" "fr fr" "cr cr"}.fbar .fa-so,.fbar .fa-cr{justify-self:start}}
 /* Right-side layout test (computers 1200px+): list on the left, options and forms on the right */
 #rightcol{display:none}
 body.dock #rightcol{display:flex;flex-direction:column;width:460px;flex:none;position:sticky;top:76px;align-self:flex-start;height:calc(100vh - 76px);background:#fff;border-left:1px solid var(--line);overflow:hidden;order:3}
@@ -415,7 +417,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=140"></script>
+<script src="app.js?v=142"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

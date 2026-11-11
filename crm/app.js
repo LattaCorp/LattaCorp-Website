@@ -2859,13 +2859,12 @@ function jobsFilterBar(tabs) {
     any = JF_GROUPS.some(function (g) {
       return JF[g[0]].length;
     });
-  /* Two groups per row: Status + How often (with Sort by on the right), then Plan + Client */
-  var rows = [el("div", "frow"), el("div", "frow")];
-  rows.forEach(function (r) {
-    bar.appendChild(r);
-  });
-  JF_GROUPS.forEach(function (g, gi) {
-    var grp = el("div", "fgrp");
+  /* A 3-column grid so the groups line up:
+       Status | Client    | Sort by
+       Plan   | How often | Clear all */
+  var AREA = { status: "fa-st", client: "fa-cl", plan: "fa-pl", freq: "fa-fr" };
+  JF_GROUPS.forEach(function (g) {
+    var grp = el("div", "fgrp " + AREA[g[0]]);
     grp.appendChild(el("span", "flbl", g[1]));
     g[2].forEach(function (o) {
       var on = JF[g[0]].indexOf(o[0]) > -1,
@@ -2885,7 +2884,7 @@ function jobsFilterBar(tabs) {
       });
       grp.appendChild(b);
     });
-    rows[gi < 2 ? 0 : 1].appendChild(grp);
+    bar.appendChild(grp);
   });
   if (any) {
     var clr = el("button", "tab fpill fclear", "Clear all");
@@ -2896,10 +2895,11 @@ function jobsFilterBar(tabs) {
       });
       render();
     });
-    rows[1].lastChild.appendChild(clr);
+    clr.classList.add("fa-cr");
+    bar.appendChild(clr);
   }
-  /* Sort by sits at the right end of the first row */
-  var sl = el("label", "fsort");
+  /* Sort by: top-right corner, Clear all right under it */
+  var sl = el("label", "fsort fa-so");
   sl.appendChild(el("span", "flbl", "Sort by"));
   var sel = document.createElement("select");
   JSORTS.forEach(function (o) {
@@ -2914,7 +2914,7 @@ function jobsFilterBar(tabs) {
     render();
   });
   sl.appendChild(sel);
-  rows[0].appendChild(sl);
+  bar.appendChild(sl);
   tabs.appendChild(bar);
 }
 
