@@ -192,12 +192,15 @@ function renderJobs() {
           : /^commercial\b/i.test(j.title || "")
             ? "commercial"
             : "",
-      b = el("button", "row client job " + (lawn ? "lawn" : "other") + (tier ? " t-" + tier : ""));
+      jc = byId(clients, j.client_id),
+      ctype = jc && (jc.type === "hoa" || jc.type === "commercial") ? jc.type : "",
+      b = el("button", "row client job " + (lawn ? "lawn" : "other") + (tier ? " t-" + tier : "") + (ctype ? " ct-" + ctype : ""));
     b.type = "button";
     var left = el("div");
     left.appendChild(el("b", null, cname(j.client_id)));
     var plan = lawn ? "Lawn maintenance" + ((j.title.split(/\s+-\s+/)[1] || "") ? " \u00b7 " + j.title.split(/\s+-\s+/)[1] : "") : j.title;
-    left.appendChild(el("span", "jtype", plan));
+    // HOA and Commercial accounts are named in the tag and colored like the client type; the tier still shows
+    left.appendChild(el("span", "jtype", (ctype === "hoa" ? "HOA \u00b7 " : ctype === "commercial" ? "Commercial \u00b7 " : "") + plan));
     left.appendChild(
       el(
         "div",
