@@ -453,7 +453,7 @@ function ccForm(c, x, holder) {
   var box = el("div", "pcard"),
     g = el("div", "grid2");
   var nm = fld("Name", "text", x ? x.name : ""),
-    rl = fld("Role (Spouse, Board member...)", "text", x ? x.role : "");
+    rl = fld("Role", "text", x ? x.role : "");
   var dl = document.createElement("datalist");
   dl.id = "ccroles";
   CROLES.forEach(function (r) {
@@ -470,7 +470,7 @@ function ccForm(c, x, holder) {
   g.appendChild(ph);
   g.appendChild(em);
   box.appendChild(g);
-  var nt = fld("Notes (best time to call, what to contact them about...)", "text", x ? x.notes : "");
+  var nt = fld("Notes", "text", x ? x.notes : "");
   box.appendChild(nt);
   /* client portal: this person may sign in to see this account (needs an email) */
   var pa = null;
@@ -619,10 +619,10 @@ function drawProps(c, holder) {
 }
 function propForm(c, pr, holder) {
   var box = el("div", "pcard");
-  var lab = fld("Label (Main, Rental, Office...)", "text", pr ? pr.label : "");
+  var lab = fld("Label", "text", pr ? pr.label : "");
   var adr = fld("Address", "text", pr ? pr.address : "");
   adr.input.placeholder = "123 Example Ln, Kissimmee, FL 34758";
-  var nts = fld("Access notes (gate code, dogs, parking...)", "textarea", pr ? pr.notes : "");
+  var nts = fld("Access notes", "textarea", pr ? pr.notes : "");
   box.appendChild(lab);
   box.appendChild(adr);
   box.appendChild(nts);
@@ -675,25 +675,18 @@ function propForm(c, pr, holder) {
 function openClientForm(c) {
   var p = panel();
   p.appendChild(el("h2", null, c ? "Edit client" : "New client"));
-  var n = fld("Name (as on the account, e.g. Mr & Mrs Smith, or Alejandro Torres Jr)", "text", c && c.name),
-    ln = fld("Last name (for sorting)", "text", c && c.last_name),
-    nk = fld("Preferred name / nickname (optional)", "text", c && c.nickname),
-    co = fld("Company / HOA name (optional)", "text", c && c.company);
+  var n = fld("Name", "text", c && c.name),
+    ln = fld("Last name", "text", c && c.last_name),
+    nk = fld("Nickname", "text", c && c.nickname),
+    co = fld("Company / HOA", "text", c && c.company);
   var ph = fld("Phone", "tel", c && c.phone),
-    ph2 = fld("Phone 2 (optional)", "tel", c && c.phone2);
+    ph2 = fld("Phone 2", "tel", c && c.phone2);
   var em = fld("Email", "email", c && c.email),
     ty = fld("Type", "select", c ? c.type : "residential", TYPES);
   var nt = fld("Notes", "textarea", c && c.notes);
-  var acn = fld(
-    "Account number (shows on invoices and in the portal; leave blank on a new client to get the next number)",
-    "number",
-    c && c.account_no
-  );
-  acn.input.step = "1";
-  acn.input.inputMode = "numeric";
-  var bp = fld("Invoices for multiple properties", "select", c && c.bill_by_property ? "1" : "0", [
-    ["0", "One combined invoice for all properties"],
-    ["1", "Separate invoice for each property"]
+  var bp = fld("Billing", "select", c && c.bill_by_property ? "1" : "0", [
+    ["0", "One invoice for all properties"],
+    ["1", "Separate invoice per property"]
   ]);
   var g = el("div", "grid2");
   g.appendChild(n);
@@ -705,17 +698,19 @@ function openClientForm(c) {
   g.appendChild(em);
   g.appendChild(ty);
   p.appendChild(g);
-  if (!c || "account_no" in c) p.appendChild(acn);
+  // account numbers are given out automatically (the next number) when a client is added; clients moved over from
+  // GroundsKeeper Pro keep their old numbers. Shown here, not editable.
+  if (c && c.account_no) p.appendChild(el("p", "note", "Account #" + c.account_no));
   p.appendChild(bp);
   p.appendChild(nt);
   function hint() {
-    ln.input.placeholder = guessLast(n.input.value) || "Left blank = guessed from the name";
+    ln.input.placeholder = guessLast(n.input.value) || "Auto from name";
   }
   n.input.addEventListener("input", hint);
   hint();
   var addr = null;
   if (!c) {
-    addr = fld("Service address (required, you can add more later)", "text", "");
+    addr = fld("Service address", "text", "");
     addr.input.placeholder = "123 Example Ln, Kissimmee, FL 34758";
     p.appendChild(addr);
   }
@@ -752,25 +747,6 @@ function openClientForm(c) {
       }),
       wantBp = bp.input.value === "1";
     if (bpOk || wantBp) row.bill_by_property = wantBp;
-    var acRaw = acn.input.value.trim();
-    if (acRaw !== "") {
-      var acNum = parseInt(acRaw, 10);
-      if (isNaN(acNum) || acNum < 1 || String(acNum) !== acRaw) {
-        alert("The account number must be a whole number, like 1043.");
-        return;
-      }
-      var taken = clients.filter(function (x) {
-        return x.account_no === acNum && (!c || x.id !== c.id);
-      })[0];
-      if (taken) {
-        alert("Account number " + acNum + " already belongs to " + taken.name + ".");
-        return;
-      }
-      row.account_no = acNum;
-    } else if (c && c.account_no) {
-      alert("Every client needs an account number. Type one in, or keep " + c.account_no + ".");
-      return;
-    }
     save.disabled = true;
     if (c) {
       sb.from("clients")

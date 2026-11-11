@@ -217,6 +217,12 @@ function optMark(b) {
     if (optOpen.dataset.lbl) optOpen.textContent = optOpen.dataset.lbl;
   }
   optOpen = b;
+  // the open option's form shows right under it: options after it move below the form
+  var after = false;
+  [].forEach.call($("topbtns").children, function (x) {
+    x.style.order = after ? "3" : "";
+    if (x === b) after = true;
+  });
   if (!b) return;
   b.classList.add("on");
   if (!b.dataset.lbl) b.dataset.lbl = b.textContent;

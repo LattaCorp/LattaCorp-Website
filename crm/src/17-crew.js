@@ -53,7 +53,7 @@ function openCrew() {
     var box = el("div", "pcard"),
       g = el("div", "grid2");
     var n = fld("Name", "text", m ? m.name : ""),
-      ph = fld("Phone (for texting routes)", "tel", m ? m.phone : "");
+      ph = fld("Phone", "tel", m ? m.phone : "");
     g.appendChild(n);
     g.appendChild(ph);
     box.appendChild(g);
@@ -76,7 +76,7 @@ function openCrew() {
       var lw = el("div");
       lw.hidden = true;
       em = fld("Login email", "email", "");
-      pw = fld("Starting password (8+ characters, you tell them)", "text", "");
+      pw = fld("Password", "text", "");
       pw.input.autocomplete = "off";
       lw.appendChild(em);
       lw.appendChild(pw);

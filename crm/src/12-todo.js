@@ -227,8 +227,8 @@ function openTodo(t) {
   var p = panel();
   p.appendChild(el("h2", null, t ? "Task" : "New task"));
   var ti = fld("Task", "text", t ? t.title : ""),
-    no = fld("Notes (optional)", "textarea", t ? t.notes : ""),
-    du = fld("Due date (optional)", "date", t && t.due_date ? t.due_date : "");
+    no = fld("Notes", "textarea", t ? t.notes : ""),
+    du = fld("Due date", "date", t && t.due_date ? t.due_date : "");
   var tm = [["", "Anyone"]].concat(
     team.map(function (m) {
       return [m.email, m.name || m.email];
@@ -244,7 +244,7 @@ function openTodo(t) {
     tm.push([t.assigned_to, memberName(t.assigned_to)]);
   var as = fld("Assigned to", "select", t ? t.assigned_to : "", tm);
   var cl = fld(
-    "Client (optional)",
+    "Client",
     "select",
     t && t.client_id ? t.client_id : "",
     [["", "None"]].concat(

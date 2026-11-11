@@ -111,9 +111,9 @@ function renderTeam() {
     var box = el("div", "pcard"),
       g = el("div", "grid2"),
       nm = fld("Name", "text", ""),
-      em = fld("Their login email", "email", ""),
+      em = fld("Login email", "email", ""),
       rl = fld("Role", "select", "office", ROLES),
-      pw = fld("Starting password (8+ characters, you tell them)", "text", "");
+      pw = fld("Password", "text", "");
     pw.input.autocomplete = "off";
     g.appendChild(nm);
     g.appendChild(em);

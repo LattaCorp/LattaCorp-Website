@@ -365,12 +365,12 @@ function openEstimateForm(cid) {
     )
   );
   var ttl = fld("Job Title", "text", ""),
-    scp = fld("Notes & Terms (optional)", "textarea", ""),
+    scp = fld("Notes & Terms", "textarea", ""),
     vd = fld("Valid for (days)", "number", "30");
   vd.classList.add("short");
   p.appendChild(cs);
   // which property the work is for (shows as the service address on the estimate); blank = their Main address
-  var pps = propPicker(cs, "Property (which property this estimate is for)", "Main address");
+  var pps = propPicker(cs, "Property", "Main address");
   p.appendChild(pps);
   p.appendChild(ttl);
   p.appendChild(scp);
@@ -637,7 +637,7 @@ function openEstimate(id) {
         body.appendChild(ans);
       }
       var ttl = fld("Job Title", "text", e.title || ""),
-        scp = fld("Notes & Terms (optional)", "textarea", e.scope || ""),
+        scp = fld("Notes & Terms", "textarea", e.scope || ""),
         vu = fld("Valid until", "date", e.valid_until || ""),
         eps = clientProps(e.client_id),
         pf = fld(

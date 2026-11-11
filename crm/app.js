@@ -685,6 +685,12 @@ function optMark(b) {
     if (optOpen.dataset.lbl) optOpen.textContent = optOpen.dataset.lbl;
   }
   optOpen = b;
+  // the open option's form shows right under it: options after it move below the form
+  var after = false;
+  [].forEach.call($("topbtns").children, function (x) {
+    x.style.order = after ? "3" : "";
+    if (x === b) after = true;
+  });
   if (!b) return;
   b.classList.add("on");
   if (!b.dataset.lbl) b.dataset.lbl = b.textContent;
@@ -1536,7 +1542,7 @@ function ccForm(c, x, holder) {
   var box = el("div", "pcard"),
     g = el("div", "grid2");
   var nm = fld("Name", "text", x ? x.name : ""),
-    rl = fld("Role (Spouse, Board member...)", "text", x ? x.role : "");
+    rl = fld("Role", "text", x ? x.role : "");
   var dl = document.createElement("datalist");
   dl.id = "ccroles";
   CROLES.forEach(function (r) {
@@ -1553,7 +1559,7 @@ function ccForm(c, x, holder) {
   g.appendChild(ph);
   g.appendChild(em);
   box.appendChild(g);
-  var nt = fld("Notes (best time to call, what to contact them about...)", "text", x ? x.notes : "");
+  var nt = fld("Notes", "text", x ? x.notes : "");
   box.appendChild(nt);
   /* client portal: this person may sign in to see this account (needs an email) */
   var pa = null;
@@ -1702,10 +1708,10 @@ function drawProps(c, holder) {
 }
 function propForm(c, pr, holder) {
   var box = el("div", "pcard");
-  var lab = fld("Label (Main, Rental, Office...)", "text", pr ? pr.label : "");
+  var lab = fld("Label", "text", pr ? pr.label : "");
   var adr = fld("Address", "text", pr ? pr.address : "");
   adr.input.placeholder = "123 Example Ln, Kissimmee, FL 34758";
-  var nts = fld("Access notes (gate code, dogs, parking...)", "textarea", pr ? pr.notes : "");
+  var nts = fld("Access notes", "textarea", pr ? pr.notes : "");
   box.appendChild(lab);
   box.appendChild(adr);
   box.appendChild(nts);
@@ -1758,25 +1764,18 @@ function propForm(c, pr, holder) {
 function openClientForm(c) {
   var p = panel();
   p.appendChild(el("h2", null, c ? "Edit client" : "New client"));
-  var n = fld("Name (as on the account, e.g. Mr & Mrs Smith, or Alejandro Torres Jr)", "text", c && c.name),
-    ln = fld("Last name (for sorting)", "text", c && c.last_name),
-    nk = fld("Preferred name / nickname (optional)", "text", c && c.nickname),
-    co = fld("Company / HOA name (optional)", "text", c && c.company);
+  var n = fld("Name", "text", c && c.name),
+    ln = fld("Last name", "text", c && c.last_name),
+    nk = fld("Nickname", "text", c && c.nickname),
+    co = fld("Company / HOA", "text", c && c.company);
   var ph = fld("Phone", "tel", c && c.phone),
-    ph2 = fld("Phone 2 (optional)", "tel", c && c.phone2);
+    ph2 = fld("Phone 2", "tel", c && c.phone2);
   var em = fld("Email", "email", c && c.email),
     ty = fld("Type", "select", c ? c.type : "residential", TYPES);
   var nt = fld("Notes", "textarea", c && c.notes);
-  var acn = fld(
-    "Account number (shows on invoices and in the portal; leave blank on a new client to get the next number)",
-    "number",
-    c && c.account_no
-  );
-  acn.input.step = "1";
-  acn.input.inputMode = "numeric";
-  var bp = fld("Invoices for multiple properties", "select", c && c.bill_by_property ? "1" : "0", [
-    ["0", "One combined invoice for all properties"],
-    ["1", "Separate invoice for each property"]
+  var bp = fld("Billing", "select", c && c.bill_by_property ? "1" : "0", [
+    ["0", "One invoice for all properties"],
+    ["1", "Separate invoice per property"]
   ]);
   var g = el("div", "grid2");
   g.appendChild(n);
@@ -1788,17 +1787,19 @@ function openClientForm(c) {
   g.appendChild(em);
   g.appendChild(ty);
   p.appendChild(g);
-  if (!c || "account_no" in c) p.appendChild(acn);
+  // account numbers are given out automatically (the next number) when a client is added; clients moved over from
+  // GroundsKeeper Pro keep their old numbers. Shown here, not editable.
+  if (c && c.account_no) p.appendChild(el("p", "note", "Account #" + c.account_no));
   p.appendChild(bp);
   p.appendChild(nt);
   function hint() {
-    ln.input.placeholder = guessLast(n.input.value) || "Left blank = guessed from the name";
+    ln.input.placeholder = guessLast(n.input.value) || "Auto from name";
   }
   n.input.addEventListener("input", hint);
   hint();
   var addr = null;
   if (!c) {
-    addr = fld("Service address (required, you can add more later)", "text", "");
+    addr = fld("Service address", "text", "");
     addr.input.placeholder = "123 Example Ln, Kissimmee, FL 34758";
     p.appendChild(addr);
   }
@@ -1835,25 +1836,6 @@ function openClientForm(c) {
       }),
       wantBp = bp.input.value === "1";
     if (bpOk || wantBp) row.bill_by_property = wantBp;
-    var acRaw = acn.input.value.trim();
-    if (acRaw !== "") {
-      var acNum = parseInt(acRaw, 10);
-      if (isNaN(acNum) || acNum < 1 || String(acNum) !== acRaw) {
-        alert("The account number must be a whole number, like 1043.");
-        return;
-      }
-      var taken = clients.filter(function (x) {
-        return x.account_no === acNum && (!c || x.id !== c.id);
-      })[0];
-      if (taken) {
-        alert("Account number " + acNum + " already belongs to " + taken.name + ".");
-        return;
-      }
-      row.account_no = acNum;
-    } else if (c && c.account_no) {
-      alert("Every client needs an account number. Type one in, or keep " + c.account_no + ".");
-      return;
-    }
     save.disabled = true;
     if (c) {
       sb.from("clients")
@@ -3255,15 +3237,15 @@ function openJobForm(client, job) {
     )
   );
   var ti = fld("Job name", "text", job ? job.title : ""),
-    pr = fld("Price per visit ($)", "number", job ? job.price : "");
+    pr = fld("Price ($)", "number", job ? job.price : "");
   pr.input.step = "0.01";
   pr.input.min = "0";
   pr.input.inputMode = "decimal";
   var fq = fld("How often", "select", job ? job.frequency : "weekly", FREQ);
-  var sd = fld("First visit / start date", "date", job ? job.start_date : today());
-  var ed = fld("Ends on (optional)", "date", (job && job.end_date) || "");
+  var sd = fld("Start date", "date", job ? job.start_date : today());
+  var ed = fld("End date", "date", (job && job.end_date) || "");
   var ins = fld(
-    "Instructions for the crew (gate, dogs, edging, etc.)",
+    "Crew notes",
     "textarea",
     job ? job.instructions : ""
   );
@@ -3447,7 +3429,7 @@ function openServices() {
     var box = el("div", "pcard"),
       g = el("div", "grid2");
     var n = fld("Name", "text", s ? s.name : ""),
-      d = fld("Default price ($, optional)", "number", s && s.default_price != null ? s.default_price : "");
+      d = fld("Price ($)", "number", s && s.default_price != null ? s.default_price : "");
     d.input.step = "0.01";
     d.input.min = "0";
     d.input.inputMode = "decimal";
@@ -5304,9 +5286,9 @@ function renderTeam() {
     var box = el("div", "pcard"),
       g = el("div", "grid2"),
       nm = fld("Name", "text", ""),
-      em = fld("Their login email", "email", ""),
+      em = fld("Login email", "email", ""),
       rl = fld("Role", "select", "office", ROLES),
-      pw = fld("Starting password (8+ characters, you tell them)", "text", "");
+      pw = fld("Password", "text", "");
     pw.input.autocomplete = "off";
     g.appendChild(nm);
     g.appendChild(em);
@@ -5749,8 +5731,8 @@ function personBio(host, p) {
   ss.input.addEventListener("blur", function () {
     ss.input.value = fmtSsn(ss.input.value);
   });
-  var en = fld("Emergency contact name", "text", src.emergency_name || ""),
-    ep = fld("Emergency contact phone", "tel", src.emergency_phone || "");
+  var en = fld("Emergency contact", "text", src.emergency_name || ""),
+    ep = fld("Emergency phone", "tel", src.emergency_phone || "");
   var jt = fld("Job title", "text", src.job_title || ""),
     sts = fld("Status", "select", src.status || "active", PSTAT),
     sd = fld("Start date", "date", dv(src.start_date)),
@@ -5827,7 +5809,7 @@ function personBio(host, p) {
       ["office", "Office (clients, jobs, schedule, billing)"],
       ["owner", "Owner / co-owner (everything)"]
     ]);
-    tlPass = fld("Starting password (8+ characters, you tell them)", "text", "");
+    tlPass = fld("Password", "text", "");
     tlPass.input.autocomplete = "off";
     gg.appendChild(tlEmail);
     gg.appendChild(tlRole);
@@ -6066,7 +6048,7 @@ function personPay(host, p) {
   host.appendChild(el("h3", null, "Record a payment"));
   var g = el("div", "grid2"),
     pd = fld("Date paid", "date", today()),
-    hr = fld("Hours (optional)", "number", ""),
+    hr = fld("Hours", "number", ""),
     am = fld("Amount paid ($)", "number", ""),
     me = fld("Paid by", "select", "zelle", PMETH);
   hr.input.step = "0.25";
@@ -6087,7 +6069,7 @@ function personPay(host, p) {
     g.appendChild(x);
   });
   host.appendChild(g);
-  var no = fld("Note (job, week, etc.)", "text", "");
+  var no = fld("Note", "text", "");
   host.appendChild(no);
   var add = btn("Record payment", "btn", function () {
     var a = Number(am.input.value);
@@ -6153,7 +6135,7 @@ function personPay(host, p) {
         c.textContent = "";
         var eg = el("div", "grid2"),
           epd = fld("Date paid", "date", String(r.paid_on).slice(0, 10)),
-          ehr = fld("Hours (optional)", "number", r.hours == null ? "" : r.hours),
+          ehr = fld("Hours", "number", r.hours == null ? "" : r.hours),
           eam = fld("Amount paid ($)", "number", r.amount),
           eme = fld("Paid by", "select", r.method, PMETH);
         ehr.input.step = "0.25";
@@ -6246,7 +6228,7 @@ function personBen(host, p) {
   );
   var g = el("div", "grid2"),
     ti = fld("Benefit", "text", ""),
-    va = fld("Value ($, optional)", "number", ""),
+    va = fld("Value ($)", "number", ""),
     sd = fld("Starts", "date", today()),
     de = fld("Details", "text", "");
   va.input.step = "0.01";
@@ -6310,7 +6292,7 @@ function personBen(host, p) {
         c.textContent = "";
         var eg = el("div", "grid2"),
           eti = fld("Benefit", "text", b.title),
-          eva = fld("Value ($, optional)", "number", b.value == null ? "" : b.value),
+          eva = fld("Value ($)", "number", b.value == null ? "" : b.value),
           esd = fld("Starts", "date", b.starts_on ? String(b.starts_on).slice(0, 10) : ""),
           ede = fld("Details", "text", b.details || "");
         eva.input.step = "0.01";
@@ -6388,7 +6370,7 @@ function personDocs(host, p) {
     )
   );
   var g = el("div", "grid2"),
-    ti = fld("Title (optional)", "text", ""),
+    ti = fld("Title", "text", ""),
     ki = fld("Type", "select", "W-9", DKINDS);
   g.appendChild(ti);
   g.appendChild(ki);
@@ -6746,8 +6728,8 @@ function openTodo(t) {
   var p = panel();
   p.appendChild(el("h2", null, t ? "Task" : "New task"));
   var ti = fld("Task", "text", t ? t.title : ""),
-    no = fld("Notes (optional)", "textarea", t ? t.notes : ""),
-    du = fld("Due date (optional)", "date", t && t.due_date ? t.due_date : "");
+    no = fld("Notes", "textarea", t ? t.notes : ""),
+    du = fld("Due date", "date", t && t.due_date ? t.due_date : "");
   var tm = [["", "Anyone"]].concat(
     team.map(function (m) {
       return [m.email, m.name || m.email];
@@ -6763,7 +6745,7 @@ function openTodo(t) {
     tm.push([t.assigned_to, memberName(t.assigned_to)]);
   var as = fld("Assigned to", "select", t ? t.assigned_to : "", tm);
   var cl = fld(
-    "Client (optional)",
+    "Client",
     "select",
     t && t.client_id ? t.client_id : "",
     [["", "None"]].concat(
@@ -8319,7 +8301,7 @@ function openExpense(e, pre, scanFile) {
       });
     p.appendChild(d);
   })();
-  var code = fld("Code (pick or type, up to 4 letters)", "text", src.code || ""),
+  var code = fld("Code", "text", src.code || ""),
     dt = fld("Date", "text", mdy(e ? e.spent_on : pre.date || today()));
   dt.input.placeholder = "MM/DD/YYYY";
   dt.input.inputMode = "numeric";
@@ -8409,8 +8391,8 @@ function openExpense(e, pre, scanFile) {
   p.appendChild(rn);
   var DEF_TAXP = 7.5,
     haveTax = !!(e || pre.amount != null || pre.tax);
-  var am = fld("Amount ($, before tax)", "number", e ? expNet(e) : pre.amount != null ? pre.amount : ""),
-    tx = fld("or tax amount ($)", "number", e ? expTax(e) || "" : pre.tax || ""),
+  var am = fld("Amount ($)", "number", e ? expNet(e) : pre.amount != null ? pre.amount : ""),
+    tx = fld("Tax ($)", "number", e ? expTax(e) || "" : pre.tax || ""),
     tp = fld("Tax rate (%)", "number", "");
   am.input.step = "0.01";
   am.input.inputMode = "decimal";
@@ -8486,7 +8468,7 @@ function openExpense(e, pre, scanFile) {
     chk();
   });
   p.appendChild(tot);
-  var tn = fld("Tax description (notes for your accountant)", "textarea", e ? e.tax_note || "" : "");
+  var tn = fld("Tax notes", "textarea", e ? e.tax_note || "" : "");
   tn.input.placeholder = "Why this was bought, what it was used for, how it should be treated for taxes...";
   p.appendChild(tn);
   var dw = el("div", "pcard");
@@ -8510,7 +8492,7 @@ function openExpense(e, pre, scanFile) {
   });
   setTimeout(chk, 0);
   var cl = fld(
-    "For a client's job (optional)",
+    "Client job",
     "select",
     e && e.client_id ? e.client_id : "",
     [["", "None"]].concat(
@@ -10370,7 +10352,7 @@ function openAddPhotos() {
   var p = panel();
   p.appendChild(el("h2", null, "Add photos"));
   var cl = fld(
-    "Client (optional)",
+    "Client",
     "select",
     "",
     [["", "No client"]].concat(
@@ -10466,7 +10448,7 @@ function openCrew() {
     var box = el("div", "pcard"),
       g = el("div", "grid2");
     var n = fld("Name", "text", m ? m.name : ""),
-      ph = fld("Phone (for texting routes)", "tel", m ? m.phone : "");
+      ph = fld("Phone", "tel", m ? m.phone : "");
     g.appendChild(n);
     g.appendChild(ph);
     box.appendChild(g);
@@ -10489,7 +10471,7 @@ function openCrew() {
       var lw = el("div");
       lw.hidden = true;
       em = fld("Login email", "email", "");
-      pw = fld("Starting password (8+ characters, you tell them)", "text", "");
+      pw = fld("Password", "text", "");
       pw.input.autocomplete = "off";
       lw.appendChild(em);
       lw.appendChild(pw);
@@ -11150,7 +11132,7 @@ function createInvoice(cid, vs, through, pid) {
 /* Property picker: follows the chosen client's properties. Empty = the whole account (no specific property). */
 function propPicker(cs, label, emptyText) {
   emptyText = emptyText || "Whole account / no specific property";
-  var w = fld(label || "Property (optional: bill this to one property of the account)", "select", "", [["", emptyText]]);
+  var w = fld(label || "Property", "select", "", [["", emptyText]]);
   function fill() {
     var cur = w.input.value;
     w.input.textContent = "";
@@ -11197,7 +11179,7 @@ function openInvoiceForm(cid) {
   var pps = propPicker(cs);
   p.appendChild(pps);
   var ttl = fld("Job Title", "text", ""),
-    nt = fld("Notes & Terms (optional; the \"Zelle to ..., or Cash upon next visit\" line is always included)", "textarea", "");
+    nt = fld("Notes & Terms", "textarea", "");
   p.appendChild(ttl);
   p.appendChild(nt);
   var terms = Number(bizv("terms_days", 10));
@@ -11239,7 +11221,7 @@ function openInvoiceForm(cid) {
   gp.appendChild(pbeg);
   gp.appendChild(pend);
   p.appendChild(gp);
-  var ref = fld("Reference / PO number (optional, shows on the invoice)", "text", "");
+  var ref = fld("PO / Reference", "text", "");
   p.appendChild(ref);
   p.appendChild(el("h3", null, "Work Billed"));
   var box = el("div"),
@@ -16546,12 +16528,12 @@ function openEstimateForm(cid) {
     )
   );
   var ttl = fld("Job Title", "text", ""),
-    scp = fld("Notes & Terms (optional)", "textarea", ""),
+    scp = fld("Notes & Terms", "textarea", ""),
     vd = fld("Valid for (days)", "number", "30");
   vd.classList.add("short");
   p.appendChild(cs);
   // which property the work is for (shows as the service address on the estimate); blank = their Main address
-  var pps = propPicker(cs, "Property (which property this estimate is for)", "Main address");
+  var pps = propPicker(cs, "Property", "Main address");
   p.appendChild(pps);
   p.appendChild(ttl);
   p.appendChild(scp);
@@ -16818,7 +16800,7 @@ function openEstimate(id) {
         body.appendChild(ans);
       }
       var ttl = fld("Job Title", "text", e.title || ""),
-        scp = fld("Notes & Terms (optional)", "textarea", e.scope || ""),
+        scp = fld("Notes & Terms", "textarea", e.scope || ""),
         vu = fld("Valid until", "date", e.valid_until || ""),
         eps = clientProps(e.client_id),
         pf = fld(

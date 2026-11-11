@@ -721,7 +721,7 @@ function openAddPhotos() {
   var p = panel();
   p.appendChild(el("h2", null, "Add photos"));
   var cl = fld(
-    "Client (optional)",
+    "Client",
     "select",
     "",
     [["", "No client"]].concat(

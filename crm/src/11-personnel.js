@@ -386,8 +386,8 @@ function personBio(host, p) {
   ss.input.addEventListener("blur", function () {
     ss.input.value = fmtSsn(ss.input.value);
   });
-  var en = fld("Emergency contact name", "text", src.emergency_name || ""),
-    ep = fld("Emergency contact phone", "tel", src.emergency_phone || "");
+  var en = fld("Emergency contact", "text", src.emergency_name || ""),
+    ep = fld("Emergency phone", "tel", src.emergency_phone || "");
   var jt = fld("Job title", "text", src.job_title || ""),
     sts = fld("Status", "select", src.status || "active", PSTAT),
     sd = fld("Start date", "date", dv(src.start_date)),
@@ -464,7 +464,7 @@ function personBio(host, p) {
       ["office", "Office (clients, jobs, schedule, billing)"],
       ["owner", "Owner / co-owner (everything)"]
     ]);
-    tlPass = fld("Starting password (8+ characters, you tell them)", "text", "");
+    tlPass = fld("Password", "text", "");
     tlPass.input.autocomplete = "off";
     gg.appendChild(tlEmail);
     gg.appendChild(tlRole);
@@ -703,7 +703,7 @@ function personPay(host, p) {
   host.appendChild(el("h3", null, "Record a payment"));
   var g = el("div", "grid2"),
     pd = fld("Date paid", "date", today()),
-    hr = fld("Hours (optional)", "number", ""),
+    hr = fld("Hours", "number", ""),
     am = fld("Amount paid ($)", "number", ""),
     me = fld("Paid by", "select", "zelle", PMETH);
   hr.input.step = "0.25";
@@ -724,7 +724,7 @@ function personPay(host, p) {
     g.appendChild(x);
   });
   host.appendChild(g);
-  var no = fld("Note (job, week, etc.)", "text", "");
+  var no = fld("Note", "text", "");
   host.appendChild(no);
   var add = btn("Record payment", "btn", function () {
     var a = Number(am.input.value);
@@ -790,7 +790,7 @@ function personPay(host, p) {
         c.textContent = "";
         var eg = el("div", "grid2"),
           epd = fld("Date paid", "date", String(r.paid_on).slice(0, 10)),
-          ehr = fld("Hours (optional)", "number", r.hours == null ? "" : r.hours),
+          ehr = fld("Hours", "number", r.hours == null ? "" : r.hours),
           eam = fld("Amount paid ($)", "number", r.amount),
           eme = fld("Paid by", "select", r.method, PMETH);
         ehr.input.step = "0.25";
@@ -883,7 +883,7 @@ function personBen(host, p) {
   );
   var g = el("div", "grid2"),
     ti = fld("Benefit", "text", ""),
-    va = fld("Value ($, optional)", "number", ""),
+    va = fld("Value ($)", "number", ""),
     sd = fld("Starts", "date", today()),
     de = fld("Details", "text", "");
   va.input.step = "0.01";
@@ -947,7 +947,7 @@ function personBen(host, p) {
         c.textContent = "";
         var eg = el("div", "grid2"),
           eti = fld("Benefit", "text", b.title),
-          eva = fld("Value ($, optional)", "number", b.value == null ? "" : b.value),
+          eva = fld("Value ($)", "number", b.value == null ? "" : b.value),
           esd = fld("Starts", "date", b.starts_on ? String(b.starts_on).slice(0, 10) : ""),
           ede = fld("Details", "text", b.details || "");
         eva.input.step = "0.01";
@@ -1025,7 +1025,7 @@ function personDocs(host, p) {
     )
   );
   var g = el("div", "grid2"),
-    ti = fld("Title (optional)", "text", ""),
+    ti = fld("Title", "text", ""),
     ki = fld("Type", "select", "W-9", DKINDS);
   g.appendChild(ti);
   g.appendChild(ki);

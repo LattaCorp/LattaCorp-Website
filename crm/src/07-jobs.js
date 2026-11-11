@@ -570,15 +570,15 @@ function openJobForm(client, job) {
     )
   );
   var ti = fld("Job name", "text", job ? job.title : ""),
-    pr = fld("Price per visit ($)", "number", job ? job.price : "");
+    pr = fld("Price ($)", "number", job ? job.price : "");
   pr.input.step = "0.01";
   pr.input.min = "0";
   pr.input.inputMode = "decimal";
   var fq = fld("How often", "select", job ? job.frequency : "weekly", FREQ);
-  var sd = fld("First visit / start date", "date", job ? job.start_date : today());
-  var ed = fld("Ends on (optional)", "date", (job && job.end_date) || "");
+  var sd = fld("Start date", "date", job ? job.start_date : today());
+  var ed = fld("End date", "date", (job && job.end_date) || "");
   var ins = fld(
-    "Instructions for the crew (gate, dogs, edging, etc.)",
+    "Crew notes",
     "textarea",
     job ? job.instructions : ""
   );
@@ -762,7 +762,7 @@ function openServices() {
     var box = el("div", "pcard"),
       g = el("div", "grid2");
     var n = fld("Name", "text", s ? s.name : ""),
-      d = fld("Default price ($, optional)", "number", s && s.default_price != null ? s.default_price : "");
+      d = fld("Price ($)", "number", s && s.default_price != null ? s.default_price : "");
     d.input.step = "0.01";
     d.input.min = "0";
     d.input.inputMode = "decimal";

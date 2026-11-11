@@ -636,7 +636,7 @@ function openExpense(e, pre, scanFile) {
       });
     p.appendChild(d);
   })();
-  var code = fld("Code (pick or type, up to 4 letters)", "text", src.code || ""),
+  var code = fld("Code", "text", src.code || ""),
     dt = fld("Date", "text", mdy(e ? e.spent_on : pre.date || today()));
   dt.input.placeholder = "MM/DD/YYYY";
   dt.input.inputMode = "numeric";
@@ -726,8 +726,8 @@ function openExpense(e, pre, scanFile) {
   p.appendChild(rn);
   var DEF_TAXP = 7.5,
     haveTax = !!(e || pre.amount != null || pre.tax);
-  var am = fld("Amount ($, before tax)", "number", e ? expNet(e) : pre.amount != null ? pre.amount : ""),
-    tx = fld("or tax amount ($)", "number", e ? expTax(e) || "" : pre.tax || ""),
+  var am = fld("Amount ($)", "number", e ? expNet(e) : pre.amount != null ? pre.amount : ""),
+    tx = fld("Tax ($)", "number", e ? expTax(e) || "" : pre.tax || ""),
     tp = fld("Tax rate (%)", "number", "");
   am.input.step = "0.01";
   am.input.inputMode = "decimal";
@@ -803,7 +803,7 @@ function openExpense(e, pre, scanFile) {
     chk();
   });
   p.appendChild(tot);
-  var tn = fld("Tax description (notes for your accountant)", "textarea", e ? e.tax_note || "" : "");
+  var tn = fld("Tax notes", "textarea", e ? e.tax_note || "" : "");
   tn.input.placeholder = "Why this was bought, what it was used for, how it should be treated for taxes...";
   p.appendChild(tn);
   var dw = el("div", "pcard");
@@ -827,7 +827,7 @@ function openExpense(e, pre, scanFile) {
   });
   setTimeout(chk, 0);
   var cl = fld(
-    "For a client's job (optional)",
+    "Client job",
     "select",
     e && e.client_id ? e.client_id : "",
     [["", "None"]].concat(

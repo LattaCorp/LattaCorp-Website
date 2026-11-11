@@ -188,7 +188,7 @@ function createInvoice(cid, vs, through, pid) {
 /* Property picker: follows the chosen client's properties. Empty = the whole account (no specific property). */
 function propPicker(cs, label, emptyText) {
   emptyText = emptyText || "Whole account / no specific property";
-  var w = fld(label || "Property (optional: bill this to one property of the account)", "select", "", [["", emptyText]]);
+  var w = fld(label || "Property", "select", "", [["", emptyText]]);
   function fill() {
     var cur = w.input.value;
     w.input.textContent = "";
@@ -235,7 +235,7 @@ function openInvoiceForm(cid) {
   var pps = propPicker(cs);
   p.appendChild(pps);
   var ttl = fld("Job Title", "text", ""),
-    nt = fld("Notes & Terms (optional; the \"Zelle to ..., or Cash upon next visit\" line is always included)", "textarea", "");
+    nt = fld("Notes & Terms", "textarea", "");
   p.appendChild(ttl);
   p.appendChild(nt);
   var terms = Number(bizv("terms_days", 10));
@@ -277,7 +277,7 @@ function openInvoiceForm(cid) {
   gp.appendChild(pbeg);
   gp.appendChild(pend);
   p.appendChild(gp);
-  var ref = fld("Reference / PO number (optional, shows on the invoice)", "text", "");
+  var ref = fld("PO / Reference", "text", "");
   p.appendChild(ref);
   p.appendChild(el("h3", null, "Work Billed"));
   var box = el("div"),
