@@ -473,6 +473,50 @@ export async function handlePortalInvite(request, env) {
   return json({ ok: true });
 }
 
+
+// ---- Quote approved: the client's quote page calls this right after they sign. Emails the business once per quote.
+// Only accepted quotes signed online are emailed (declines are not). The database records when it was emailed so a
+// second call never sends it twice.
+const money2 = (n) => "$" + Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export async function handleQuoteApproved(request, env) {
+  if (!env.SUPABASE_SECRET_KEY || !env.RESEND_API_KEY) return json({ error: "not set up" }, 500);
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const tok = String(d && d.t || "");
+  if (!/^[A-Za-z0-9_-]{32,128}$/.test(tok)) return json({ error: "bad request" }, 400);
+  // claim it: only an accepted, client-signed quote that hasn't been emailed yet
+  const now = new Date().toISOString();
+  const cr = await sbRest(env, `estimates?share_token=eq.${tok}&status=eq.accepted&response_signature=not.is.null&approval_emailed_at=is.null&select=*`, {
+    method: "PATCH", headers: { Prefer: "return=representation" }, body: JSON.stringify({ approval_emailed_at: now }) });
+  if (!cr.ok) return json({ error: "lookup failed" }, 502);
+  const e = ((await cr.json()) || [])[0];
+  if (!e) return json({ ok: true, sent: false });
+  let c = {};
+  try { const r = await sbRest(env, `clients?id=eq.${e.client_id}&select=name,company`); c = ((await r.json()) || [])[0] || {}; } catch {}
+  const word = e.doc_type === "estimate" ? "Estimate" : "Quote", num = (word === "Estimate" ? "EST-" : "QTE-") + String(e.number).padStart(4, "0");
+  const dep = e.deposit ? (e.deposit.mode === "pct" ? Math.round(Number(e.total) * Number(e.deposit.pct || 0)) / 100 : Number(e.deposit.amt || 0)) : 0;
+  const who = (c.name || "A client") + (c.company ? " · " + c.company : "");
+  const when = new Date(e.responded_at || now).toLocaleString("en-US", { timeZone: "America/New_York", month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  const rows = [["Signed by", e.response_name], ["PO / Approval #", e.response_po], ["Deposit due", dep > 0 ? money2(dep) : ""], ["Signed", when]].filter((x) => x[1]);
+  const link = `${SITE}/d/?t=${tok}&p=1`;
+  const html = `<!doctype html><html><body style="margin:0;padding:24px 12px;background:#f3f7f1;font-family:Arial,sans-serif;color:#1c2a20">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;margin:0 auto;background:#fff;border:1px solid #e4ece1;border-radius:12px;overflow:hidden">
+<tr><td style="background:#1b552b;padding:16px 22px;color:#fff;font-size:18px;font-weight:700">&#10003; ${word} approved</td></tr>
+<tr><td style="padding:22px">
+<p style="margin:0 0 14px;font-size:16px;line-height:1.5"><b>${esc(who)}</b> signed ${word.toLowerCase()} <b>${num}</b>${e.title ? ` (“${esc(e.title)}”)` : ""} for <b>${money2(e.total)}</b>.</p>
+<table role="presentation" cellpadding="0" cellspacing="0" style="font-size:14px;margin:0 0 18px">${rows.map((r) => `<tr><td style="padding:3px 16px 3px 0;color:#58675c">${r[0]}</td><td style="padding:3px 0">${esc(r[1])}</td></tr>`).join("")}</table>
+<p style="margin:0"><a href="${link}" style="display:inline-block;background:#1b552b;color:#fff;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:6px">See the signed ${word.toLowerCase()}</a>
+&nbsp; <a href="${SITE}/crm/" style="color:#1b552b">Open Foreman</a></p></td></tr></table></body></html>`;
+  const text = [`${word} approved`, "", `${who} signed ${word.toLowerCase()} ${num}${e.title ? ` ("${e.title}")` : ""} for ${money2(e.total)}.`, ...rows.map((r) => `${r[0]}: ${r[1]}`), "", `See the signed ${word.toLowerCase()}: ${link}`].join("\n");
+  const ok = await sendViaResend(env, { from: "Foreman <website@lattacorpfl.com>", to: [env.TO_EMAIL || DEFAULT_TO],
+    subject: `${word} approved: ${who} · ${num} · ${money2(e.total)}`, html, text, headers: AUTO_HEADERS });
+  if (!ok) {
+    // let a later call try again
+    await sbRest(env, `estimates?id=eq.${e.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ approval_emailed_at: null }) });
+    return json({ error: "The email could not be sent." }, 502);
+  }
+  return json({ ok: true, sent: true });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -491,6 +535,10 @@ export default {
     if (url.pathname === "/api/team") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handleTeam(request, env);
+    }
+    if (url.pathname === "/api/quote-approved") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      return handleQuoteApproved(request, env);
     }
     if (url.pathname === "/api/portal/code" || url.pathname === "/api/portal/request" || url.pathname === "/api/portal/invite") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);

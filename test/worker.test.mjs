@@ -203,3 +203,30 @@ assert(tcalls.some((c) => c.opts.method === "DELETE" && c.url.includes("/auth/v1
 calls = []; globalThis.fetch = async (url, opts = {}) => { url = String(url); if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ email: "sis@example.com" })); if (url.includes("/rest/v1/staff")) return new Response(JSON.stringify([{ email: "sis@example.com", role: "office" }])); return new Response("{}", { status: 200 }); };
 r = await worker.fetch(cl({ action: "create", crew_id: CID, email: "z@y.co", password: "longenough1" }, "any"), env); assert.equal(r.status, 403, "office staff cannot create crew logins");
 console.log("all worker checks passed");
+
+// ---- quote approved email ----
+{
+  let qcalls = [], claimed = false, mailOk = true;
+  globalThis.fetch = async (url, opts = {}) => {
+    url = String(url); qcalls.push({ url, opts });
+    if (url.includes("/rest/v1/estimates?share_token=")) {
+      if (claimed) return new Response("[]");
+      claimed = true;
+      return new Response(JSON.stringify([{ id: "e1", client_id: "c1", number: 4, doc_type: "quote", title: "Shrub <Removal>", total: 167.74, status: "accepted", response_name: "Don <b>Asher</b>", response_po: "HOA-7", deposit: { mode: "pct", pct: 50 }, responded_at: "2026-11-11T10:20:00Z" }]));
+    }
+    if (url.includes("/rest/v1/clients?id=eq.c1")) return new Response(JSON.stringify([{ name: "Shingle Creek", company: "" }]));
+    if (url.includes("api.resend.com")) return new Response("{}", { status: mailOk ? 200 : 500 });
+    return new Response("[]");
+  };
+  const qa = (t) => new Request("https://x.test/api/quote-approved", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ t }) });
+  let r = await worker.fetch(qa("short"), env); assert.equal(r.status, 400, "bad token");
+  const T = "a".repeat(64);
+  r = await worker.fetch(qa(T), env); assert.equal(r.status, 200); assert.equal((await r.json()).sent, true);
+  const m = qcalls.find((c) => c.url.includes("api.resend.com")), mb = JSON.parse(m.opts.body);
+  assert.equal(mb.to[0], "owner@example.com"); assert.equal(mb.subject, "Quote approved: Shingle Creek · QTE-0004 · $167.74");
+  assert(mb.html.includes("Don &lt;b&gt;Asher&lt;/b&gt;") && mb.html.includes("$83.87") && mb.html.includes("HOA-7"), "email content");
+  qcalls = []; r = await worker.fetch(qa(T), env); assert.equal((await r.json()).sent, false, "only once");
+  assert(!qcalls.some((c) => c.url.includes("api.resend.com")), "no second email");
+  r = await worker.fetch(new Request("https://x.test/api/quote-approved", { method: "GET" }), env); assert.equal(r.status, 405);
+  console.log("quote approved checks passed");
+}

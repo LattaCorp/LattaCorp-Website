@@ -383,7 +383,8 @@ function respond(decision){
   var y=document.getElementById("ay"),n=document.getElementById("an2");y.disabled=n.disabled=true;err.textContent=t("sending");
   var poEl=document.getElementById("apo");
   rpc("respond_estimate",{tok:tok(),decision:decision,who:name,note:note,po:poEl?poEl.value.trim():"",sig:decision==="accepted"&&cv?cv.toDataURL("image/png"):null}).then(function(r){
-    if(r&&r.ok){load(function(){var a=document.getElementById("paper");var m=document.createElement("div");m.className="state";m.style.margin="0 auto";m.style.color="#1b552b";m.style.fontWeight="700";m.textContent=decision==="accepted"?t("thanksA"):t("thanksD");a.insertBefore(m,a.firstChild)})}
+    if(r&&r.ok){if(decision==="accepted")try{fetch("/api/quote-approved",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({t:tok()}),keepalive:true}).catch(function(){})}catch(e){}
+      load(function(){var a=document.getElementById("paper");var m=document.createElement("div");m.className="state";m.style.margin="0 auto";m.style.color="#1b552b";m.style.fontWeight="700";m.textContent=decision==="accepted"?t("thanksA"):t("thanksD");a.insertBefore(m,a.firstChild)})}
     else{y.disabled=n.disabled=false;err.textContent=t("failed")}
   },function(){y.disabled=n.disabled=false;err.textContent=t("failed")})}
 
