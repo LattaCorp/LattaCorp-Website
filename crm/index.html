@@ -142,6 +142,22 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .panel.withprev .pform{overflow-y:auto;min-height:0;align-self:stretch;padding:0 10px 0 6px;margin:0 -4px 0 -6px;scrollbar-gutter:stable}
 .panel.withprev .pprev{position:static;display:flex;flex-direction:column;min-height:0;padding-top:30px}
 .panel.withprev .ppwrap{flex:1;min-height:0}}
+/* Right-side layout test (computers 1200px+): list on the left, options and forms on the right */
+#rightcol{display:none}
+body.dock #rightcol{display:flex;flex-direction:column;width:460px;flex:none;position:sticky;top:76px;align-self:flex-start;height:calc(100vh - 76px);background:#fff;border-left:1px solid var(--line);overflow:hidden;order:3}
+body.dock #rightcol .rch{font-size:.78rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);padding:16px 16px 8px}
+body.dock #rightcol .top{display:block;padding:0 12px 12px;margin:0;border-bottom:1px solid var(--line)}
+body.dock #rightcol #topbtns{display:flex;flex-direction:column;gap:6px;width:100%}
+body.dock #rightcol #topbtns>*{display:block;width:100%;margin:0!important;text-align:left;background:#f3f8f1;color:var(--forest);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-weight:700;box-shadow:none}
+body.dock #rightcol #topbtns>*:hover{background:#e3f1df}
+body.dock #rightcol #topbtns:empty::before{content:"No options on this screen";color:var(--muted);font-size:.9rem}
+body.dock #detail{position:static;inset:auto;background:none;display:none;flex:1;min-height:0;overflow:auto;z-index:auto}
+body.dock #detail.on{display:block}
+body.dock #detail .panel{max-width:none;margin:0;border-radius:0;box-shadow:none;padding:16px 16px 28px;min-height:0}
+body.dock #detail.full{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:20;overflow:auto;flex:none}
+body.dock #detail.full .panel{margin:20px auto;border-radius:14px}
+body.dock #app{max-width:none}
+body.dock #app>*{max-width:1000px;margin-left:auto;margin-right:auto}
 @media(max-width:1000px){.panel.withprev{grid-template-columns:minmax(0,1fr)}.panel.withprev>*{min-width:0}.pprev{position:static;padding-top:6px}}
 .panel h2{margin:0 0 2px;color:var(--forest)}
 .close{position:absolute;right:12px;top:10px;background:none;border:0;font-size:1.8rem;cursor:pointer;color:var(--muted)}
@@ -357,7 +373,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=125"></script>
+<script src="app.js?v=126"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

@@ -44,6 +44,7 @@ window.addEventListener("resize", lpFit);
 /* Turns the open panel into form + preview. Returns a function to call with the draft document. */
 function livePreview(p) {
   p.classList.add("withprev");
+  detailFull(true);
   var form = el("div", "pform"),
     side = el("div", "pprev");
   [].slice.call(p.childNodes).forEach(function (n) {

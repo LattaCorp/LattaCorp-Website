@@ -630,11 +630,51 @@ function render() {
   else renderSchedule();
 }
 
+/* ---- Right-side layout (test, computers only): the screen's list stays on the left; the tab's options
+   (New client, Services, ...) are listed down the right side, and forms and details open there instead of a pop-up.
+   The New quote / New invoice window still opens full screen because it needs the room for its live preview.
+   To turn it off, set DOCK_TEST to false. ---- */
+var DOCK_TEST = true,
+  DOCK_MIN = 1200;
+function docked() {
+  return DOCK_TEST && window.innerWidth >= DOCK_MIN;
+}
+function dockLayout() {
+  var on = docked(),
+    rc = $("rightcol"),
+    top = document.querySelector("#app .top") || (rc && rc.querySelector(".top")),
+    d = $("detail");
+  document.body.classList.toggle("dock", on);
+  if (!rc) {
+    rc = el("aside", null);
+    rc.id = "rightcol";
+    rc.appendChild(el("div", "rch", "Options"));
+    $("layout").appendChild(rc);
+  }
+  if (on) {
+    if (top && top.parentNode !== rc) rc.insertBefore(top, rc.children[1] || null);
+    if (!d.classList.contains("full") && d.parentNode !== rc) rc.appendChild(d);
+  } else {
+    if (top && top.parentNode === rc) $("app").insertBefore(top, $("msg"));
+    if (d.parentNode !== document.body) document.body.appendChild(d);
+  }
+}
+// the New quote / New invoice window takes the whole screen
+function detailFull(full) {
+  var d = $("detail");
+  d.classList.toggle("full", !!full);
+  if (full && d.parentNode !== document.body) document.body.appendChild(d);
+  if (!full) dockLayout();
+}
+window.addEventListener("resize", dockLayout);
+dockLayout();
+
 /* ---- panel helpers ---- */
 function panel() {
   var p = $("panel");
   p.textContent = "";
   p.classList.remove("withprev");
+  detailFull(false);
   lpFrame = null;
   p.appendChild(btn("×", "close", closeDetail)).setAttribute("aria-label", "Close");
   $("detail").classList.add("on");
@@ -18660,6 +18700,7 @@ window.addEventListener("resize", lpFit);
 /* Turns the open panel into form + preview. Returns a function to call with the draft document. */
 function livePreview(p) {
   p.classList.add("withprev");
+  detailFull(true);
   var form = el("div", "pform"),
     side = el("div", "pprev");
   [].slice.call(p.childNodes).forEach(function (n) {
