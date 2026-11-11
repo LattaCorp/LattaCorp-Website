@@ -115,38 +115,128 @@ function paddr(id) {
   return p ? p.address : "";
 }
 
+/* ---- Jobs list: filters and sorting ---- */
+var JF = { status: [], freq: [], plan: [], client: [] },
+  JSORT = "name";
+var JF_GROUPS = [
+  ["status", "Status", [["active", "Active"], ["paused", "Paused"], ["ended", "Ended"]]],
+  ["freq", "How often", [["weekly", "Weekly"], ["biweekly", "Every 2 weeks"], ["once", "One-time"]]],
+  ["plan", "Plan", [["basic", "Basic"], ["plus", "Plus"], ["premier", "Premier"], ["elite", "Elite"], ["other", "Other work"]]],
+  ["client", "Client", [["hoa", "HOA"], ["commercial", "Commercial"], ["residential", "Residential"]]]
+];
+var JSORTS = [
+  ["name", "Client name (A to Z)"],
+  ["name_desc", "Client name (Z to A)"],
+  ["next", "Next visit (soonest first)"],
+  ["price_desc", "Price (highest first)"],
+  ["price", "Price (lowest first)"],
+  ["plan", "Plan (Basic to Elite)"]
+];
+// what each job counts as, for the filters
+function jobFacet(j, g) {
+  if (g === "status") return j.status === "active" ? "active" : j.status === "paused" ? "paused" : "ended";
+  if (g === "freq") return j.frequency;
+  if (g === "plan") {
+    var m = /^lawn\s*maint/i.test(j.title || "") ? (String(j.title).toLowerCase().match(/basic|plus|premier|elite/) || [""])[0] : "";
+    return m || "other";
+  }
+  var c = byId(clients, j.client_id);
+  return (c && c.type) || "residential";
+}
+function jobMatches(j) {
+  return JF_GROUPS.every(function (g) {
+    var on = JF[g[0]];
+    return !on.length || on.indexOf(jobFacet(j, g[0])) > -1;
+  });
+}
+function jobSorter() {
+  var tierN = { basic: 1, plus: 2, premier: 3, elite: 4, other: 5 },
+    nm = function (j) {
+      return String(cname(j.client_id) || "").toLowerCase();
+    },
+    nv = function (j) {
+      var v = nextVisit(j);
+      return v ? v.scheduled_date : "9999-12-31";
+    };
+  return function (a, b) {
+    var r = 0;
+    if (JSORT === "next") r = nv(a) < nv(b) ? -1 : nv(a) > nv(b) ? 1 : 0;
+    else if (JSORT === "price_desc") r = Number(b.price || 0) - Number(a.price || 0);
+    else if (JSORT === "price") r = Number(a.price || 0) - Number(b.price || 0);
+    else if (JSORT === "plan") r = tierN[jobFacet(a, "plan")] - tierN[jobFacet(b, "plan")];
+    if (r) return r;
+    r = nm(a).localeCompare(nm(b));
+    return JSORT === "name_desc" ? -r : r;
+  };
+}
+function jobsFilterBar(tabs) {
+  var bar = el("div", "fbar"),
+    any = JF_GROUPS.some(function (g) {
+      return JF[g[0]].length;
+    });
+  JF_GROUPS.forEach(function (g) {
+    var grp = el("div", "fgrp");
+    grp.appendChild(el("span", "flbl", g[1]));
+    g[2].forEach(function (o) {
+      var on = JF[g[0]].indexOf(o[0]) > -1,
+        n = jobs.filter(function (j) {
+          return jobFacet(j, g[0]) === o[0];
+        }).length,
+        b = el("button", "tab fpill" + (on ? " on" : ""), o[1]);
+      b.type = "button";
+      b.setAttribute("aria-pressed", on ? "true" : "false");
+      b.appendChild(el("span", null, "(" + n + ")"));
+      if (on) b.appendChild(el("i", "fchk", "\u2713"));
+      b.addEventListener("click", function () {
+        var a = JF[g[0]],
+          k = a.indexOf(o[0]);
+        if (k > -1) a.splice(k, 1);
+        else a.push(o[0]);
+        render();
+      });
+      grp.appendChild(b);
+    });
+    bar.appendChild(grp);
+  });
+  var end = el("div", "fgrp fend");
+  if (any) {
+    var clr = el("button", "tab fpill fclear", "Clear all");
+    clr.type = "button";
+    clr.addEventListener("click", function () {
+      JF_GROUPS.forEach(function (g) {
+        JF[g[0]] = [];
+      });
+      render();
+    });
+    end.appendChild(clr);
+  }
+  var sl = el("label", "fsort");
+  sl.appendChild(el("span", "flbl", "Sort by"));
+  var sel = document.createElement("select");
+  JSORTS.forEach(function (o) {
+    var op = document.createElement("option");
+    op.value = o[0];
+    op.textContent = o[1];
+    sel.appendChild(op);
+  });
+  sel.value = JSORT;
+  sel.addEventListener("change", function () {
+    JSORT = sel.value;
+    render();
+  });
+  sl.appendChild(sel);
+  end.appendChild(sl);
+  bar.appendChild(end);
+  tabs.appendChild(bar);
+}
+
 /* ---- Jobs list ---- */
 function renderJobs() {
   var tabs = $("tabs");
   tabs.textContent = "";
-  var rec = jobs.filter(function (j) {
-      return j.status === "active" && j.frequency !== "once";
-    }),
-    one = jobs.filter(function (j) {
-      return j.status === "active" && j.frequency === "once";
-    }),
-    paused = jobs.filter(function (j) {
-      return j.status === "paused";
-    }),
-    ended = jobs.filter(function (j) {
-      return j.status !== "active" && j.status !== "paused";
-    });
-  if (jfilter === "inactive") jfilter = "paused";
-  [
-    ["active", "Recurring", rec.length],
-    ["once", "One-time", one.length],
-    ["paused", "Paused", paused.length],
-    ["ended", "Ended", ended.length]
-  ].forEach(function (s) {
-    var b = el("button", "tab" + (jfilter === s[0] ? " on" : ""), s[1]);
-    b.type = "button";
-    b.appendChild(el("span", null, "(" + s[2] + ")"));
-    b.addEventListener("click", function () {
-      jfilter = s[0];
-      render();
-    });
-    tabs.appendChild(b);
-  });
+  /* Filter pills (tap to turn on, tap again to turn off; a check mark shows what's on). No filters = every job.
+     Inside a group any match counts (Weekly OR Every 2 weeks); across groups all must match (Weekly AND Elite). */
+  jobsFilterBar(tabs);
   var tb = $("topbtns");
   tb.appendChild(
     btn("+ New job", "btn", function () {
@@ -173,16 +263,19 @@ function renderJobs() {
     );
     return;
   }
-  var shown = (jfilter === "active" ? rec : jfilter === "once" ? one : jfilter === "paused" ? paused : ended).filter(function (j) {
-    if (!query) return true;
-    return [cname(j.client_id), j.title, paddr(j.property_id)].join(" ").toLowerCase().indexOf(query) > -1;
-  });
+  var shown = jobs
+    .filter(jobMatches)
+    .filter(function (j) {
+      if (!query) return true;
+      return [cname(j.client_id), j.title, paddr(j.property_id)].join(" ").toLowerCase().indexOf(query) > -1;
+    })
+    .sort(jobSorter());
   if (!shown.length) {
     list.appendChild(
       el(
         "div",
         "empty",
-        jobs.length ? "Nothing here." : "No jobs yet. Add one here, or from a client's page."
+        jobs.length ? "No jobs match these filters." : "No jobs yet. Add one here, or from a client's page."
       )
     );
     return;
