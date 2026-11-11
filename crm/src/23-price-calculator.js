@@ -1242,7 +1242,8 @@ function depEditor(dep, getTotal) {
   k.appendChild(k.box);
   pc.input.inputMode = am.input.inputMode = "decimal";
   pc.input.autocomplete = am.input.autocomplete = "off";
-  pc.input.placeholder = "none";
+  pc.input.placeholder = "0";
+  am.input.placeholder = "0.00";
   r.appendChild(k);
   r.appendChild(pc);
   r.appendChild(am);

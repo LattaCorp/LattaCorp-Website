@@ -109,7 +109,12 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 #paper.page.tight .cl .top{padding:10px 24px}#paper.page.tight .cl>.inner{padding-top:10px}#paper.page.tight .cl .grid{margin-bottom:10px}#paper.page.tight .cl .sumwrap{margin-top:6px}
 #paper.page.tight .cl .ntw{margin-top:8px}#paper.page.tight .cl .appr{margin-top:8px}#paper.page.tight .cl .appr .apv{height:44px}#paper.page.tight .cl .thx{margin-top:8px;padding-top:4px;font-size:1.08rem}
 .cl .ct.mid .blk{flex:1;display:flex;flex-direction:column;justify-content:center;margin:0}
-.cl .ntw.side{margin:0;flex:1}.cl .grid td{vertical-align:middle}.cl .grid td.wide{white-space:normal}.cl .ntw{margin-top:12px;border-left:4px solid var(--leaf);padding:2px 0 2px 12px}.cl .ntw .lb{display:block;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cl .ntw.side{margin:0;flex:1}
+.cl .nbox{flex:1;display:flex;flex-direction:column;border:1px solid #8fb08f;background:#fff}
+.cl .nbox .nbh{background:var(--forest);color:#fff;font-size:.82rem;font-weight:700;text-align:center;padding:6px 8px;line-height:1.5}
+#paper.page .cl .nbox .nbh{padding:4px 8px}
+.cl .nbox .ntx{padding:7px 10px;white-space:pre-wrap;font-size:.88rem;line-height:1.45;color:#26412c}
+.cl .nbox .nlines{flex:1;min-height:60px;margin:0 10px;background:repeating-linear-gradient(to bottom,transparent 0 23px,#c9dcc6 23px 24px)}.cl .grid td{vertical-align:middle}.cl .grid td.wide{white-space:normal}.cl .ntw{margin-top:12px;border-left:4px solid var(--leaf);padding:2px 0 2px 12px}.cl .ntw .lb{display:block;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .cl .ntw .ntx{white-space:pre-wrap;font-size:.88rem;line-height:1.45;color:#26412c}
 .cl .appr .aph{padding:4px 10px}.cl .appr .aph .apl2{flex:1;font-weight:500;font-size:.72rem;color:#d9ecd6;text-align:left;margin-left:6px}
 .cl .appr .apg{padding:6px 12px 8px}.cl .appr .apv{height:50px}.cl .appr .apv img{height:46px}
@@ -322,13 +327,15 @@ function drawEstimate(){
   // a required deposit shows under the total (it does not change the total)
   var dp=d.deposit&&(d.deposit.pct||d.deposit.amt)?d.deposit:null,depAmt=dp?(dp.mode==="pct"?Math.round(Number(d.total)*Number(dp.pct))/100:Number(dp.amt)):0;
   var depRows=depAmt>0?'<tr class="dep dep1"><td class="k">'+t("depreq")+'</td><td class="p">'+esc(pctTxt(dp.mode==="pct"?dp.pct:(d.total?depAmt/d.total*100:0)))+'</td><td class="v">'+esc(money(depAmt))+"</td></tr>"
-    +'<tr class="dep"><td class="k">'+t("depbal")+'</td><td class="v" colspan="2">'+esc(money(Math.round((Number(d.total)-depAmt)*100)/100))+"</td></tr>":"";
+    +'<tr class="dep"><td class="k">'+t("depbal")+'</td><td class="v" colspan="2">'+esc(money(Math.round((Number(d.total)-depAmt)*100)/100))+"</td></tr>"
+    :'<tr class="dep dep1"><td class="k">'+t("depreq")+'</td><td class="p">0%</td><td class="v">'+esc(money(0))+"</td></tr>";
   var sum='<div class="asum est"><table><thead><tr><th>'+tq("esum")+'</th><th colspan="2">'+t("totals")+"</th></tr></thead><tbody>"
     +row(t("subtotal"),esc(money(sub)))+orows+row(tq("etotal"),esc(money(d.total)),"tot")+depRows
     +(isQ()?"":'<tr class="nts"><td colspan="3">'+t("e_note")+"</td></tr>")+"</tbody></table></div>";
   // Notes & Terms sit under Prepared For, beside the summary, instead of a band of their own
   // Notes & Terms sit beside the summary, running its full height
-  var ct='<div class="ct">'+(d.scope?'<div class="ntw side"><span class="lb">'+t("notes")+'</span><div class="ntx">'+esc(d.scope)+"</div></div>":"")+"</div>";
+  // a Notes & Terms box beside the summary, the same height; with no notes it has ruled lines to write on
+  var ct='<div class="ct"><div class="nbox"><div class="nbh">'+t("notes")+"</div>"+(d.scope?'<div class="ntx">'+esc(d.scope)+"</div>":'<div class="nlines"></div>')+"</div></div>";
   var notes=d.scope?'<div class="notes"><div class="nh">'+t("notes")+'</div><div class="nb">'+esc(d.scope)+"</div></div>"
     :"";
   var acc=d.status==="accepted",sigOk=acc&&/^data:image\/png;base64,/.test(d.response_signature||"");
