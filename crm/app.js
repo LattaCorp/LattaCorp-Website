@@ -11838,13 +11838,14 @@ function propPicker(cs, label, emptyText) {
   return w;
 }
 /* Manual invoice: pick a client, add the lines, and it is created ready to send (no completed visits needed). */
-function openInvoiceForm(cid) {
+function openInvoiceForm(cid, ex) {
+  var IV = ex ? ex.inv : null;
   if (billErr) {
     alert("Billing isn't set up yet. Run the Stage 5 SQL in Supabase first.");
     return;
   }
   var p = panel();
-  p.appendChild(el("h2", null, "New invoice"));
+  p.appendChild(el("h2", null, IV ? "Edit invoice " + invNum(IV.number) : "New invoice"));
   var list = clients.filter(function (c) {
     return !c.archived || c.id === cid;
   });
@@ -11858,20 +11859,22 @@ function openInvoiceForm(cid) {
       })
     )
   );
+  if (IV) cs.input.disabled = true;
   p.appendChild(cs);
   // laid out like the New quote form: who it's for, the job title and notes, then the dates, then the lines
   var pps = propPicker(cs);
   p.appendChild(pps);
-  var ttl = fld("Job Title", "text", ""),
-    nt = fld("Notes & Terms", "textarea", "");
+  if (IV && IV.property_id) pps.input.value = IV.property_id;
+  var ttl = fld("Job Title", "text", IV ? IV.title || "" : ""),
+    nt = fld("Notes & Terms", "textarea", IV ? IV.terms || "" : "");
   p.appendChild(ttl);
   p.appendChild(nt);
   var terms = Number(bizv("terms_days", 10));
   terms = isNaN(terms) ? 10 : terms;
   var g = el("div", "grid2"),
-    isd = fld("Invoice date", "date", today()),
-    dd = fld("Due date", "date", addDays(today(), terms)),
-    dueTouched = false;
+    isd = fld("Invoice date", "date", IV ? IV.issue_date : today()),
+    dd = fld("Due date", "date", IV ? IV.due_date : addDays(today(), terms)),
+    dueTouched = !!IV;
   dd.input.addEventListener("change", function () {
     dueTouched = true;
   });
@@ -11888,9 +11891,9 @@ function openInvoiceForm(cid) {
       return m + "-" + (end ? String(last) : "01");
     },
     gp = el("div", "grid2"),
-    pbeg = fld("Period beginning", "date", monthOf(today())),
-    pend = fld("Period ending", "date", monthOf(today(), true)),
-    perTouched = false;
+    pbeg = fld("Period beginning", "date", IV ? IV.period_start || "" : monthOf(today())),
+    pend = fld("Period ending", "date", IV ? IV.period_end || "" : monthOf(today(), true)),
+    perTouched = !!IV;
   [pbeg, pend].forEach(function (x) {
     x.input.addEventListener("change", function () {
       perTouched = true;
@@ -11905,7 +11908,7 @@ function openInvoiceForm(cid) {
   gp.appendChild(pbeg);
   gp.appendChild(pend);
   p.appendChild(gp);
-  var ref = fld("PO / Reference", "text", "");
+  var ref = fld("PO / Reference", "text", IV ? IV.reference || "" : "");
   p.appendChild(ref);
   p.appendChild(el("h3", null, "Work Billed"));
   var box = el("div"),
@@ -11944,9 +11947,19 @@ function openInvoiceForm(cid) {
     rows.push({ el: r, t: tt, d: d, q: q, a: a });
   }
   p.appendChild(box);
+  if (ex)
+    ex.items.forEach(function (it) {
+      addRow();
+      var x = rows[rows.length - 1];
+      x.item = it;
+      x.t.input.value = it.title || "";
+      x.d.input.value = it.description || "";
+      x.q.input.value = it.qty || "";
+      x.a.input.value = it.amount == null ? "" : String(it.amount);
+    });
   addRow();
   p.appendChild(el("p", "note", "A negative total is a discount; 0 is a no-charge line."));
-  var go = btn("Create invoice", "btn", function () {
+  var go = btn(IV ? "Save changes" : "Create invoice", "btn", function () {
     if (!cs.input.value) {
       alert("Choose a client.");
       return;
@@ -11968,7 +11981,8 @@ function openInvoiceForm(cid) {
         return;
       }
       var line = { title: tt, description: d, amount: a };
-      if (q) line.qty = q;
+      if (q || IV) line.qty = q;
+      if (rows[i].item) line._old = rows[i].item;
       items.push(line);
     }
     if (!items.length) {
@@ -11986,6 +12000,66 @@ function openInvoiceForm(cid) {
     }
     var zero = total === 0;
     go.disabled = true;
+    if (IV) {
+      // save the changes: the invoice's details, then its lines (changed ones updated, new ones added, removed ones
+      // deleted; a removed visit goes back to To bill)
+      var pid0 = pps.input.value || null,
+        urow = {
+          issue_date: isd.input.value,
+          due_date: dd.input.value,
+          total: total,
+          reference: ref.input.value.trim(),
+          title: ttl.input.value.trim(),
+          terms: nt.input.value.trim(),
+          property_id: pid0,
+          period_start: pbeg.input.value || null,
+          period_end: pend.input.value || null
+        };
+      var kept = {},
+        jobs2 = [];
+      items.forEach(function (x) {
+        var o = x._old;
+        delete x._old;
+        if (o) {
+          kept[o.id] = 1;
+          jobs2.push(sb.from("invoice_items").update({ title: x.title, description: x.description, qty: x.qty, amount: x.amount }).eq("id", o.id));
+        } else {
+          x.invoice_id = IV.id;
+          x.service_date = isd.input.value;
+          if (pid0) x.address = paddr(pid0);
+          jobs2.push(sb.from("invoice_items").insert(x));
+        }
+      });
+      ex.items.forEach(function (o) {
+        if (kept[o.id]) return;
+        jobs2.push(sb.from("invoice_items").delete().eq("id", o.id));
+        if (o.visit_id) jobs2.push(sb.from("visits").update({ invoice_id: null }).eq("id", o.visit_id));
+      });
+      sb.from("invoices")
+        .update(urow)
+        .eq("id", IV.id)
+        .then(function (r) {
+          if (r.error) {
+            go.disabled = false;
+            alert("Could not save the changes.");
+            return;
+          }
+          Object.assign(IV, urow);
+          Promise.all(jobs2).then(function (rs) {
+            if (
+              rs.some(function (x) {
+                return x && x.error;
+              })
+            )
+              alert("Some lines could not be saved. Open the invoice and check it.");
+            loadUnbilled().then(function () {
+              render();
+              openInvoice(IV.id);
+            });
+          });
+        });
+      return;
+    }
     var pid = pps.input.value || null,
       irow = {
         client_id: cs.input.value,
@@ -12070,7 +12144,7 @@ function openInvoiceForm(cid) {
     show({
       kind: "invoice",
       doc: {
-        number: lpNextNumber(invoices),
+        number: IV ? IV.number : lpNextNumber(invoices),
         issue_date: isd.input.value,
         due_date: dd.input.value,
         status: "open",
@@ -15010,350 +15084,256 @@ function renderToBill(list, bg) {
 }
 
 /* ---- Invoice detail ---- */
+/* ---- One invoice in the side panel: what's owed at the top, a readable card of the lines, and only the buttons that
+   fit where it stands (Record payment, Send or Send reminder, Preview). Edit, Copy link and Void are under More. ---- */
 function openInvoice(id) {
   var inv = byId(invoices, id);
   if (!inv) return;
   var c = byId(clients, inv.client_id),
     p = panel();
-  p.appendChild(el("h2", null, invNum(inv.number) + " · " + cname(inv.client_id)));
-  var ips = clientProps(inv.client_id);
-  if (ips.length > 1) {
-    var ipf = fld(
-      "Property",
-      "select",
-      inv.property_id || "",
-      [["", "Not tied to a property (whole account)"]].concat(
-        ips.map(function (q) {
-          return [q.id, (q.label ? q.label + " \u00b7 " : "") + q.address];
-        })
-      )
-    );
-    ipf.style.cssText = "margin:6px 0;max-width:420px";
-    ipf.input.addEventListener("change", function () {
-      var v = ipf.input.value || null;
-      ipf.input.disabled = true;
-      sb.from("invoices")
-        .update({ property_id: v })
-        .eq("id", inv.id)
-        .then(function (r) {
-          ipf.input.disabled = false;
-          if (r.error) {
-            alert("Could not change the property.");
-            ipf.input.value = inv.property_id || "";
-            return;
-          }
-          inv.property_id = v;
-          render();
-        });
-    });
-    p.appendChild(ipf);
-  } else if (inv.property_id) p.appendChild(el("div", "note", "Property: " + paddr(inv.property_id)));
+  p.classList.add("qpanel");
+  p.appendChild(el("h2", null, cname(inv.client_id)));
+  var od = isOverdue(inv),
+    days = od ? Math.max(1, Math.round((new Date(today() + "T12:00:00") - new Date(inv.due_date + "T12:00:00")) / 864e5)) : 0,
+    paid = invPaidSum(inv),
+    bal = inv.status === "open" ? Math.max(0, r2(Number(inv.total || 0) - paid)) : 0;
   var st =
-    inv.status === "paid" ? "Paid" : inv.status === "void" ? "Void" : isOverdue(inv) ? "Overdue" : "Open";
-  p.appendChild(
-    el(
-      "div",
-      "note",
-      st +
-        " · issued " +
-        dshort(inv.issue_date) +
-        " · due " +
-        dshort(inv.due_date) +
-        (inv.sent_at ? " · sent " + dshort(String(inv.sent_at).slice(0, 10)) : " · not sent yet")
-    )
-  );
-  var body = el("div");
-  body.appendChild(el("div", "note", "Loading..."));
-  p.appendChild(body);
-  sb.from("invoice_items")
-    .select("*")
-    .eq("invoice_id", inv.id)
-    .order("service_date", { ascending: true })
-    .limit(1000)
-    .then(function (r) {
-      var items = r.error ? [] : r.data || [];
-      body.textContent = "";
-      var locked = inv.status !== "open";
-      var t = document.createElement("table");
-      t.className = "itable";
-      items.forEach(function (it) {
-        var tr = document.createElement("tr");
-        tr.appendChild(el("td", null, it.service_date ? dshort(it.service_date) : ""));
-        tr.appendChild(el("td", "ttl", it.title || ""));
-        var d = el("td", null, (it.description || "") + (it.qty ? " · QTY " + it.qty : "") + (it.address ? " · " + it.address : ""));
-        tr.appendChild(d);
-        var a = el("td", "amt", money(it.amount));
-        tr.appendChild(a);
-        if (!locked) {
-          var x = el("td");
-          var rm = btn("×", "link", function () {
-            removeLine(inv, it, function () {
-              openInvoice(inv.id);
-            });
-          });
-          rm.setAttribute("aria-label", "Remove line");
-          rm.style.cssText = "font-size:1.2rem;text-decoration:none;color:var(--red)";
-          x.appendChild(rm);
-          tr.appendChild(x);
-        }
-        t.appendChild(tr);
+    inv.status === "paid" ? ["Paid", "ok"] : inv.status === "void" ? ["Void", "no"] : od ? ["Overdue · " + days + " day" + (days > 1 ? "s" : ""), "no"] : !inv.sent_at ? ["Not sent yet", "draft"] : ["Open", "wait"];
+  var hd = el("div", "qhead");
+  hd.appendChild(el("span", "qnum", "Invoice " + invNum(inv.number)));
+  hd.appendChild(el("span", "qst " + st[1], st[0]));
+  p.appendChild(hd);
+  // the money, big
+  var seen = inv.viewed_at ? "client opened it " + dshort(String(inv.viewed_at).slice(0, 10)) : inv.sent_at ? "sent " + dshort(String(inv.sent_at).slice(0, 10)) + ", not opened yet" : "not sent yet";
+  var ban;
+  if (inv.status === "open") {
+    ban = el("div", "qban " + (od ? "no" : "wait"));
+    ban.appendChild(el("b", null, money(bal) + " due"));
+    ban.appendChild(el("div", null, (od ? "Was due " : "Due ") + dshort(inv.due_date) + " · " + seen + (inv.reminded_at ? " · reminded " + dshort(String(inv.reminded_at).slice(0, 10)) : "")));
+  } else if (inv.status === "paid") {
+    ban = el("div", "qban ok");
+    ban.appendChild(el("b", null, "✓ Paid" + (inv.paid_at ? " " + dshort(String(inv.paid_at).slice(0, 10)) : "")));
+    if (inv.paid_method) ban.appendChild(el("div", null, "By " + inv.paid_method));
+  } else {
+    ban = el("div", "qban void");
+    ban.appendChild(el("b", null, "Voided"));
+    ban.appendChild(el("div", null, "Nothing is owed on this invoice. Its visits went back to To bill."));
+  }
+  p.appendChild(ban);
+  var main = el("div", "qacts");
+  p.appendChild(main);
+  var msg = invMessage(inv, c),
+    sendRow = el("div", "qsend");
+  sendRow.hidden = true;
+  var items = null;
+  function preview() {
+    if (inv.share_token) window.open(docUrl(inv.share_token, true), "_blank", "noopener");
+    else if (items) showInvoice(inv, items);
+  }
+  if (inv.status === "open") {
+    main.appendChild(
+      btn("Record payment", "btn", function () {
+        openPayment(inv.client_id);
+      })
+    );
+    var remind = od || !!inv.sent_at,
+      text = remind ? invRemind(inv, c) : msg;
+    main.appendChild(
+      btn(remind ? "Send reminder" : "Send", "btn alt", function () {
+        sendRow.hidden = !sendRow.hidden;
+      })
+    );
+    if (c && c.email) {
+      var em = el("a", "btn alt", "Email");
+      em.href = remind
+        ? mailHref(c.email, "Payment reminder: invoice " + invNum(inv.number), text)
+        : mailHref(c.email, "Invoice " + invNum(inv.number) + " from " + bizv("name", "Latta Corp"), text);
+      em.addEventListener("click", function () {
+        remind ? stampInv(inv) : markSent(inv);
       });
-      body.appendChild(t);
-      var tot = el("div", "invtotal", "Total " + money(inv.total));
-      body.appendChild(tot);
-      if (!locked) {
-        var add = el("div", "pcard"),
-          g = el("div", "grid3");
-        var ttl = fld("Add a line: title", "text", ""),
-          dsc = fld("Description (extra work, discount, late fee)", "text", ""),
-          amt = fld("Total ($, negative = discount)", "number", "");
-        amt.input.step = "0.01";
-        amt.input.inputMode = "decimal";
-        g.appendChild(ttl);
-        g.appendChild(dsc);
-        g.appendChild(amt);
-        add.appendChild(g);
-        var ab = btn("Add line", "btn alt sm", function () {
-          var a2 = parseFloat(amt.input.value);
-          if ((!ttl.input.value.trim() && !dsc.input.value.trim()) || isNaN(a2)) {
-            alert("Enter a title or description, and a total.");
-            return;
-          }
-          var line = {
-            invoice_id: inv.id,
-            service_date: today(),
-            description: dsc.input.value.trim(),
-            amount: a2
-          };
-          if (ttl.input.value.trim()) line.title = ttl.input.value.trim();
-          sb.from("invoice_items")
-            .insert(line)
-            .then(function (r2_) {
-              if (r2_.error) {
-                alert(line.title ? "Could not add the line. Did you run the Stage 32 SQL?" : "Could not add the line.");
-                return;
-              }
-              setTotal(inv, r2(Number(inv.total) + a2), function () {
-                openInvoice(inv.id);
-              });
-            });
-        });
-        ab.style.marginTop = "8px";
-        add.appendChild(ab);
-        body.appendChild(add);
-      }
-      var ref = fld("Reference / PO number (shows on the invoice)", "text", inv.reference || "");
-      body.appendChild(ref);
-      var rb = btn("Save reference", "btn alt sm", function () {
+      sendRow.appendChild(em);
+    }
+    if (c && c.phone) {
+      var tx = el("a", "btn alt", "Text");
+      tx.href = smsHref(c.phone, text);
+      tx.addEventListener("click", function () {
+        remind ? stampInv(inv) : markSent(inv);
+      });
+      sendRow.appendChild(tx);
+    }
+    sendRow.appendChild(
+      copyBtn("Copy message", text, false, function () {
+        remind ? stampInv(inv) : markSent(inv);
+      })
+    );
+  }
+  main.appendChild(btn("Preview", "btn alt", preview));
+  p.appendChild(sendRow);
+  var card = el("div", "pcard qcard");
+  card.appendChild(el("div", "note", "Loading..."));
+  p.appendChild(card);
+  // rarely needed
+  var more = document.createElement("details");
+  more.className = "qmore";
+  more.appendChild(el("summary", null, "More"));
+  var mr = el("div", "qacts");
+  if (inv.status === "open")
+    mr.appendChild(
+      btn("Edit invoice", "btn alt", function () {
+        openInvoiceEditor(inv);
+      })
+    );
+  if (inv.status !== "void") {
+    if (inv.sent_at && inv.status === "open")
+      mr.appendChild(
+        copyBtn("Copy invoice message", msg, false, function () {
+          markSent(inv);
+        })
+      );
+    if (inv.share_token)
+      mr.appendChild(
+        copyBtn("Copy link", docUrl(inv.share_token), false, function () {
+          markSent(inv);
+        })
+      );
+  }
+  if (inv.status === "paid")
+    mr.appendChild(
+      btn("Mark unpaid", "btn alt", function () {
         sb.from("invoices")
-          .update({ reference: ref.input.value.trim() })
+          .update({ status: "open", paid_at: null, paid_method: "" })
           .eq("id", inv.id)
           .then(function (r2_) {
             if (r2_.error) {
               alert("Could not save.");
               return;
             }
-            inv.reference = ref.input.value.trim();
-            rb.textContent = "Saved";
-            setTimeout(function () {
-              rb.textContent = "Save reference";
-            }, 1200);
+            inv.status = "open";
+            inv.paid_at = null;
+            inv.paid_method = "";
+            render();
+            openInvoice(inv.id);
           });
-      });
-      rb.style.marginTop = "6px";
-      body.appendChild(rb);
-      var acts = el("div", "contact");
-      acts.style.marginTop = "14px";
-      acts.appendChild(
-        btn("View / Print / PDF", "btn", function () {
-          showInvoice(inv, items);
-        })
-      );
-      var msg = invMessage(inv, c);
-      if (c && c.email) {
-        var a2 = el("a", "btn", "Email invoice");
-        a2.href = mailHref(
-          c.email,
-          "Invoice " + invNum(inv.number) + " from " + bizv("name", "Latta Corp"),
-          msg + (inv.share_token ? "" : "\n\n(The invoice PDF is attached.)")
-        );
-        a2.addEventListener("click", function () {
-          markSent(inv);
-        });
-        acts.appendChild(a2);
-      }
-      acts.appendChild(
-        copyBtn("Copy message", msg, false, function () {
-          markSent(inv);
-        })
-      );
-      if (inv.share_token) {
-        acts.appendChild(
-          copyBtn("Copy link", docUrl(inv.share_token), false, function () {
-            markSent(inv);
-          })
-        );
-        var pv = el("a", "btn alt", "Preview link");
-        pv.href = docUrl(inv.share_token, true);
-        pv.target = "_blank";
-        pv.rel = "noopener";
-        acts.appendChild(pv);
-      }
-      if (isOwner() && c && c.phone) {
-        var a1 = el("a", "btn alt", "Text");
-        a1.href = smsHref(c.phone, msg);
-        a1.addEventListener("click", function () {
-          markSent(inv);
-        });
-        acts.appendChild(a1);
-      }
-      if (inv.status === "open" && c && (isOverdue(inv) || inv.sent_at)) {
-        var rem = invRemind(inv, c);
-        if (c.email) {
-          var a4 = el("a", "btn alt", "Email a reminder");
-          a4.href = mailHref(c.email, "Payment reminder: invoice " + invNum(inv.number), rem);
-          a4.addEventListener("click", function () {
-            stampInv(inv);
-          });
-          acts.appendChild(a4);
-        }
-        if (isOwner() && c.phone) {
-          var a3 = el("a", "btn alt", "Text a reminder");
-          a3.href = smsHref(c.phone, rem);
-          a3.addEventListener("click", function () {
-            stampInv(inv);
-          });
-          acts.appendChild(a3);
-        }
-      }
-      body.appendChild(acts);
-      if (inv.share_token && inv.viewed_at)
-        body.appendChild(el("div", "note", "✓ Client opened the invoice link " + ago(inv.viewed_at) + "."));
-      else if (inv.share_token && inv.sent_at)
-        body.appendChild(el("div", "note", "The client hasn't opened the link yet."));
-      if (!inv.share_token)
-        body.appendChild(
-          el(
-            "div",
-            "note",
-            "Run the Stage 11 SQL in Supabase to give each invoice a private link clients can open."
-          )
-        );
-      if (inv.status === "open" && inv.reminded_at)
-        body.appendChild(
-          el("div", "note", "Last reminder texted " + dshort(String(inv.reminded_at).slice(0, 10)) + ".")
-        );
-      if (c && !c.email)
-        body.appendChild(
-          el(
-            "div",
-            "note",
-            "Tip: add an email on the client page to get an Email button here. To email the PDF: tap View / Print / PDF, choose Save as PDF, then attach it."
-          )
-        );
-      var pay = el("div", "sec");
-      if (inv.status === "open") {
-        pay.appendChild(el("h3", null, "Record payment"));
-        var pg = el("div", "grid2");
-        var pm = fld("Method", "select", "Zelle", [
-            ["Zelle", "Zelle"],
-            ["Cash", "Cash"],
-            ["Check", "Check"],
-            ["Other", "Other"]
-          ]),
-          pdt = fld("Date received", "date", today());
-        pg.appendChild(pm);
-        pg.appendChild(pdt);
-        pay.appendChild(pg);
-        var pb = btn("Mark paid", "btn", function () {
-          var when = (pdt.input.value || today()) + "T12:00:00";
+      })
+    );
+  if (inv.status !== "void")
+    mr.appendChild(
+      btn("Void invoice", "btn danger", function () {
+        if (!confirm("Void this invoice? Its visits go back to 'To bill' so you can bill them again.")) return;
+        releaseVisits(inv, function () {
           sb.from("invoices")
-            .update({ status: "paid", paid_at: when, paid_method: pm.input.value })
+            .update({ status: "void" })
             .eq("id", inv.id)
-            .then(function (r2_) {
-              if (r2_.error) {
-                alert("Could not save.");
-                return;
-              }
-              inv.status = "paid";
-              inv.paid_at = when;
-              inv.paid_method = pm.input.value;
+            .then(function () {
+              inv.status = "void";
               render();
               openInvoice(inv.id);
             });
         });
-        pb.style.marginTop = "8px";
-        pay.appendChild(pb);
-      } else if (inv.status === "paid") {
-        pay.appendChild(
-          el(
-            "div",
-            "note",
-            "Paid " +
-              (inv.paid_at ? dshort(String(inv.paid_at).slice(0, 10)) : "") +
-              (inv.paid_method ? " by " + inv.paid_method : "")
-          )
-        );
-        pay.appendChild(
-          btn("Mark unpaid", "btn alt sm", function () {
-            sb.from("invoices")
-              .update({ status: "open", paid_at: null, paid_method: "" })
-              .eq("id", inv.id)
-              .then(function (r2_) {
-                if (r2_.error) {
-                  alert("Could not save.");
-                  return;
-                }
-                inv.status = "open";
-                inv.paid_at = null;
-                inv.paid_method = "";
-                render();
-                openInvoice(inv.id);
-              });
-          })
-        );
-      }
-      var dz = el("div", "actions");
-      dz.appendChild(el("span"));
-      if (inv.status !== "void")
-        dz.appendChild(
-          btn("Void invoice", "btn danger", function () {
-            if (!confirm("Void this invoice? Its visits go back to 'To bill' so you can bill them again."))
+      })
+    );
+  else
+    mr.appendChild(
+      btn("Delete", "btn danger", function () {
+        if (!confirm("Delete this voided invoice for good?")) return;
+        sb.from("invoices")
+          .delete()
+          .eq("id", inv.id)
+          .then(function (r2_) {
+            if (r2_.error) {
+              alert("Could not delete.");
               return;
-            releaseVisits(inv, function () {
-              sb.from("invoices")
-                .update({ status: "void" })
-                .eq("id", inv.id)
-                .then(function () {
-                  inv.status = "void";
-                  render();
-                  openInvoice(inv.id);
-                });
+            }
+            invoices = invoices.filter(function (z) {
+              return z.id !== inv.id;
             });
-          })
-        );
-      else
-        dz.appendChild(
-          btn("Delete", "btn danger", function () {
-            if (!confirm("Delete this voided invoice for good?")) return;
-            sb.from("invoices")
-              .delete()
-              .eq("id", inv.id)
-              .then(function (r2_) {
-                if (r2_.error) {
-                  alert("Could not delete.");
-                  return;
-                }
-                invoices = invoices.filter(function (z) {
-                  return z.id !== inv.id;
-                });
-                closeDetail();
-                render();
-              });
-          })
-        );
-      body.appendChild(pay);
-      body.appendChild(dz);
+            closeDetail();
+            render();
+          });
+      })
+    );
+  more.appendChild(mr);
+  p.appendChild(more);
+  sb.from("invoice_items")
+    .select("*")
+    .eq("invoice_id", inv.id)
+    .order("service_date", { ascending: true })
+    .limit(1000)
+    .then(function (r) {
+      items = r.error ? [] : r.data || [];
+      card.textContent = "";
+      if (inv.title) card.appendChild(el("h3", "qtitle", inv.title));
+      var addrs = [];
+      items.forEach(function (it) {
+        if (it.address && addrs.indexOf(it.address) < 0) addrs.push(it.address);
+      });
+      if (!addrs.length) addrs.push(inv.property_id ? paddr(inv.property_id) : (clientProps(inv.client_id)[0] || {}).address || "");
+      var facts = [
+        ["Bill to", cname(inv.client_id) + (c && c.account_no ? " (" + c.account_no + ")" : "")],
+        [addrs.length > 1 ? "Service addresses" : "Service address", addrs.filter(Boolean).join("; ")],
+        ["Invoice date", dshort(inv.issue_date)],
+        ["Payment due", dshort(inv.due_date)],
+        ["Service period", inv.period_start && inv.period_end ? dshort(inv.period_start) + " – " + dshort(inv.period_end) : ""],
+        ["PO / Reference", inv.reference || ""]
+      ].filter(function (x) {
+        return x[1];
+      });
+      var fl = el("div", "qfacts");
+      facts.forEach(function (x) {
+        var d = el("div");
+        d.appendChild(el("span", null, x[0]));
+        d.appendChild(el("b", null, x[1]));
+        fl.appendChild(d);
+      });
+      card.appendChild(fl);
+      var t = el("div", "qlines");
+      items.forEach(function (it) {
+        var ln = el("div", "ql"),
+          l = el("div");
+        l.appendChild(el("b", null, it.title || it.description || ""));
+        var sub = [it.service_date ? dshort(it.service_date) : "", it.title ? it.description : "", addrs.length > 1 ? it.address : ""].filter(Boolean).join(" · ");
+        if (sub) l.appendChild(el("div", null, sub));
+        ln.appendChild(l);
+        var rt = el("div", "qamt");
+        rt.appendChild(el("b", null, money(it.amount)));
+        if (it.qty) rt.appendChild(el("div", null, "QTY " + it.qty));
+        ln.appendChild(rt);
+        t.appendChild(ln);
+      });
+      if (!items.length) t.appendChild(el("div", "note", "No lines."));
+      card.appendChild(t);
+      var tot = el("div", "qtot");
+      function trow(k, v, cls) {
+        var d = el("div", cls || "");
+        d.appendChild(el("span", null, k));
+        d.appendChild(el("span", null, v));
+        tot.appendChild(d);
+      }
+      trow("Total", money(inv.total), "big");
+      if (inv.status === "open") {
+        trow("Paid", money(paid));
+        trow("Balance due", money(bal), "bal");
+      }
+      card.appendChild(tot);
+      if (inv.terms) {
+        card.appendChild(el("div", "qnh", "Notes & Terms"));
+        card.appendChild(el("div", "qnotes", inv.terms));
+      }
+    });
+}
+// Edit opens the same window as New invoice (with the live preview), filled in with this invoice
+function openInvoiceEditor(inv) {
+  sb.from("invoice_items")
+    .select("*")
+    .eq("invoice_id", inv.id)
+    .order("service_date", { ascending: true })
+    .limit(1000)
+    .then(function (r) {
+      if (r.error) {
+        alert("Could not load the lines.");
+        return;
+      }
+      openInvoiceForm(inv.client_id, { inv: inv, items: r.data || [] });
     });
 }
 function setTotal(inv, total, cb) {

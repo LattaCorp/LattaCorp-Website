@@ -210,13 +210,14 @@ function propPicker(cs, label, emptyText) {
   return w;
 }
 /* Manual invoice: pick a client, add the lines, and it is created ready to send (no completed visits needed). */
-function openInvoiceForm(cid) {
+function openInvoiceForm(cid, ex) {
+  var IV = ex ? ex.inv : null;
   if (billErr) {
     alert("Billing isn't set up yet. Run the Stage 5 SQL in Supabase first.");
     return;
   }
   var p = panel();
-  p.appendChild(el("h2", null, "New invoice"));
+  p.appendChild(el("h2", null, IV ? "Edit invoice " + invNum(IV.number) : "New invoice"));
   var list = clients.filter(function (c) {
     return !c.archived || c.id === cid;
   });
@@ -230,20 +231,22 @@ function openInvoiceForm(cid) {
       })
     )
   );
+  if (IV) cs.input.disabled = true;
   p.appendChild(cs);
   // laid out like the New quote form: who it's for, the job title and notes, then the dates, then the lines
   var pps = propPicker(cs);
   p.appendChild(pps);
-  var ttl = fld("Job Title", "text", ""),
-    nt = fld("Notes & Terms", "textarea", "");
+  if (IV && IV.property_id) pps.input.value = IV.property_id;
+  var ttl = fld("Job Title", "text", IV ? IV.title || "" : ""),
+    nt = fld("Notes & Terms", "textarea", IV ? IV.terms || "" : "");
   p.appendChild(ttl);
   p.appendChild(nt);
   var terms = Number(bizv("terms_days", 10));
   terms = isNaN(terms) ? 10 : terms;
   var g = el("div", "grid2"),
-    isd = fld("Invoice date", "date", today()),
-    dd = fld("Due date", "date", addDays(today(), terms)),
-    dueTouched = false;
+    isd = fld("Invoice date", "date", IV ? IV.issue_date : today()),
+    dd = fld("Due date", "date", IV ? IV.due_date : addDays(today(), terms)),
+    dueTouched = !!IV;
   dd.input.addEventListener("change", function () {
     dueTouched = true;
   });
@@ -260,9 +263,9 @@ function openInvoiceForm(cid) {
       return m + "-" + (end ? String(last) : "01");
     },
     gp = el("div", "grid2"),
-    pbeg = fld("Period beginning", "date", monthOf(today())),
-    pend = fld("Period ending", "date", monthOf(today(), true)),
-    perTouched = false;
+    pbeg = fld("Period beginning", "date", IV ? IV.period_start || "" : monthOf(today())),
+    pend = fld("Period ending", "date", IV ? IV.period_end || "" : monthOf(today(), true)),
+    perTouched = !!IV;
   [pbeg, pend].forEach(function (x) {
     x.input.addEventListener("change", function () {
       perTouched = true;
@@ -277,7 +280,7 @@ function openInvoiceForm(cid) {
   gp.appendChild(pbeg);
   gp.appendChild(pend);
   p.appendChild(gp);
-  var ref = fld("PO / Reference", "text", "");
+  var ref = fld("PO / Reference", "text", IV ? IV.reference || "" : "");
   p.appendChild(ref);
   p.appendChild(el("h3", null, "Work Billed"));
   var box = el("div"),
@@ -316,9 +319,19 @@ function openInvoiceForm(cid) {
     rows.push({ el: r, t: tt, d: d, q: q, a: a });
   }
   p.appendChild(box);
+  if (ex)
+    ex.items.forEach(function (it) {
+      addRow();
+      var x = rows[rows.length - 1];
+      x.item = it;
+      x.t.input.value = it.title || "";
+      x.d.input.value = it.description || "";
+      x.q.input.value = it.qty || "";
+      x.a.input.value = it.amount == null ? "" : String(it.amount);
+    });
   addRow();
   p.appendChild(el("p", "note", "A negative total is a discount; 0 is a no-charge line."));
-  var go = btn("Create invoice", "btn", function () {
+  var go = btn(IV ? "Save changes" : "Create invoice", "btn", function () {
     if (!cs.input.value) {
       alert("Choose a client.");
       return;
@@ -340,7 +353,8 @@ function openInvoiceForm(cid) {
         return;
       }
       var line = { title: tt, description: d, amount: a };
-      if (q) line.qty = q;
+      if (q || IV) line.qty = q;
+      if (rows[i].item) line._old = rows[i].item;
       items.push(line);
     }
     if (!items.length) {
@@ -358,6 +372,66 @@ function openInvoiceForm(cid) {
     }
     var zero = total === 0;
     go.disabled = true;
+    if (IV) {
+      // save the changes: the invoice's details, then its lines (changed ones updated, new ones added, removed ones
+      // deleted; a removed visit goes back to To bill)
+      var pid0 = pps.input.value || null,
+        urow = {
+          issue_date: isd.input.value,
+          due_date: dd.input.value,
+          total: total,
+          reference: ref.input.value.trim(),
+          title: ttl.input.value.trim(),
+          terms: nt.input.value.trim(),
+          property_id: pid0,
+          period_start: pbeg.input.value || null,
+          period_end: pend.input.value || null
+        };
+      var kept = {},
+        jobs2 = [];
+      items.forEach(function (x) {
+        var o = x._old;
+        delete x._old;
+        if (o) {
+          kept[o.id] = 1;
+          jobs2.push(sb.from("invoice_items").update({ title: x.title, description: x.description, qty: x.qty, amount: x.amount }).eq("id", o.id));
+        } else {
+          x.invoice_id = IV.id;
+          x.service_date = isd.input.value;
+          if (pid0) x.address = paddr(pid0);
+          jobs2.push(sb.from("invoice_items").insert(x));
+        }
+      });
+      ex.items.forEach(function (o) {
+        if (kept[o.id]) return;
+        jobs2.push(sb.from("invoice_items").delete().eq("id", o.id));
+        if (o.visit_id) jobs2.push(sb.from("visits").update({ invoice_id: null }).eq("id", o.visit_id));
+      });
+      sb.from("invoices")
+        .update(urow)
+        .eq("id", IV.id)
+        .then(function (r) {
+          if (r.error) {
+            go.disabled = false;
+            alert("Could not save the changes.");
+            return;
+          }
+          Object.assign(IV, urow);
+          Promise.all(jobs2).then(function (rs) {
+            if (
+              rs.some(function (x) {
+                return x && x.error;
+              })
+            )
+              alert("Some lines could not be saved. Open the invoice and check it.");
+            loadUnbilled().then(function () {
+              render();
+              openInvoice(IV.id);
+            });
+          });
+        });
+      return;
+    }
     var pid = pps.input.value || null,
       irow = {
         client_id: cs.input.value,
@@ -442,7 +516,7 @@ function openInvoiceForm(cid) {
     show({
       kind: "invoice",
       doc: {
-        number: lpNextNumber(invoices),
+        number: IV ? IV.number : lpNextNumber(invoices),
         issue_date: isd.input.value,
         due_date: dd.input.value,
         status: "open",

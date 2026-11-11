@@ -71,6 +71,9 @@ textarea{min-height:110px;resize:vertical}
 .qban{border-radius:12px;padding:12px 14px;margin:0 0 12px;font-size:.95rem;line-height:1.45}
 .qban b{display:block;font-size:1.15rem;margin-bottom:2px}
 .qban.ok{background:#e4f5e1;color:#123d1e;border:2px solid var(--leaf)}.qban.no{background:#fdeceb;color:#7a1a15;border:2px solid #f2c4bf}
+.qban.wait{background:#eef4fb;color:#173a63;border:2px solid #b7cdea}.qban.void{background:#f1f1f1;color:#555;border:2px solid #ccc}
+.qtot>div.bal{font-weight:800}
+body.dock #detail:not(.full) .panel .qban.wait,body.dock #detail:not(.full) .panel .qban.wait *{color:#173a63}body.dock #detail:not(.full) .panel .qban.void,body.dock #detail:not(.full) .panel .qban.void *{color:#555}
 .qban img{display:block;height:56px;width:auto;margin-top:8px;background:#fff;border-radius:6px;border-bottom:1.5px solid #1d2a20}
 .qacts{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
 .qsend{display:flex;flex-wrap:wrap;gap:8px;margin:-2px 0 12px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12)}
@@ -556,7 +559,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=172"></script>
+<script src="app.js?v=174"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
