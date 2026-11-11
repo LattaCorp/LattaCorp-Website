@@ -18647,11 +18647,23 @@ function lpSend(d) {
 function lpFit() {
   if (!lpFrame) return;
   var wrap = lpFrame.parentNode,
-    s = Math.min(1, (wrap.clientWidth || 520) / 860),
-    h = lpFrame._h || 1100;
+    h = lpFrame._h || 1100,
+    s;
+  if (window.innerWidth > 1000) {
+    // the window fits the screen: the whole page preview is scaled to fit its box, centered
+    var ww = wrap.clientWidth || 520,
+      wh = wrap.clientHeight || 700;
+    s = Math.min(1, ww / 860, wh / h);
+    wrap.style.height = "";
+    lpFrame.style.marginLeft = Math.max(0, Math.round((ww - 860 * s) / 2)) + "px";
+    lpFrame.style.marginTop = Math.max(0, Math.round((wh - h * s) / 2)) + "px";
+  } else {
+    s = Math.min(1, (wrap.clientWidth || 520) / 860);
+    wrap.style.height = Math.ceil(h * s) + "px";
+    lpFrame.style.marginLeft = lpFrame.style.marginTop = "";
+  }
   lpFrame.style.transform = "scale(" + s + ")";
   lpFrame.style.height = h + "px";
-  wrap.style.height = Math.ceil(h * s) + "px";
 }
 window.addEventListener("resize", lpFit);
 

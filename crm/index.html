@@ -135,6 +135,11 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .panel.withprev .pform .btn{background:#fff;color:var(--forest);border-color:#fff}
 .panel.withprev .pform .pcard{color:var(--ink)}.panel.withprev .pform .pcard b,.panel.withprev .pform .pcard h3{color:var(--forest)}.panel.withprev .pform .pcard .f span,.panel.withprev .pform .pcard .note{color:var(--muted)}
 .panel.withprev .ppwrap{background:#e6e6e6;border-color:rgba(255,255,255,.35)}
+/* on a computer the New quote / New invoice window fits the screen: the form scrolls on its own, the preview fits beside it */
+@media(min-width:1001px){.panel.withprev{height:calc(100vh - 40px);box-sizing:border-box;overflow:hidden;align-items:stretch;grid-template-rows:minmax(0,1fr)}
+.panel.withprev .pform{overflow-y:auto;min-height:0;align-self:stretch;padding-right:10px;margin-right:-4px;scrollbar-gutter:stable}
+.panel.withprev .pprev{position:static;display:flex;flex-direction:column;min-height:0;padding-top:30px}
+.panel.withprev .ppwrap{flex:1;min-height:0}}
 @media(max-width:1000px){.panel.withprev{grid-template-columns:minmax(0,1fr)}.panel.withprev>*{min-width:0}.pprev{position:static;padding-top:6px}}
 .panel h2{margin:0 0 2px;color:var(--forest)}
 .close{position:absolute;right:12px;top:10px;background:none;border:0;font-size:1.8rem;cursor:pointer;color:var(--muted)}
@@ -350,7 +355,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=119"></script>
+<script src="app.js?v=120"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
