@@ -109,7 +109,7 @@ tfoot td.lbl{color:var(--muted);font-size:.95rem}
 #paper.page.tight .cl .top{padding:10px 24px}#paper.page.tight .cl>.inner{padding-top:10px}#paper.page.tight .cl .grid{margin-bottom:10px}#paper.page.tight .cl .sumwrap{margin-top:6px}
 #paper.page.tight .cl .ntw{margin-top:8px}#paper.page.tight .cl .appr{margin-top:8px}#paper.page.tight .cl .appr .apv{height:44px}#paper.page.tight .cl .thx{margin-top:8px;padding-top:4px;font-size:1.08rem}
 .cl .ct.mid .blk{flex:1;display:flex;flex-direction:column;justify-content:center;margin:0}
-.cl .ntw{margin-top:12px;border-left:4px solid var(--leaf);padding:2px 0 2px 12px}.cl .ntw .lb{display:block;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.cl .ntw.side{margin:0;flex:1}.cl .grid td{vertical-align:middle}.cl .grid td.wide{white-space:normal}.cl .ntw{margin-top:12px;border-left:4px solid var(--leaf);padding:2px 0 2px 12px}.cl .ntw .lb{display:block;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
 .cl .ntw .ntx{white-space:pre-wrap;font-size:.88rem;line-height:1.45;color:#26412c}
 .cl .appr .aph{padding:4px 10px}.cl .appr .aph .apl2{flex:1;font-weight:500;font-size:.72rem;color:#d9ecd6;text-align:left;margin-left:6px}
 .cl .appr .apg{padding:6px 12px 8px}.cl .appr .apv{height:50px}.cl .appr .apv img{height:46px}
@@ -305,11 +305,12 @@ function drawEstimate(){
     +'<div class="mid2"><div class="w est">'+(isQ()?t("q_word"):t("e_word"))+"</div>"+(d.title?'<div class="jt">'+esc(d.title)+"</div>":"")
     +"</div>"
     +hdrRight(b,1)+'</div><div class="inner">';
-  var cells=[[tq("cest"),n],[t("cacct"),c.account_no?String(c.account_no):"—"],[tq("edate"),dn(d.issue_date)],[t("validU"),dn(d.valid_until)],[t("saddr"),d.property_address||"—",1]];
+  // who it's for leads the top row (account number beside the name); notes then fit beside the summary
+  var cells=[[t("prepfor"),(c.name||"")+(c.account_no?" ("+c.account_no+")":""),1],[tq("cest"),n],[tq("edate"),dn(d.issue_date)],[t("validU"),dn(d.valid_until)],[t("saddr"),d.property_address||"—",1]];
   h+=gridRow(cells);
   var rows=items.map(function(it){return'<tr><td class="tt">'+esc(it.title||"")+"</td><td>"+esc(it.description)+'</td><td class="q">'+esc(it.qty||"")+'</td><td class="a">'+esc(money(it.amount))+"</td></tr>"}).join("");
   // printed copies fill the page with ruled lines, minus the room the notes take (about 95 characters a line)
-  var noteLines=d.scope?1+String(d.scope).split("\n").reduce(function(a,l){return a+Math.max(1,Math.ceil(l.length/95))},0):0;
+  var noteLines=d.scope?Math.max(0,String(d.scope).split("\n").reduce(function(a,l){return a+Math.max(1,Math.ceil(l.length/45))},0)-7):0;
   var padN=Math.max(3,PRINT_ROWS-noteLines-items.length);
   for(var i=0;i<padN;i++)rows+='<tr class="pad'+(i>=3?" pr":"")+'"><td class="tt"></td><td></td><td class="q"></td><td class="a"></td></tr>';
   h+='<div class="sect"><b>'+t("propwork")+"</b><span>"+t("goodthru")+"</span></div>"
@@ -326,9 +327,8 @@ function drawEstimate(){
     +row(t("subtotal"),esc(money(sub)))+orows+row(tq("etotal"),esc(money(d.total)),"tot")+depRows
     +(isQ()?"":'<tr class="nts"><td colspan="3">'+t("e_note")+"</td></tr>")+"</tbody></table></div>";
   // Notes & Terms sit under Prepared For, beside the summary, instead of a band of their own
-  // Prepared For runs the full height of the summary beside it; Notes & Terms go across the page underneath both
-  var ct='<div class="ct mid">'+clientBlock(t("prepfor"),c)+"</div>";
-  var ntw=d.scope?'<div class="ntw"><span class="lb">'+t("notes")+'</span><div class="ntx">'+esc(d.scope)+"</div></div>":"";
+  // Notes & Terms sit beside the summary, running its full height
+  var ct='<div class="ct">'+(d.scope?'<div class="ntw side"><span class="lb">'+t("notes")+'</span><div class="ntx">'+esc(d.scope)+"</div></div>":"")+"</div>";
   var notes=d.scope?'<div class="notes"><div class="nh">'+t("notes")+'</div><div class="nb">'+esc(d.scope)+"</div></div>"
     :"";
   var acc=d.status==="accepted",sigOk=acc&&/^data:image\/png;base64,/.test(d.response_signature||"");
@@ -341,7 +341,7 @@ function drawEstimate(){
     +cell("",acc&&d.responded_at?esc(dn(String(d.responded_at).slice(0,10))):"",t("date"))
     +cell("",acc?esc(d.response_po||""):"",t("po"))
     +"</div></div>";
-  h+='<div class="sumwrap">'+ct+sum+"</div>"+ntw+appr+banner;
+  h+='<div class="sumwrap">'+ct+sum+"</div>"+appr+banner;
   AFTER=(canAct?'<div class="accept sign" id="acc"><div class="ah"><b>'+t("ahead")+"</b><span>"+t("ahelp2")+(depAmt>0?" "+esc(t("depnote").replace("{d}",money(depAmt))):"")+"</span></div>"
      +'<div class="sgrid"><div><label>'+t("sig")+' <button type="button" class="clr" id="sclr">'+t("clear")+'</button></label><canvas id="spad" width="640" height="150"></canvas></div>'
      +'<div><label for="an">'+t("name")+'</label><input id="an" autocomplete="name" maxlength="120"><label for="apo">'+t("pooptional")+'</label><input id="apo" maxlength="60"><div class="row"><button class="go" id="ay" type="button">'+tq("accept")+'</button><button class="no" id="an2" type="button">'+t("decline")+'</button></div></div></div>'
