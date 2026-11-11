@@ -162,6 +162,9 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .row.job.t-basic{border-left-color:#9dd497}.row.job.t-basic .jtype{background:#eaf6e7;color:#2b6a37}
 .row.job.t-plus{border-left-color:#3f9d4b}.row.job.t-plus .jtype{background:#a9dba3;color:#0f3a1b}
 .row.job.t-premier{border-left-color:#0f3a1b}.row.job.t-premier .jtype{background:#1b552b;color:#fff}
+/* HOA and Commercial lawn maintenance use the same colors as those client types */
+.row.job.t-hoa{border-left-color:#1d4f91}.row.job.t-hoa .jtype{background:#e3eefc;color:#1d4f91}
+.row.job.t-commercial{border-left-color:#5b2a86}.row.job.t-commercial .jtype{background:#f1e6fa;color:#5b2a86}
 .row.job.other{border-left-color:#2f6fb0}.row.job.other .jtype{background:#e3eef9;color:#1f4f86}
 /* the open option on the right side */
 body.dock #rightcol #topbtns>.on{background:var(--forest);color:#fff;border-color:var(--forest)}
@@ -399,7 +402,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=133"></script>
+<script src="app.js?v=134"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

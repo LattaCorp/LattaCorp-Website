@@ -2870,7 +2870,7 @@ function renderJobs() {
   shown.forEach(function (j) {
     // lawn maintenance jobs are green; any other work (trimming, cleanups, installs...) is blue
     var lawn = /^lawn\s*maint/i.test(j.title || ""),
-      tier = lawn ? ((j.title.split(/\s+-\s+/)[1] || "").toLowerCase().match(/basic|plus|premier/) || [""])[0] : "",
+      tier = lawn ? ((j.title.split(/\s+-\s+/)[1] || "").toLowerCase().match(/basic|plus|premier|hoa|commercial/) || [""])[0] : "",
       b = el("button", "row client job " + (lawn ? "lawn" : "other") + (tier ? " t-" + tier : ""));
     b.type = "button";
     var left = el("div");
