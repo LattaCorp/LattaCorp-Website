@@ -217,7 +217,9 @@ function layoutEst(){var paper=document.getElementById("paper");if(!paper)return
   while(!paper.classList.contains("multi")&&paper.scrollHeight>paper.clientHeight+1&&tb.querySelector("tr.pad"))tb.removeChild(tb.querySelector("tr.pad:last-child"));
   fitScale()}
 // on a computer screen the whole page is shown at once (scaled down a little on short screens)
-function fitScale(){var paper=document.getElementById("paper");if(!paper)return;paper.style.transform="";paper.style.marginBottom="";
+function fitScale(){var paper=document.getElementById("paper");if(!paper)return;paper.style.transform="";paper.style.marginBottom="";paper.style.marginTop="";
+  // inside Foreman's live preview, the gap above and below the page matches the gap at the sides
+  if(embed&&paper.classList.contains("page")){var g=Math.max(16,Math.round((window.innerWidth-paper.offsetWidth)/2))+"px";paper.style.marginTop=paper.style.marginBottom=g}
   if(embed||!paper.classList.contains("page")||paper.classList.contains("multi"))return;
   var bar=document.getElementById("bar"),avail=window.innerHeight-(bar&&!bar.hidden?bar.offsetHeight:0)-28,s=Math.max(.62,Math.min(1,avail/PAGE_H));
   if(s<1){paper.style.transform="scale("+s+")";paper.style.marginBottom=(-PAGE_H*(1-s))+"px"}}

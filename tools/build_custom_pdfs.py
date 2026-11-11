@@ -28,7 +28,7 @@ BIZ = {
     "name": "LattaCorp of Central Florida",
     "phone": "407-470-5309",
     "email": "Support@lattacorpfl.com",
-    "footer": 'Thank you for letting us treat you lawn with a "Latta" love!',
+    "footer": 'Thank you for letting us treat your lawn with a "Latta" love!',
 }
 DOCS = {
     "custom-invoice.pdf": {

@@ -951,7 +951,10 @@ function qeChoice(val) {
       w.dispatchEvent(new Event("change", { bubbles: true }));
     });
     l.appendChild(r);
-    l.appendChild(document.createTextNode(k === "quote" ? "Quote (fixed price)" : "Estimate (price may change)"));
+    var tx = el("span", "t");
+    tx.appendChild(el("b", null, k === "quote" ? "Quote" : "Estimate"));
+    tx.appendChild(el("small", null, k === "quote" ? "Fixed price" : "Price may change"));
+    l.appendChild(tx);
     var q = el("button", "qtip", "?");
     q.type = "button";
     q.setAttribute("aria-label", "When to use a " + k);
