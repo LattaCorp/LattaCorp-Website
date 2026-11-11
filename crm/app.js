@@ -8298,6 +8298,7 @@ function renderReports() {
     );
     nt.style.marginBottom = "10px";
     out.appendChild(nt);
+    out.appendChild(salesSnapshot(d.from, d.to));
     var h1 = el("h3", null, "By month");
     h1.style.margin = "14px 0 6px";
     out.appendChild(h1);
@@ -8630,6 +8631,119 @@ function drawCharts(host, d, d3) {
       "Made " + money(d.collected) + " − spent " + money(d.spent) + " = " + sm(d.net) + "."
     )
   );
+}
+
+/* ---- Sales snapshot: how website requests and quotes turned into work, for the same period as the report ---- */
+function salesSnapshot(from, to) {
+  var box = el("div", "sales");
+  var h = el("h3", null, "Sales");
+  h.style.margin = "18px 0 6px";
+  box.appendChild(h);
+  function inR(x) {
+    x = String(x || "").slice(0, 10);
+    return x && x >= from && x <= to;
+  }
+  var reqs = leads.filter(function (l) {
+      return inR(l.created_at);
+    }),
+    made = estimates.filter(function (e) {
+      return inR(e.issue_date || e.created_at);
+    }),
+    sent = made.filter(function (e) {
+      return e.status !== "draft";
+    }),
+    ok = estimates.filter(function (e) {
+      return e.status === "accepted" && inR(e.responded_at);
+    }),
+    no = estimates.filter(function (e) {
+      return (e.status === "declined" && inR(e.responded_at)) || ((e.status === "sent" || e.status === "draft") && e.valid_until && e.valid_until < today() && inR(e.valid_until));
+    }),
+    val = r2(
+      ok.reduce(function (a, e) {
+        return a + Number(e.total || 0);
+      }, 0)
+    ),
+    rate = ok.length + no.length ? Math.round((ok.length / (ok.length + no.length)) * 100) : null,
+    jobsMade = ok.filter(function (e) {
+      return e.job_id;
+    }).length;
+  var st = el("div", "stats");
+  [
+    ["Website requests", String(reqs.length)],
+    ["Quotes sent", String(sent.length)],
+    ["Approved", String(ok.length), ok.length ? money(val) : ""],
+    ["Approval rate", rate == null ? "\u2014" : rate + "%"]
+  ].forEach(function (x) {
+    var c = el("div", "stat");
+    c.appendChild(el("span", null, x[0]));
+    c.appendChild(el("b", null, x[1]));
+    if (x[2]) c.appendChild(el("small", "ssub", x[2]));
+    st.appendChild(c);
+  });
+  box.appendChild(st);
+  box.appendChild(
+    el(
+      "div",
+      "note",
+      (no.length ? no.length + " declined or expired. " : "") +
+        (ok.length ? jobsMade + " of " + ok.length + " approved quote" + (ok.length > 1 ? "s have" : " has") + " been made into a job. " : "") +
+        "Approval rate = approved \u00f7 (approved + declined or expired) in this period."
+    )
+  );
+  // month by month
+  var months = {},
+    order = [];
+  function mk(x) {
+    var k = String(x || "").slice(0, 7);
+    if (!k) return null;
+    if (!months[k]) {
+      months[k] = { req: 0, sent: 0, ok: 0, no: 0, val: 0 };
+      order.push(k);
+    }
+    return months[k];
+  }
+  reqs.forEach(function (l) {
+    mk(l.created_at).req++;
+  });
+  sent.forEach(function (e) {
+    mk(e.issue_date || e.created_at).sent++;
+  });
+  ok.forEach(function (e) {
+    var m = mk(e.responded_at);
+    m.ok++;
+    m.val += Number(e.total || 0);
+  });
+  no.forEach(function (e) {
+    mk(e.status === "declined" ? e.responded_at : e.valid_until).no++;
+  });
+  if (order.length > 1) {
+    order.sort();
+    var tb = document.createElement("table");
+    tb.className = "rtable";
+    var hd = document.createElement("tr");
+    ["Month", "Requests", "Quotes", "Approved", "Declined", "Approved $"].forEach(function (x, i) {
+      var th = document.createElement("th");
+      th.textContent = x;
+      if (i) th.className = "r";
+      hd.appendChild(th);
+    });
+    tb.appendChild(hd);
+    order.forEach(function (k) {
+      var m = months[k],
+        tr = document.createElement("tr");
+      [pd(k + "-01").toLocaleDateString(undefined, { month: "long", year: "numeric" }), m.req, m.sent, m.ok, m.no, money(r2(m.val))].forEach(function (x, i) {
+        var td = document.createElement("td");
+        td.textContent = String(x);
+        if (i) td.className = "r";
+        tr.appendChild(td);
+      });
+      tb.appendChild(tr);
+    });
+    var w = el("div", "tscroll");
+    w.appendChild(tb);
+    box.appendChild(w);
+  }
+  return box;
 }
 
 /* ======================= crm/src/14-expenses.js ======================= */
