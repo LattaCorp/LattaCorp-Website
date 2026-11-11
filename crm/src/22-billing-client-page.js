@@ -532,26 +532,34 @@ function clientBillingSection(c, only) {
   var ab = el("div", "acts");
   ab.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin:6px 0";
   ab.appendChild(
-    btn("New invoice", "btn alt sm", function () {
+    btn("+ New invoice", "btn sm", function () {
       openInvoiceForm(c.id);
     })
   );
-  ab.appendChild(customInvoiceLink("btn alt sm"));
   ab.appendChild(
     btn("Record payment", "btn alt sm", function () {
       openPayment(c.id);
     })
   );
-  ab.appendChild(
+  // now-and-then tools, tucked away like on the Billing page
+  var tl = document.createElement("details");
+  tl.className = "qmore";
+  tl.style.width = "100%";
+  tl.appendChild(el("summary", null, "Tools"));
+  var tr_ = el("div", "qacts");
+  tr_.appendChild(
     btn("Past invoice", "btn alt sm", function () {
       openPastInvoice(c.id);
     })
   );
-  ab.appendChild(
+  tr_.appendChild(
     btn("Import history", "btn alt sm", function () {
       openHistImport(c.id);
     })
   );
+  tr_.appendChild(customInvoiceLink("btn alt sm"));
+  tl.appendChild(tr_);
+  ab.appendChild(tl);
   sec.appendChild(ab);
   var hist = mine.slice().sort(function (a, b) {
     return b.number - a.number;

@@ -1572,30 +1572,138 @@ function renderClients() {
 }
 
 /* ---- client detail ---- */
+/* ---- Client page: who they are and three numbers up top (balance, next visit, active jobs), quick contact buttons,
+   then tabs: Overview (properties, jobs, quotes, contacts, details), Billing, History and Photos.
+   Portal, Archive and Delete are under More. The tab you were on is kept while you work on the client. ---- */
+var clientTab = {};
 function openClient(id) {
   var c = byId(clients, id);
   if (!c) return;
   var p = panel();
+  p.classList.add("qpanel");
   p.appendChild(el("h2", null, c.name + (c.company ? " · " + c.company : "")));
-  p.appendChild(
-    el(
-      "div",
-      "note",
-      (c.account_no ? "Account " + c.account_no + " · " : "") +
-        (c.nickname ? 'Goes by "' + c.nickname + '" · ' : "") +
-        tlabel(c.type) +
-        " · added " +
-        new Date(c.created_at).toLocaleDateString() +
-        (c.source ? " · from " + c.source : "") +
-        (c.archived ? " · ARCHIVED" : "")
-    )
+  var hd = el("div", "qhead");
+  if (c.account_no) hd.appendChild(el("span", "qnum", "Account " + c.account_no));
+  hd.appendChild(el("span", "qst ty-" + (c.type || "residential"), tlabel(c.type)));
+  if (c.nickname) hd.appendChild(el("span", "note", 'Goes by "' + c.nickname + '"'));
+  if (c.archived) hd.appendChild(el("span", "qst no", "Archived"));
+  p.appendChild(hd);
+  // three numbers
+  var bal = billErr ? 0 : clientBal(c.id) - (typeof creditOf === "function" ? creditOf(c.id) : 0),
+    nv = visits
+      .filter(function (v) {
+        return v.client_id === c.id && v.status === "scheduled" && v.scheduled_date >= today();
+      })
+      .sort(function (x, y) {
+        return x.scheduled_date < y.scheduled_date ? -1 : 1;
+      })[0],
+    aj = jobs.filter(function (j) {
+      return j.client_id === c.id && j.status === "active";
+    }).length;
+  var stats = el("div", "cstats");
+  [
+    ["Balance", bal > 0 ? money(bal) : bal < 0 ? money(-bal) + " credit" : "$0.00", bal > 0 && acctStatus(c).key === "past_due" ? "red" : ""],
+    ["Next visit", nv ? dshort(nv.scheduled_date) : "None", ""],
+    ["Active jobs", String(aj), ""]
+  ].forEach(function (x) {
+    var d = el("div");
+    d.appendChild(el("span", null, x[0]));
+    d.appendChild(el("b", x[2], x[1]));
+    stats.appendChild(d);
+  });
+  p.appendChild(stats);
+  var cr = contactRow(c.phone || c.phone2, c.email);
+  cr.classList.add("qacts");
+  var mp = clientProps(c.id)[0];
+  if (mp && mp.address) {
+    var ma = el("a", "btn alt", "Map");
+    ma.href = mapsUrl(mp.address);
+    ma.target = "_blank";
+    ma.rel = "noopener";
+    cr.appendChild(ma);
+  }
+  if (cr.firstChild) cr.firstChild.className = "btn";
+  p.appendChild(cr);
+  // tabs
+  var TABS = [
+      ["overview", "Overview"],
+      ["billing", "Billing"],
+      ["history", "History"],
+      ["photos", "Photos"]
+    ],
+    cur = clientTab[c.id] || "overview",
+    bar = el("div", "ctabs"),
+    panes = {};
+  TABS.forEach(function (t) {
+    var b = el("button", t[0] === cur ? "on" : "", t[1]);
+    b.type = "button";
+    b.addEventListener("click", function () {
+      clientTab[c.id] = t[0];
+      [].forEach.call(bar.children, function (x) {
+        x.classList.toggle("on", x === b);
+      });
+      Object.keys(panes).forEach(function (k) {
+        panes[k].hidden = k !== t[0];
+      });
+    });
+    bar.appendChild(b);
+    panes[t[0]] = el("div", "ctab");
+    panes[t[0]].hidden = t[0] !== cur;
+  });
+  p.appendChild(bar);
+  TABS.forEach(function (t) {
+    p.appendChild(panes[t[0]]);
+  });
+  // Overview
+  var ov = panes.overview;
+  var sec = el("div", "sec"),
+    h = el("h3", null, "Properties"),
+    addp = btn("+ Add property", "btn alt sm", function () {
+      propForm(c, null, sec, h);
+    });
+  h.appendChild(addp);
+  sec.appendChild(h);
+  ov.appendChild(sec);
+  var holder = el("div");
+  sec.appendChild(holder);
+  drawProps(c, holder);
+  ov.appendChild(clientJobsSection(c));
+  if (!estErr) ov.appendChild(clientEstimatesSection(c));
+  ov.appendChild(clientContactsSection(c));
+  var ls = leads.filter(function (l) {
+    return l.client_id === c.id;
+  });
+  if (ls.length) {
+    var s2 = el("div", "sec");
+    s2.appendChild(el("h3", null, "Requests from the website"));
+    ls.forEach(function (l) {
+      var r = el("div", "pcard");
+      r.appendChild(el("b", null, l.kind + " · " + label(l.status)));
+      r.appendChild(el("div", "note", new Date(l.created_at).toLocaleDateString() + (l.service ? " · " + l.service : "")));
+      r.appendChild(
+        btn("Open", "btn alt sm", function () {
+          openLead(l.id);
+        })
+      ).style.marginTop = "6px";
+      s2.appendChild(r);
+    });
+    ov.appendChild(s2);
+  }
+  var det = el("div", "sec");
+  var dh = el("h3", null, "Details");
+  dh.appendChild(
+    btn("Edit details", "btn alt sm", function () {
+      openClientForm(c);
+    })
   );
-  p.appendChild(contactRow(c.phone || c.phone2, c.email));
+  det.appendChild(dh);
   var t = document.createElement("table");
   [
     ["Phone", c.phone],
     ["Phone 2", c.phone2],
     ["Email", c.email],
+    ["Billing", c.bill_by_property ? "Separate invoice per property" : "One invoice for all properties"],
+    ["Added", c.created_at ? new Date(c.created_at).toLocaleDateString() + (c.source ? " (" + c.source + ")" : "") : ""],
     ["Notes", c.notes]
   ].forEach(function (r) {
     if (!r[1]) return;
@@ -1604,15 +1712,21 @@ function openClient(id) {
     tr.appendChild(el("td", null, r[1]));
     t.appendChild(tr);
   });
-  p.appendChild(t);
-  var acts = el("div", "contact");
-  acts.appendChild(
-    btn("Edit details", "btn alt sm", function () {
-      openClientForm(c);
-    })
-  );
-  acts.appendChild(
-    btn(c.archived ? "Unarchive" : "Archive", "btn alt sm", function () {
+  det.appendChild(t);
+  ov.appendChild(det);
+  // Billing, History, Photos
+  panes.billing.appendChild(clientBillingSection(c));
+  panes.history.appendChild(historySection(c));
+  panes.photos.appendChild(clientPhotosSection(c));
+  // More: portal, archive, delete
+  var more = document.createElement("details");
+  more.className = "qmore";
+  more.appendChild(el("summary", null, "More (portal, archive, delete)"));
+  more.appendChild(clientPortalSection(c));
+  var mr = el("div", "qacts");
+  mr.style.marginTop = "10px";
+  mr.appendChild(
+    btn(c.archived ? "Unarchive" : "Archive", "btn alt", function () {
       sb.from("clients")
         .update({ archived: !c.archived })
         .eq("id", c.id)
@@ -1627,54 +1741,9 @@ function openClient(id) {
         });
     })
   );
-  p.appendChild(acts);
-  p.appendChild(clientContactsSection(c));
-  p.appendChild(clientPortalSection(c));
-  /* properties */
-  var sec = el("div", "sec"),
-    h = el("h3", null, "Properties"),
-    addp = btn("+ Add property", "btn alt sm", function () {
-      propForm(c, null, sec, h);
-    });
-  h.appendChild(addp);
-  sec.appendChild(h);
-  p.appendChild(sec);
-  var holder = el("div");
-  sec.appendChild(holder);
-  drawProps(c, holder);
-  p.appendChild(clientJobsSection(c));
-  p.appendChild(clientBillingSection(c));
-  if (!estErr) p.appendChild(clientEstimatesSection(c));
-  p.appendChild(clientPhotosSection(c));
-  p.appendChild(historySection(c));
-  /* leads */
-  var ls = leads.filter(function (l) {
-    return l.client_id === c.id;
-  });
-  if (ls.length) {
-    var s2 = el("div", "sec");
-    s2.appendChild(el("h3", null, "Requests from the website"));
-    ls.forEach(function (l) {
-      var r = el("div", "pcard");
-      r.appendChild(el("b", null, l.kind + " · " + label(l.status)));
-      r.appendChild(
-        el("div", "note", new Date(l.created_at).toLocaleDateString() + (l.service ? " · " + l.service : ""))
-      );
-      r.appendChild(
-        btn("Open", "btn alt sm", function () {
-          openLead(l.id);
-        })
-      ).style.marginTop = "6px";
-      s2.appendChild(r);
-    });
-    p.appendChild(s2);
-  }
-  var d = el("div", "actions");
-  d.appendChild(el("span"));
-  d.appendChild(
+  mr.appendChild(
     btn("Delete client", "btn danger", function () {
-      if (!confirm("Delete this client and all their properties for good? (Archive keeps the history.)"))
-        return;
+      if (!confirm("Delete this client and all their properties for good? (Archive keeps the history.)")) return;
       sb.from("clients")
         .delete()
         .eq("id", c.id)
@@ -1697,7 +1766,8 @@ function openClient(id) {
         });
     })
   );
-  p.appendChild(d);
+  more.appendChild(mr);
+  p.appendChild(more);
 }
 /* ---- other contacts on a client (spouse, board members...) ---- */
 function clientCC(id) {
@@ -15677,9 +15747,9 @@ function renderEstimates(list) {
 }
 function clientEstimatesSection(c) {
   var sec = el("div", "sec"),
-    h = el("h3", null, "Estimates");
+    h = el("h3", null, "Quotes");
   h.appendChild(
-    btn("+ New estimate", "btn alt sm", function () {
+    btn("+ New quote", "btn alt sm", function () {
       openEstimateForm(c.id);
     })
   );
@@ -16427,26 +16497,34 @@ function clientBillingSection(c, only) {
   var ab = el("div", "acts");
   ab.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;margin:6px 0";
   ab.appendChild(
-    btn("New invoice", "btn alt sm", function () {
+    btn("+ New invoice", "btn sm", function () {
       openInvoiceForm(c.id);
     })
   );
-  ab.appendChild(customInvoiceLink("btn alt sm"));
   ab.appendChild(
     btn("Record payment", "btn alt sm", function () {
       openPayment(c.id);
     })
   );
-  ab.appendChild(
+  // now-and-then tools, tucked away like on the Billing page
+  var tl = document.createElement("details");
+  tl.className = "qmore";
+  tl.style.width = "100%";
+  tl.appendChild(el("summary", null, "Tools"));
+  var tr_ = el("div", "qacts");
+  tr_.appendChild(
     btn("Past invoice", "btn alt sm", function () {
       openPastInvoice(c.id);
     })
   );
-  ab.appendChild(
+  tr_.appendChild(
     btn("Import history", "btn alt sm", function () {
       openHistImport(c.id);
     })
   );
+  tr_.appendChild(customInvoiceLink("btn alt sm"));
+  tl.appendChild(tr_);
+  ab.appendChild(tl);
   sec.appendChild(ab);
   var hist = mine.slice().sort(function (a, b) {
     return b.number - a.number;

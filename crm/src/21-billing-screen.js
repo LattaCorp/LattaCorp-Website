@@ -1028,9 +1028,9 @@ function renderEstimates(list) {
 }
 function clientEstimatesSection(c) {
   var sec = el("div", "sec"),
-    h = el("h3", null, "Estimates");
+    h = el("h3", null, "Quotes");
   h.appendChild(
-    btn("+ New estimate", "btn alt sm", function () {
+    btn("+ New quote", "btn alt sm", function () {
       openEstimateForm(c.id);
     })
   );

@@ -74,6 +74,17 @@ textarea{min-height:110px;resize:vertical}
 .qban.wait{background:#eef4fb;color:#173a63;border:2px solid #b7cdea}.qban.void{background:#f1f1f1;color:#555;border:2px solid #ccc}
 .qtot>div.bal{font-weight:800}
 body.dock #detail:not(.full) .panel .qban.wait,body.dock #detail:not(.full) .panel .qban.wait *{color:#173a63}body.dock #detail:not(.full) .panel .qban.void,body.dock #detail:not(.full) .panel .qban.void *{color:#555}
+.cstats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:2px 0 12px}
+.cstats div{background:#fff;border:1px solid var(--line);border-radius:10px;padding:8px 10px;color:var(--ink)}
+.cstats span{display:block;font-size:.7rem;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:var(--muted)}
+.cstats b{font-size:1.05rem}.cstats b.red{color:#b3261e}
+body.dock #detail:not(.full) .panel .cstats div,body.dock #detail:not(.full) .panel .cstats b{color:var(--ink)}body.dock #detail:not(.full) .panel .cstats span{color:var(--muted)}body.dock #detail:not(.full) .panel .cstats b.red{color:#b3261e}
+.ctabs{display:flex;gap:2px;margin:6px 0 4px;border-bottom:2px solid var(--line);overflow-x:auto}
+.ctabs button{background:none;border:0;color:var(--muted);font-weight:700;padding:8px 12px;font-size:.95rem;border-bottom:3px solid transparent;margin-bottom:-2px;cursor:pointer;white-space:nowrap}
+.ctabs button.on{color:var(--forest);border-bottom-color:var(--forest)}
+body.dock #detail:not(.full) .panel .ctabs{border-bottom-color:rgba(255,255,255,.3)}body.dock #detail:not(.full) .panel .ctabs button{color:#cfe3c9}body.dock #detail:not(.full) .panel .ctabs button.on{color:#fff;border-bottom-color:#fff}
+.ctab[hidden]{display:none}.ctab>.sec:first-child{border-top:0;margin-top:0}
+.qhead .qst.ty-hoa{background:#1d4f91;color:#fff}.qhead .qst.ty-commercial{background:#5b2a86;color:#fff}.qhead .qst.ty-residential{background:#d6f2da;color:#14532d}
 .qban img{display:block;height:56px;width:auto;margin-top:8px;background:#fff;border-radius:6px;border-bottom:1.5px solid #1d2a20}
 .qacts{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 10px}
 .qsend{display:flex;flex-wrap:wrap;gap:8px;margin:-2px 0 12px;padding:10px;border-radius:10px;background:rgba(127,127,127,.12)}
@@ -559,7 +570,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=174"></script>
+<script src="app.js?v=176"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
