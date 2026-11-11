@@ -565,18 +565,18 @@ function render() {
     ["clients", "Clients", 0],
     ["jobs", "Jobs", 0],
     ["schedule", "Schedule", stops],
+    ["billing", "Billing", invoices.filter(isOverdue).length],
+    ["expenses", "Expenses", 0],
+    ["reports", "Reports", 0],
+    ["photos", "Photos", 0],
+    ["inventory", "Inventory", 0],
     [
       "todo",
       "To-Do",
       todos.filter(function (t) {
         return !t.done && t.due_date && t.due_date <= tdy;
       }).length
-    ],
-    ["billing", "Billing", invoices.filter(isOverdue).length],
-    ["expenses", "Expenses", 0],
-    ["reports", "Reports", 0],
-    ["photos", "Photos", 0],
-    ["inventory", "Inventory", 0]
+    ]
   ]
     .concat(
       isOwner()
