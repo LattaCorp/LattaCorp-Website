@@ -186,7 +186,6 @@ function jobsFilterBar(tabs) {
       b.type = "button";
       b.setAttribute("aria-pressed", on ? "true" : "false");
       b.appendChild(el("span", null, "(" + n + ")"));
-      if (on) b.appendChild(el("i", "fchk", "\u2713"));
       b.addEventListener("click", function () {
         var a = JF[g[0]],
           k = a.indexOf(o[0]);
@@ -198,7 +197,6 @@ function jobsFilterBar(tabs) {
     });
     bar.appendChild(grp);
   });
-  var end = el("div", "fgrp fend");
   if (any) {
     var clr = el("button", "tab fpill fclear", "Clear all");
     clr.type = "button";
@@ -208,8 +206,9 @@ function jobsFilterBar(tabs) {
       });
       render();
     });
-    end.appendChild(clr);
+    bar.lastChild.appendChild(clr);
   }
+  /* Sort by sits in the top-right corner, on the first row of pills */
   var sl = el("label", "fsort");
   sl.appendChild(el("span", "flbl", "Sort by"));
   var sel = document.createElement("select");
@@ -225,8 +224,7 @@ function jobsFilterBar(tabs) {
     render();
   });
   sl.appendChild(sel);
-  end.appendChild(sl);
-  bar.appendChild(end);
+  bar.insertBefore(sl, bar.firstChild);
   tabs.appendChild(bar);
 }
 
@@ -234,7 +232,7 @@ function jobsFilterBar(tabs) {
 function renderJobs() {
   var tabs = $("tabs");
   tabs.textContent = "";
-  /* Filter pills (tap to turn on, tap again to turn off; a check mark shows what's on). No filters = every job.
+  /* Filter pills (tap to turn on, tap again to turn off; dark green shows what's on). No filters = every job.
      Inside a group any match counts (Weekly OR Every 2 weeks); across groups all must match (Weekly AND Elite). */
   jobsFilterBar(tabs);
   var tb = $("topbtns");

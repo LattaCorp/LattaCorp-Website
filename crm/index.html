@@ -175,15 +175,14 @@ body.dock #rightcol #topbtns>.on{background:var(--forest);color:#fff;border-colo
 .row.client.pastdue{background:#fdeceb;border-color:#f2c4bf;border-left-color:var(--red)}
 .row.client.pastdue:hover{background:#fbe1df}
 /* Jobs filter pills: groups of on/off pills (a check mark when on), Clear all, and Sort by */
-.fbar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;width:100%}
-.fbar .fgrp{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
-.fbar .flbl{font-size:.72rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-right:2px}
+.fbar{display:block;width:100%;line-height:0}
+.fbar .fgrp{display:inline-flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 18px 8px 0;line-height:normal;vertical-align:middle}
+.fbar .flbl{display:inline-block;font-size:.8rem;font-weight:900;letter-spacing:.07em;text-transform:uppercase;color:var(--forest);background:#dcefd6;border:1.5px solid #9fd09a;border-radius:6px;padding:5px 9px;margin-right:4px}
 .fbar .fpill{display:inline-flex;align-items:center;gap:5px}
-.fbar .fpill .fchk{font-style:normal;display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:#fff;color:var(--forest);font-size:.72rem;font-weight:900;margin-left:2px}
-.fbar .fclear{border-style:dashed}
-.fbar .fend{margin-left:auto}
-.fbar .fsort{display:inline-flex;align-items:center;gap:6px}
+.fbar .fclear{border-style:dashed;margin-left:6px}
+.fbar .fsort{float:right;display:inline-flex;align-items:center;gap:8px;margin:0 0 8px 18px;line-height:normal}
 .fbar .fsort select{border-radius:999px;padding:7px 30px 7px 14px;font-weight:600;border:1.5px solid var(--line);background-color:#fff;width:auto}
+@media (max-width:700px){.fbar .fsort{float:none;display:flex;margin:0 0 10px}}
 /* Right-side layout test (computers 1200px+): list on the left, options and forms on the right */
 #rightcol{display:none}
 body.dock #rightcol{display:flex;flex-direction:column;width:460px;flex:none;position:sticky;top:76px;align-self:flex-start;height:calc(100vh - 76px);background:#fff;border-left:1px solid var(--line);overflow:hidden;order:3}
@@ -415,7 +414,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=138"></script>
+<script src="app.js?v=139"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
