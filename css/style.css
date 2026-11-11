@@ -647,3 +647,7 @@ footer .brand.fbrand img.wword{width:100%;max-width:280px;min-width:170px}
 .fcard h3{margin:8px 0 4px;font-size:1.05rem;color:var(--forest)}.fcard p{margin:0;color:var(--muted);font-size:.95rem}
 @media (max-width:860px){.phones{grid-template-columns:1fr;gap:34px}.fgrid{grid-template-columns:1fr 1fr}}
 @media (max-width:520px){.fgrid{grid-template-columns:1fr}}
+
+#hoa .elite{background:linear-gradient(135deg,var(--forest),#1f5e3a);color:#fff;border-radius:12px;padding:22px 24px;margin:0 0 22px;box-shadow:0 6px 20px rgba(0,0,0,.12)}#hoa .elite h2{color:#fff;margin:.2em 0 .4em!important}#hoa .elite p,#hoa .elite li{color:#eef7f0}#hoa .elite ul{margin:0 0 .8em}#hoa .elite .ek{display:inline-block;background:#f4c542;color:#1d2b1f;font-weight:700;font-size:.78rem;letter-spacing:.04em;text-transform:uppercase;border-radius:999px;padding:3px 10px}#hoa .elite .ef{font-weight:600;color:#fff}#hoa .elite .btn{background:#fff;color:var(--forest);border-color:#fff;margin:4px 8px 0 0}#hoa .elite .btn.alt{background:transparent;color:#fff;border:2px solid rgba(255,255,255,.7)}
+#portal .band{border-bottom:3px solid var(--leaf)}
+#portal .psi{border:2px solid var(--forest)}

@@ -18,10 +18,10 @@ document.title=t(d.title)+" | Latta Corp";if(lang==="es"){walkText();walkAttrs()
 function setHoa(k){var v=HV[k],b=document.querySelector("#hoa .band .wrap");b.innerHTML="<h1></h1><p></p>";b.firstChild.textContent=v.h;b.lastChild.textContent=v.p;
 function li(a){return"<ul>"+a.map(function(x){return"<li>"+esc(x)+"</li>"}).join("")+"</ul>"}
 var tail=(k==="hoa"||k==="property-managers")?' <a href="#/community">Service Requests</a>.':' <a href="tel:4074705309">407-470-5309</a>.';
-var h='<div class="svcbox"><h2>'+esc(v.bt)+'</h2><p>'+esc(v.bp)+'</p>'+li(v.bl)+'<p class="res">'+esc(HRES)+'</p><p>'+esc(v.br)+tail+'</p></div>'
+var e=v.el,h=(e?'<div class="elite"><span class="ek">'+esc(e.k)+'</span><h2>'+esc(e.h)+'</h2><p>'+esc(e.p)+'</p>'+li(e.l)+'<p class="ef">'+esc(e.f)+'</p><a class="btn" href="#hf" id="elbtn">'+esc(e.b)+'</a> <a class="btn alt" href="#/services">Compare all plans</a></div>':'')+'<div class="svcbox"><h2>'+esc(v.bt)+'</h2><p>'+esc(v.bp)+'</p>'+li(v.bl)+'<p class="res">'+esc(HRES)+'</p><p>'+esc(v.br)+tail+'</p></div>'
 +'<h2>'+esc(v.wt)+'</h2>'+li(v.wl)+'<h2>'+esc(v.jt)+'</h2>'+li(v.jl)+'<h2>'+esc(v.pt)+'</h2><p>'+esc(v.pp)+(v.pl?' <a href="#/services">See our maintenance plans</a>.':'')+'</p><h2>Coverage</h2><p>'+esc(v.cv||HCOV)+'</p>'
 +'<div class="cta"><a class="btn alt" href="tel:4074705309">Call or text 407-470-5309</a><a class="btn alt" href="#/portfolio">See our work</a></div><div class="pnote"><b>Client Portal</b> <span class="soon">NEW!</span><p>See your visits, invoices, and requests online. <a href="/portal/">Sign in</a></p></div>';
-document.getElementById("hdt").innerHTML=h;
+document.getElementById("hdt").innerHTML=h;var eb=document.getElementById("elbtn");if(eb)eb.addEventListener("click",function(ev){ev.preventDefault();var ta=document.querySelector("#hf textarea"),f=document.getElementById("hf");if(ta&&!ta.value)ta.value=t("I am interested in the Elite plan.");f.scrollIntoView({behavior:"smooth",block:"start"});var fi=f.querySelector("input");if(fi)setTimeout(function(){fi.focus({preventScroll:true})},500)});
 var sel=document.querySelector("#hf select");if(sel&&!sel.dataset.manual){[].forEach.call(sel.options,function(o){if(o.text===v.r)sel.value=o.value||o.text})}
 if(lang==="es"){walkText()}document.title=t(v.t)+" | Latta Corp"}
 function closeDd(){var d=document.querySelector(".dd");if(d){d.classList.remove("open");document.getElementById("ddb").setAttribute("aria-expanded","false")}}
