@@ -101,8 +101,41 @@ function fetchAll(table, col) {
   }
   return page();
 }
+/* Start-up: the screens you use all day (leads, clients, jobs, schedule, billing) load first and Foreman opens right
+   away; expenses, photos, inventory and personnel load in the background a moment later. */
+var laterReady = false;
 function load() {
   $("msg").textContent = "";
+  laterReady = false;
+  var LQ = {
+      11: function () {
+        return fetchAll("expenses", "spent_on");
+      },
+      12: function () {
+        return sb.from("photos").select("*").order("created_at", { ascending: false }).limit(5000);
+      },
+      14: function () {
+        return sb.from("inventory_cats").select("*").order("sort", { ascending: true }).limit(500);
+      },
+      15: function () {
+        return sb.from("inventory_items").select("*").order("sort", { ascending: true }).limit(20000);
+      },
+      16: function () {
+        return sb.from("personnel").select("*").order("emp_no", { ascending: true }).limit(2000);
+      },
+      17: function () {
+        return sb.from("personnel_pay").select("*").order("paid_on", { ascending: false }).limit(20000);
+      },
+      18: function () {
+        return sb.from("personnel_benefits").select("*").order("created_at", { ascending: false }).limit(5000);
+      },
+      19: function () {
+        return sb.from("personnel_docs").select("*").order("created_at", { ascending: false }).limit(5000);
+      }
+    },
+    LATER = function () {
+      return Promise.resolve({ data: null, error: null, later: true });
+    };
   Promise.all([
     sb.from("leads").select("*").order("created_at", { ascending: false }).limit(1000),
     sb.from("clients").select("*").order("name", { ascending: true }).limit(5000),
@@ -120,15 +153,15 @@ function load() {
     sb.from("business").select("*").eq("id", 1),
     sb.from("visits").select("*").eq("status", "done").is("invoice_id", null).is("paid_at", null).limit(5000),
     sb.from("todos").select("*").order("created_at", { ascending: false }).limit(3000),
-    fetchAll("expenses", "spent_on"),
-    sb.from("photos").select("*").order("created_at", { ascending: false }).limit(5000),
+    LATER(11),
+    LATER(12),
     sb.from("estimates").select("*").order("number", { ascending: false }).limit(3000),
-    sb.from("inventory_cats").select("*").order("sort", { ascending: true }).limit(500),
-    sb.from("inventory_items").select("*").order("sort", { ascending: true }).limit(20000),
-    sb.from("personnel").select("*").order("emp_no", { ascending: true }).limit(2000),
-    sb.from("personnel_pay").select("*").order("paid_on", { ascending: false }).limit(20000),
-    sb.from("personnel_benefits").select("*").order("created_at", { ascending: false }).limit(5000),
-    sb.from("personnel_docs").select("*").order("created_at", { ascending: false }).limit(5000),
+    LATER(14),
+    LATER(15),
+    LATER(16),
+    LATER(17),
+    LATER(18),
+    LATER(19),
     sb.from("invoice_payments").select("*").order("paid_on", { ascending: false }).limit(20000),
     sb.from("client_contacts").select("*").order("created_at", { ascending: true }).limit(20000),
     sb.from("cal_events").select("*").gte("event_date", addDays(today(), -120)).order("event_date", { ascending: true }).limit(5000)
@@ -190,5 +223,34 @@ function load() {
       if (n) render();
     });
     startRespWatch();
+    // the rest, in the background
+    var keys = Object.keys(LQ);
+    Promise.all(
+      keys.map(function (k) {
+        return LQ[k]();
+      })
+    ).then(function (out) {
+      var r = {};
+      keys.forEach(function (k, i) {
+        r[k] = out[i];
+      });
+      persErr = !!(r[16].error || r[17].error || r[18].error || r[19].error);
+      people = r[16].error ? [] : r[16].data || [];
+      payRows = r[17].error ? [] : r[17].data || [];
+      benRows = r[18].error ? [] : r[18].data || [];
+      docRows = r[19].error ? [] : r[19].data || [];
+      photoErr = !!r[12].error;
+      photos = r[12].error ? [] : r[12].data || [];
+      expErr = !!r[11].error;
+      expenses = r[11].error ? [] : r[11].data || [];
+      invErr = !!(r[14].error || r[15].error);
+      invCats = r[14].error ? [] : r[14].data || [];
+      invItems = r[15].error ? [] : r[15].data || [];
+      repData = null;
+      laterReady = true;
+      // redraw if you're already on one of those screens (and not typing in a form)
+      if (["expenses", "photos", "inventory", "personnel", "reports", "tax"].indexOf(view) > -1 && !$("panel").querySelector("input:focus,textarea:focus"))
+        render();
+    });
   });
 }

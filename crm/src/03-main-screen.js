@@ -177,10 +177,10 @@ function render() {
   else renderSchedule();
 }
 
-/* ---- Right-side layout (test, computers only): the screen's list stays on the left; the tab's options
-   (New client, Services, ...) are listed down the right side, and forms and details open there instead of a pop-up.
-   The New quote / New invoice window still opens full screen because it needs the room for its live preview.
-   To turn it off, set DOCK_TEST to false. ---- */
+/* ---- Right-side layout (computers): the screen's list stays on the left; the tab's options (New client, Services, ...)
+   are listed down the right side, and forms and details open there under their option. Phones and narrow windows use
+   the full-screen panel instead. The New quote / New invoice window opens full screen because it needs the room
+   for its live preview. ---- */
 var DOCK_TEST = true,
   DOCK_MIN = 1200;
 function docked() {

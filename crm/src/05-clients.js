@@ -84,48 +84,62 @@ function clientProps(id) {
     });
   return m.concat(o);
 }
+var CF = { type: [], show: [] };
+function clientFacet(c, g, k) {
+  if (g === "type") return !c.archived && (c.type || "residential") === k;
+  if (k === "archived") return !!c.archived;
+  if (c.archived) return false;
+  if (k === "pastdue") return acctStatus(c).key === "past_due";
+  if (k === "nojobs")
+    return !jobs.some(function (j) {
+      return j.client_id === c.id && j.status === "active";
+    });
+  return false;
+}
 function renderClients() {
   sortClients();
   var tabs = $("tabs");
   tabs.textContent = "";
-  var act = clients.filter(function (c) {
-    return !c.archived;
-  });
-  var defs = [
-    ["active", "Active", act.length],
-    [
-      "residential",
-      "Residential",
-      act.filter(function (c) {
-        return c.type === "residential";
-      }).length
-    ],
-    [
-      "hoa",
-      "HOA",
-      act.filter(function (c) {
-        return c.type === "hoa";
-      }).length
-    ],
-    [
-      "commercial",
-      "Commercial",
-      act.filter(function (c) {
-        return c.type === "commercial";
-      }).length
-    ],
-    ["archived", "Archived", clients.length - act.length]
+  // filter pills like Jobs and Leads: tap to turn on, tap again to turn off. Nothing on = every active client.
+  var CF_GROUPS = [
+    ["type", "Type", [["hoa", "HOA"], ["commercial", "Commercial"], ["residential", "Residential"]]],
+    ["show", "Show", [["pastdue", "Past due"], ["nojobs", "No active jobs"], ["archived", "Archived"]]]
   ];
-  defs.forEach(function (s) {
-    var b = el("button", "tab" + (cfilter === s[0] ? " on" : ""), s[1]);
-    b.type = "button";
-    b.appendChild(el("span", null, "(" + s[2] + ")"));
-    b.addEventListener("click", function () {
-      cfilter = s[0];
+  var bar = el("div", "fbar lbar"),
+    any = CF.type.length || CF.show.length;
+  CF_GROUPS.forEach(function (g) {
+    var grp = el("div", "fgrp");
+    grp.appendChild(el("span", "flbl", g[1]));
+    g[2].forEach(function (o) {
+      var on = CF[g[0]].indexOf(o[0]) > -1,
+        n = clients.filter(function (c) {
+          return clientFacet(c, g[0], o[0]);
+        }).length,
+        b = el("button", "tab fpill" + (on ? " on" : ""), o[1]);
+      b.type = "button";
+      b.appendChild(el("span", null, "(" + n + ")"));
+      b.addEventListener("click", function () {
+        var arr = CF[g[0]],
+          k = arr.indexOf(o[0]);
+        if (k > -1) arr.splice(k, 1);
+        else arr.push(o[0]);
+        render();
+      });
+      grp.appendChild(b);
+    });
+    bar.appendChild(grp);
+  });
+  if (any) {
+    var clr = el("button", "tab fpill fclear", "Clear");
+    clr.type = "button";
+    clr.addEventListener("click", function () {
+      CF.type = [];
+      CF.show = [];
       render();
     });
-    tabs.appendChild(b);
-  });
+    bar.lastChild.appendChild(clr);
+  }
+  tabs.appendChild(bar);
   var tb = $("topbtns");
   tb.appendChild(
     btn("+ New client", "btn", function () {
@@ -147,12 +161,11 @@ function renderClients() {
     return;
   }
   var shown = clients.filter(function (c) {
-    if (cfilter === "archived") {
-      if (!c.archived) return false;
-    } else {
-      if (c.archived) return false;
-      if (cfilter !== "active" && c.type !== cfilter) return false;
-    }
+    var wantArch = CF.show.indexOf("archived") > -1;
+    if (!!c.archived !== wantArch) return false;
+    if (CF.type.length && CF.type.indexOf(c.type || "residential") < 0) return false;
+    if (CF.show.indexOf("pastdue") > -1 && !clientFacet(c, "show", "pastdue")) return false;
+    if (CF.show.indexOf("nojobs") > -1 && !clientFacet(c, "show", "nojobs")) return false;
     if (!query) return true;
     var addr = clientProps(c.id)
       .map(function (p) {
@@ -171,7 +184,7 @@ function renderClients() {
       el(
         "div",
         "empty",
-        clients.length ? "Nothing matches that." : "No clients yet. Add one, import a CSV, or convert a lead."
+        clients.length ? "No clients match these filters." : "No clients yet. Add one, import a CSV, or convert a lead."
       )
     );
     return;

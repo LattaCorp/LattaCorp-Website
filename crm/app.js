@@ -385,8 +385,41 @@ function fetchAll(table, col) {
   }
   return page();
 }
+/* Start-up: the screens you use all day (leads, clients, jobs, schedule, billing) load first and Foreman opens right
+   away; expenses, photos, inventory and personnel load in the background a moment later. */
+var laterReady = false;
 function load() {
   $("msg").textContent = "";
+  laterReady = false;
+  var LQ = {
+      11: function () {
+        return fetchAll("expenses", "spent_on");
+      },
+      12: function () {
+        return sb.from("photos").select("*").order("created_at", { ascending: false }).limit(5000);
+      },
+      14: function () {
+        return sb.from("inventory_cats").select("*").order("sort", { ascending: true }).limit(500);
+      },
+      15: function () {
+        return sb.from("inventory_items").select("*").order("sort", { ascending: true }).limit(20000);
+      },
+      16: function () {
+        return sb.from("personnel").select("*").order("emp_no", { ascending: true }).limit(2000);
+      },
+      17: function () {
+        return sb.from("personnel_pay").select("*").order("paid_on", { ascending: false }).limit(20000);
+      },
+      18: function () {
+        return sb.from("personnel_benefits").select("*").order("created_at", { ascending: false }).limit(5000);
+      },
+      19: function () {
+        return sb.from("personnel_docs").select("*").order("created_at", { ascending: false }).limit(5000);
+      }
+    },
+    LATER = function () {
+      return Promise.resolve({ data: null, error: null, later: true });
+    };
   Promise.all([
     sb.from("leads").select("*").order("created_at", { ascending: false }).limit(1000),
     sb.from("clients").select("*").order("name", { ascending: true }).limit(5000),
@@ -404,15 +437,15 @@ function load() {
     sb.from("business").select("*").eq("id", 1),
     sb.from("visits").select("*").eq("status", "done").is("invoice_id", null).is("paid_at", null).limit(5000),
     sb.from("todos").select("*").order("created_at", { ascending: false }).limit(3000),
-    fetchAll("expenses", "spent_on"),
-    sb.from("photos").select("*").order("created_at", { ascending: false }).limit(5000),
+    LATER(11),
+    LATER(12),
     sb.from("estimates").select("*").order("number", { ascending: false }).limit(3000),
-    sb.from("inventory_cats").select("*").order("sort", { ascending: true }).limit(500),
-    sb.from("inventory_items").select("*").order("sort", { ascending: true }).limit(20000),
-    sb.from("personnel").select("*").order("emp_no", { ascending: true }).limit(2000),
-    sb.from("personnel_pay").select("*").order("paid_on", { ascending: false }).limit(20000),
-    sb.from("personnel_benefits").select("*").order("created_at", { ascending: false }).limit(5000),
-    sb.from("personnel_docs").select("*").order("created_at", { ascending: false }).limit(5000),
+    LATER(14),
+    LATER(15),
+    LATER(16),
+    LATER(17),
+    LATER(18),
+    LATER(19),
     sb.from("invoice_payments").select("*").order("paid_on", { ascending: false }).limit(20000),
     sb.from("client_contacts").select("*").order("created_at", { ascending: true }).limit(20000),
     sb.from("cal_events").select("*").gte("event_date", addDays(today(), -120)).order("event_date", { ascending: true }).limit(5000)
@@ -474,6 +507,35 @@ function load() {
       if (n) render();
     });
     startRespWatch();
+    // the rest, in the background
+    var keys = Object.keys(LQ);
+    Promise.all(
+      keys.map(function (k) {
+        return LQ[k]();
+      })
+    ).then(function (out) {
+      var r = {};
+      keys.forEach(function (k, i) {
+        r[k] = out[i];
+      });
+      persErr = !!(r[16].error || r[17].error || r[18].error || r[19].error);
+      people = r[16].error ? [] : r[16].data || [];
+      payRows = r[17].error ? [] : r[17].data || [];
+      benRows = r[18].error ? [] : r[18].data || [];
+      docRows = r[19].error ? [] : r[19].data || [];
+      photoErr = !!r[12].error;
+      photos = r[12].error ? [] : r[12].data || [];
+      expErr = !!r[11].error;
+      expenses = r[11].error ? [] : r[11].data || [];
+      invErr = !!(r[14].error || r[15].error);
+      invCats = r[14].error ? [] : r[14].data || [];
+      invItems = r[15].error ? [] : r[15].data || [];
+      repData = null;
+      laterReady = true;
+      // redraw if you're already on one of those screens (and not typing in a form)
+      if (["expenses", "photos", "inventory", "personnel", "reports", "tax"].indexOf(view) > -1 && !$("panel").querySelector("input:focus,textarea:focus"))
+        render();
+    });
   });
 }
 
@@ -657,10 +719,10 @@ function render() {
   else renderSchedule();
 }
 
-/* ---- Right-side layout (test, computers only): the screen's list stays on the left; the tab's options
-   (New client, Services, ...) are listed down the right side, and forms and details open there instead of a pop-up.
-   The New quote / New invoice window still opens full screen because it needs the room for its live preview.
-   To turn it off, set DOCK_TEST to false. ---- */
+/* ---- Right-side layout (computers): the screen's list stays on the left; the tab's options (New client, Services, ...)
+   are listed down the right side, and forms and details open there under their option. Phones and narrow windows use
+   the full-screen panel instead. The New quote / New invoice window opens full screen because it needs the room
+   for its live preview. ---- */
 var DOCK_TEST = true,
   DOCK_MIN = 1200;
 function docked() {
@@ -1434,48 +1496,62 @@ function clientProps(id) {
     });
   return m.concat(o);
 }
+var CF = { type: [], show: [] };
+function clientFacet(c, g, k) {
+  if (g === "type") return !c.archived && (c.type || "residential") === k;
+  if (k === "archived") return !!c.archived;
+  if (c.archived) return false;
+  if (k === "pastdue") return acctStatus(c).key === "past_due";
+  if (k === "nojobs")
+    return !jobs.some(function (j) {
+      return j.client_id === c.id && j.status === "active";
+    });
+  return false;
+}
 function renderClients() {
   sortClients();
   var tabs = $("tabs");
   tabs.textContent = "";
-  var act = clients.filter(function (c) {
-    return !c.archived;
-  });
-  var defs = [
-    ["active", "Active", act.length],
-    [
-      "residential",
-      "Residential",
-      act.filter(function (c) {
-        return c.type === "residential";
-      }).length
-    ],
-    [
-      "hoa",
-      "HOA",
-      act.filter(function (c) {
-        return c.type === "hoa";
-      }).length
-    ],
-    [
-      "commercial",
-      "Commercial",
-      act.filter(function (c) {
-        return c.type === "commercial";
-      }).length
-    ],
-    ["archived", "Archived", clients.length - act.length]
+  // filter pills like Jobs and Leads: tap to turn on, tap again to turn off. Nothing on = every active client.
+  var CF_GROUPS = [
+    ["type", "Type", [["hoa", "HOA"], ["commercial", "Commercial"], ["residential", "Residential"]]],
+    ["show", "Show", [["pastdue", "Past due"], ["nojobs", "No active jobs"], ["archived", "Archived"]]]
   ];
-  defs.forEach(function (s) {
-    var b = el("button", "tab" + (cfilter === s[0] ? " on" : ""), s[1]);
-    b.type = "button";
-    b.appendChild(el("span", null, "(" + s[2] + ")"));
-    b.addEventListener("click", function () {
-      cfilter = s[0];
+  var bar = el("div", "fbar lbar"),
+    any = CF.type.length || CF.show.length;
+  CF_GROUPS.forEach(function (g) {
+    var grp = el("div", "fgrp");
+    grp.appendChild(el("span", "flbl", g[1]));
+    g[2].forEach(function (o) {
+      var on = CF[g[0]].indexOf(o[0]) > -1,
+        n = clients.filter(function (c) {
+          return clientFacet(c, g[0], o[0]);
+        }).length,
+        b = el("button", "tab fpill" + (on ? " on" : ""), o[1]);
+      b.type = "button";
+      b.appendChild(el("span", null, "(" + n + ")"));
+      b.addEventListener("click", function () {
+        var arr = CF[g[0]],
+          k = arr.indexOf(o[0]);
+        if (k > -1) arr.splice(k, 1);
+        else arr.push(o[0]);
+        render();
+      });
+      grp.appendChild(b);
+    });
+    bar.appendChild(grp);
+  });
+  if (any) {
+    var clr = el("button", "tab fpill fclear", "Clear");
+    clr.type = "button";
+    clr.addEventListener("click", function () {
+      CF.type = [];
+      CF.show = [];
       render();
     });
-    tabs.appendChild(b);
-  });
+    bar.lastChild.appendChild(clr);
+  }
+  tabs.appendChild(bar);
   var tb = $("topbtns");
   tb.appendChild(
     btn("+ New client", "btn", function () {
@@ -1497,12 +1573,11 @@ function renderClients() {
     return;
   }
   var shown = clients.filter(function (c) {
-    if (cfilter === "archived") {
-      if (!c.archived) return false;
-    } else {
-      if (c.archived) return false;
-      if (cfilter !== "active" && c.type !== cfilter) return false;
-    }
+    var wantArch = CF.show.indexOf("archived") > -1;
+    if (!!c.archived !== wantArch) return false;
+    if (CF.type.length && CF.type.indexOf(c.type || "residential") < 0) return false;
+    if (CF.show.indexOf("pastdue") > -1 && !clientFacet(c, "show", "pastdue")) return false;
+    if (CF.show.indexOf("nojobs") > -1 && !clientFacet(c, "show", "nojobs")) return false;
     if (!query) return true;
     var addr = clientProps(c.id)
       .map(function (p) {
@@ -1521,7 +1596,7 @@ function renderClients() {
       el(
         "div",
         "empty",
-        clients.length ? "Nothing matches that." : "No clients yet. Add one, import a CSV, or convert a lead."
+        clients.length ? "No clients match these filters." : "No clients yet. Add one, import a CSV, or convert a lead."
       )
     );
     return;
