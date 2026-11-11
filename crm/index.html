@@ -119,16 +119,22 @@ body.printreport,body.printreport #layout,body.printreport main{background:#fff!
 .pprev{position:sticky;top:0;padding-top:30px}.pphd{font-size:.78rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
 .ppwrap{overflow:hidden;border-radius:8px;background:#e9efe6;border:1px solid var(--line)}.ppwrap iframe{display:block;border:0;width:860px;transform-origin:0 0;background:transparent}
 /* the fill-in side of New quote / New invoice is green, so the white boxes stand out */
-/* New quote / New invoice: very light green window; white boxes with green borders */
-.panel.withprev{background:#eef7ec;color:var(--ink)}.panel.withprev .pform{align-self:start}
-.panel.withprev .pform h2,.panel.withprev .pform h3{color:var(--forest)}
-.panel.withprev .pform .f span,.panel.withprev .pform .qe>span{color:#2f4a36}
-.panel.withprev .pform input,.panel.withprev .pform select,.panel.withprev .pform textarea{background:#fff;color:var(--ink);border-color:#b9d3b4}
-.panel.withprev .pform .adjbox{border-color:#b9d3b4;background:#fff}.panel.withprev .pform .adjbox>b{color:var(--forest)}
-.panel.withprev .pform .qe label.o{background:#fff;border-color:#b9d3b4}
-.panel.withprev .pform .qe label.o.on{background:#fff;border-color:var(--forest);box-shadow:0 0 0 2px var(--forest)}.panel.withprev .pform .qe label.o .t small{color:var(--forest)}
-.panel.withprev .pform .qe label.o .t b{color:var(--forest)}
-.panel.withprev .ppwrap{background:#dfeadb;border-color:#c8dcc3}
+/* New quote / New invoice: medium grey window with white text; white boxes */
+.panel.withprev{background:#6b7280;color:#fff}.panel.withprev .pform{align-self:start}
+.panel.withprev .close{color:#fff}.panel.withprev .pphd{color:#f3f4f6}
+.panel.withprev .pform h2,.panel.withprev .pform h3,.panel.withprev .pform .adjbox>b{color:#fff}
+.panel.withprev .pform .f span,.panel.withprev .pform .qe>span{color:#fff}
+.panel.withprev .pform .note{color:#eef0f2}
+.panel.withprev .pform details>summary{color:#fff}
+.panel.withprev .pform input,.panel.withprev .pform select,.panel.withprev .pform textarea{background:#fff;color:var(--ink);border-color:#4b5563}
+.panel.withprev .pform .adjbox{border-color:rgba(255,255,255,.4);background:rgba(255,255,255,.08)}
+.panel.withprev .pform .adjbox .fxbox{background:rgba(255,255,255,.14);color:#fff}
+.panel.withprev .pform .qe label.o{background:#fff;border-color:#fff}
+.panel.withprev .pform .qe label.o.on{background:#fff;border-color:var(--forest);box-shadow:0 0 0 2px var(--forest)}
+.panel.withprev .pform .qe label.o .t b,.panel.withprev .pform .qe label.o .t small{color:var(--forest)}
+.panel.withprev .pform .btn{background:#fff;color:var(--forest);border-color:#fff}
+.panel.withprev .pform .pcard{color:var(--ink)}.panel.withprev .pform .pcard b,.panel.withprev .pform .pcard h3{color:var(--forest)}.panel.withprev .pform .pcard .f span,.panel.withprev .pform .pcard .note{color:var(--muted)}
+.panel.withprev .ppwrap{background:#e5e7eb;border-color:rgba(255,255,255,.35)}
 @media(max-width:1000px){.panel.withprev{grid-template-columns:minmax(0,1fr)}.panel.withprev>*{min-width:0}.pprev{position:static;padding-top:6px}}
 .panel h2{margin:0 0 2px;color:var(--forest)}
 .close{position:absolute;right:12px;top:10px;background:none;border:0;font-size:1.8rem;cursor:pointer;color:var(--muted)}
@@ -344,7 +350,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=112"></script>
+<script src="app.js?v=113"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
