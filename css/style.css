@@ -674,3 +674,14 @@ footer .brand.fbrand img.wword{width:100%;max-width:280px;min-width:170px}
 .pmore{display:grid;grid-template-columns:minmax(0,290px) minmax(0,1fr);gap:40px;align-items:center;max-width:1060px;margin:0 auto}
 .pmore .pdesk{margin:0}
 @media (max-width:860px){.pmore{grid-template-columns:1fr}}
+/* Quote page: portfolio photos fill the wide side margins */
+.qside{display:none}
+@media (min-width:1640px){
+.qwide{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1240px) minmax(0,1fr);gap:24px;align-items:center;padding:0 24px}
+.qwide>.wrap{margin:0;width:100%}
+.qside{display:flex;flex-direction:column;gap:18px;align-items:center;justify-content:center}
+.qside img{display:block;width:100%;max-width:300px;height:auto;aspect-ratio:4/3;object-fit:cover;border-radius:10px;border:5px solid #fff;box-shadow:0 10px 26px rgba(27,85,43,.18)}
+.qside.ql img:nth-child(odd){transform:rotate(-2deg)}.qside.ql img:nth-child(even){transform:rotate(2deg)}
+.qside.qr img:nth-child(odd){transform:rotate(2deg)}.qside.qr img:nth-child(even){transform:rotate(-2deg)}
+.qside a{font-weight:600;color:var(--forest)}
+}
