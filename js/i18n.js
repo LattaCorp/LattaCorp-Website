@@ -1,5 +1,11 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"The all-in-one plan: everything in Premier, plus tree trimming about twice a year and mulching once a year.": "El plan todo en uno: todo lo de Premier, más poda de árboles unas dos veces al año y mulch una vez al año.",
+"Mulching once a year": "Mulch una vez al año",
+"Our Elite plan includes tree trimming about two times a year and mulching once a year, which suits property managers and commercial properties.": "Nuestro plan Elite incluye poda de árboles unas dos veces al año y mulch una vez al año, ideal para administradores de propiedades y propiedades comerciales.",
+"Our Elite plan includes tree trimming about two times a year and mulching once a year, which suits rental and commercial properties.": "Nuestro plan Elite incluye poda de árboles unas dos veces al año y mulch una vez al año, ideal para propiedades de alquiler y comerciales.",
+"Fresh mulch in your beds once a year": "Mulch fresco en sus jardineras una vez al año",
+"Mulching is typically done once a year, and it is included with our Elite plan.": "El mulch normalmente se aplica una vez al año, y está incluido en nuestro plan Elite.",
 "Meet our new invoice": "Conozca nuestra nueva factura",
 "We redesigned our invoices to be easier to read. Here is the same account, before and after.": "Rediseñamos nuestras facturas para que sean más fáciles de leer. Aquí está la misma cuenta, antes y después.",
 "Now": "Ahora",
