@@ -166,6 +166,8 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 .qtip{width:22px;height:22px;border-radius:50%;border:0;background:var(--forest,#1f5130);color:#fff;font-weight:800;font-size:.8rem;line-height:22px;padding:0;cursor:pointer;flex:none}
 .qhelp{margin-top:8px;padding:10px 12px;border-radius:10px;background:#eef6ec;border-left:4px solid var(--forest,#1f5130);font-size:.88rem;line-height:1.45}
 .qhelp b{display:block;margin-bottom:2px}
+.qe{position:relative}.qhelp.pop{position:absolute;left:0;right:0;top:calc(100% - 6px);z-index:40;margin:0;background:#fff;color:var(--ink);box-shadow:0 8px 28px rgba(15,58,27,.22);pointer-events:none}
+.f.short input{max-width:120px}
 .sec{margin-top:18px;padding-top:12px;border-top:1px solid var(--line)}
 .sec h3{margin:0 0 8px;font-size:1rem;color:var(--forest);display:flex;justify-content:space-between;align-items:center;gap:8px}
 .pcard{border:1px solid var(--line);border-radius:10px;padding:10px 12px;margin-bottom:8px;background:#fbfdfb}
@@ -342,7 +344,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=111"></script>
+<script src="app.js?v=112"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

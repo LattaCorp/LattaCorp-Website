@@ -16299,9 +16299,10 @@ function openEstimateForm(cid) {
       })
     )
   );
-  var ttl = fld("Job Title (shows under QUOTE or ESTIMATE, for example: Spring cleanup and mulch)", "text", ""),
-    scp = fld("Notes & Terms the client will see (optional, shows near the bottom)", "textarea", ""),
+  var ttl = fld("Job Title", "text", ""),
+    scp = fld("Notes & Terms (optional)", "textarea", ""),
     vd = fld("Valid for (days)", "number", "30");
+  vd.classList.add("short");
   p.appendChild(cs);
   // which property the work is for (shows as the service address on the estimate); blank = their Main address
   var pps = propPicker(cs, "Property (which property this estimate is for)", "Main address");
@@ -16561,7 +16562,7 @@ function openEstimate(id) {
         body.appendChild(ans);
       }
       var ttl = fld("Job Title", "text", e.title || ""),
-        scp = fld("Notes & Terms the client will see", "textarea", e.scope || ""),
+        scp = fld("Notes & Terms (optional)", "textarea", e.scope || ""),
         vu = fld("Valid until", "date", e.valid_until || ""),
         eps = clientProps(e.client_id),
         pf = fld(
@@ -16868,7 +16869,7 @@ var QE_HELP = {
 function qeChoice(val) {
   var w = el("div", "qe"),
     cur = val === "estimate" ? "estimate" : "quote",
-    help = el("div", "qhelp"),
+    help = el("div", "qhelp pop"),
     shown = "";
   help.hidden = true;
   w.appendChild(el("span", null, "Quote or Estimate?"));
@@ -16893,11 +16894,27 @@ function qeChoice(val) {
     var q = el("button", "qtip", "?");
     q.type = "button";
     q.setAttribute("aria-label", "When to use a " + k);
+    // the explanation pops up over the form while you point at (or tap) the "?"; nothing moves
+    function show(on) {
+      shown = on ? k : "";
+      help.innerHTML = on ? QE_HELP[k] : "";
+      help.hidden = !on;
+    }
+    q.addEventListener("mouseenter", function () {
+      show(true);
+    });
+    q.addEventListener("mouseleave", function () {
+      show(false);
+    });
+    q.addEventListener("focus", function () {
+      show(true);
+    });
+    q.addEventListener("blur", function () {
+      show(false);
+    });
     q.addEventListener("click", function (ev) {
       ev.preventDefault();
-      shown = shown === k ? "" : k;
-      help.innerHTML = shown ? QE_HELP[k] : "";
-      help.hidden = !shown;
+      show(shown !== k);
     });
     l.appendChild(q);
     opts.appendChild(l);
