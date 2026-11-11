@@ -386,6 +386,7 @@ td:last-child{white-space:pre-wrap;word-break:break-word}
 .weekgrid .daycol{min-height:160px}
 /* on a computer, drag stops to reorder; the arrows are for phones */
 @media(hover:hover) and (pointer:fine){.vcard .acts .mv{display:none}}
+.toolrow{display:grid;grid-template-columns:150px 1fr;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid rgba(127,127,127,.25)}.toolrow .btn{text-align:center}.toolrow .note{margin:0}
 .weekgrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;margin-top:8px}
 .daycol{background:#fff;border:1px solid var(--line);border-radius:10px;padding:6px;min-height:120px}.daycol.today{border-color:var(--forest);box-shadow:0 0 0 2px rgba(27,85,43,.18)}.daycol.wkend{background:#fafcf9}
 .dayhd{display:block;width:100%;text-align:left;background:var(--mint);border:0;border-radius:7px;padding:6px 8px;margin-bottom:6px;cursor:pointer;color:var(--forest)}.dayhd b{display:block}.dayhd span{font-size:.78rem;color:var(--muted)}
@@ -555,7 +556,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=171"></script>
+<script src="app.js?v=172"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

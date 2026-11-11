@@ -14603,37 +14603,20 @@ function renderBilling() {
     });
     tabs.appendChild(b);
   });
-  if (bfilter !== "payments") {
-    $("topbtns").appendChild(
-      btn("New invoice", "btn", function () {
-        openInvoiceForm(null);
-      })
-    );
-    $("topbtns").appendChild(document.createTextNode(" "));
-    $("topbtns").appendChild(customInvoiceLink("btn alt"));
-    $("topbtns").appendChild(document.createTextNode(" "));
-    $("topbtns").appendChild(
-      btn("Past invoice", "btn alt", function () {
-        openPastInvoice(null);
-      })
-    );
-    $("topbtns").appendChild(document.createTextNode(" "));
-    $("topbtns").appendChild(
-      btn("Customer payment", "btn alt", function () {
-        openPayment(null);
-      })
-    );
-    $("topbtns").appendChild(document.createTextNode(" "));
-    $("topbtns").appendChild(btn("Import payments", "btn alt", openPayImport));
-    $("topbtns").appendChild(document.createTextNode(" "));
-    $("topbtns").appendChild(
-      btn("Import history", "btn alt", function () {
-        openHistImport(null);
-      })
-    );
-    $("topbtns").appendChild(document.createTextNode(" "));
-  }
-  $("topbtns").appendChild(btn("Price calculator", "btn alt", openCalc));
+  // the everyday options; the one-time and rarely used ones live under Tools
+  $("topbtns").appendChild(
+    btn("+ New invoice", "btn", function () {
+      openInvoiceForm(null);
+    })
+  );
+  $("topbtns").appendChild(document.createTextNode(" "));
+  $("topbtns").appendChild(
+    btn("Record payment", "btn alt", function () {
+      openPayment(null);
+    })
+  );
+  $("topbtns").appendChild(document.createTextNode(" "));
+  $("topbtns").appendChild(btn("Tools", "btn alt", openBillTools));
   $("topbtns").appendChild(document.createTextNode(" "));
   $("topbtns").appendChild(btn("Billing settings", "btn alt", openBizSettings));
   var list = $("list");
@@ -15760,6 +15743,31 @@ function customInvoiceLink(cls) {
     cls,
     "Fill-in-the-blanks invoice PDF. Not saved in Foreman, so it won't show in balances or the portal."
   );
+}
+
+/* ---- Billing tools: the things you only need now and then ---- */
+function openBillTools() {
+  var p = panel();
+  p.appendChild(el("h2", null, "Billing tools"));
+  p.appendChild(el("p", "note", "Things you only need now and then."));
+  [
+    ["Past invoice", "Add an old invoice that was already sent and paid, so it shows in the client's history.", function () {
+      openPastInvoice(null);
+    }],
+    ["Import payments", "Bring in a list of payments from a spreadsheet (like the GroundsKeeper Pro export).", openPayImport],
+    ["Import history", "Bring in a client's old invoices and payments from the old software.", function () {
+      openHistImport(null);
+    }]
+  ].forEach(function (t) {
+    var row = el("div", "toolrow");
+    row.appendChild(btn(t[0], "btn alt", t[2]));
+    row.appendChild(el("div", "note", t[1]));
+    p.appendChild(row);
+  });
+  var row = el("div", "toolrow");
+  row.appendChild(customInvoiceLink("btn alt"));
+  row.appendChild(el("div", "note", "A blank fill-in invoice PDF to print or fill out by hand. It isn't saved in Foreman."));
+  p.appendChild(row);
 }
 
 /* ---- billing settings ---- */
