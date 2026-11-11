@@ -1173,7 +1173,7 @@ function clientEstimatesSection(c) {
 }
 
 /* ---- Fill-in-the-blanks PDFs in the invoice design (made by tools/build_custom_pdfs.py), for documents made by
-   hand: Custom invoice (Billing) and New Estimate/Quote (Jobs). Nothing typed into them is saved here. ---- */
+   hand: Custom invoice (Billing). Nothing typed into it is saved here. ---- */
 function customDocLink(label, file, cls, tip) {
   var a = el("a", cls, label);
   a.href = "/forms/" + file;
@@ -1188,14 +1188,6 @@ function customInvoiceLink(cls) {
     "custom-invoice.pdf",
     cls,
     "Fill-in-the-blanks invoice PDF. Not saved in Foreman, so it won't show in balances or the portal."
-  );
-}
-function customEstimateLink(cls) {
-  return customDocLink(
-    "Custom estimate",
-    "custom-estimate.pdf",
-    cls,
-    "Fill-in-the-blanks estimate/quote PDF. Not saved in Foreman."
   );
 }
 

@@ -155,8 +155,6 @@ function renderJobs() {
     })
   );
   tb.appendChild(document.createTextNode(" "));
-  tb.appendChild(customEstimateLink("btn alt"));
-  tb.appendChild(document.createTextNode(" "));
   tb.appendChild(btn("Services", "btn alt", openServices));
   var list = $("list");
   list.textContent = "";
