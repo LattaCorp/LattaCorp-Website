@@ -1,5 +1,8 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"See your visits, invoices and balance any time.": "Vea sus visitas, facturas y saldo cuando quiera.",
+"Clean lines right up to the water.": "Líneas limpias hasta la orilla del agua.",
+"Entrances, clubhouses and shared grounds.": "Entradas, casas club y áreas compartidas.",
 "Your own client portal": "Su propio portal de clientes",
 "Lake and pond banks": "Orillas de lagos y estanques",
 "Service requests online": "Solicitudes de servicio en línea",
