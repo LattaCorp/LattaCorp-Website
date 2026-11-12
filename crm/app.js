@@ -874,8 +874,14 @@ function gearify() {
     g.bs.push(b);
   });
   groups.forEach(function (g) {
-    var w = gearMenu();
-    g.par.insertBefore(w, g.bs[0]);
+    var w = gearMenu(),
+      card = g.par.closest ? g.par.closest(".pcard,.rcard,.row,.card") : null;
+    if (card && !card.querySelector(":scope > .gearwrap.gcorner")) {
+      // the gear sits in the top right corner of the card it belongs to
+      w.classList.add("gcorner");
+      card.classList.add("hasgear");
+      card.insertBefore(w, card.firstChild);
+    } else g.par.insertBefore(w, g.bs[0]);
     g.bs.forEach(function (b) {
       w.menu.appendChild(b);
     });
@@ -2318,6 +2324,35 @@ function drawProps(c, holder) {
   }
   ps.forEach(function (pr) {
     var card = el("div", "pcard");
+    // the newest photo saved for this property (or for the client, when they have just one property)
+    var pph =
+      typeof photos !== "undefined" && !photoErr
+        ? photos
+            .filter(function (x) {
+              return (
+                x.kind !== "receipt_todo" &&
+                x.kind !== "receipt" &&
+                (x.property_id === pr.id || (ps.length === 1 && !x.property_id && x.client_id === c.id))
+              );
+            })
+            .sort(function (x, y) {
+              return String(y.created_at) < String(x.created_at) ? -1 : 1;
+            })
+        : [];
+    if (pph.length) {
+      card.classList.add("haspic");
+      var pim = document.createElement("img");
+      pim.className = "proppic";
+      pim.alt = "Photo of " + pr.address;
+      pim.title = "Open photos of this property";
+      pim.addEventListener("click", function () {
+        openLightbox(pph, 0);
+      });
+      card.appendChild(pim);
+      signPaths([pph[0].path]).then(function () {
+        if (pcache[pph[0].path]) pim.src = pcache[pph[0].path].url;
+      });
+    }
     card.appendChild(el("b", null, (pr.label ? pr.label + ": " : "") + pr.address));
     if (pr.notes) card.appendChild(el("div", "note", pr.notes));
     var a = el("div", "acts"),

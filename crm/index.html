@@ -603,6 +603,14 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 .close:hover{background:rgba(0,0,0,.08)}
 #rviewer .rvx{width:40px;height:40px;border-radius:10px}#rviewer .rvx:hover{background:rgba(255,255,255,.15)}
 #invview{cursor:default}
+/* gear in the top right corner of its card */
+.hasgear{position:relative;padding-right:46px}
+.gearwrap.gcorner{position:absolute;top:8px;right:8px}
+.popl .popgear{float:none;position:absolute;top:14px;right:12px;margin:0}.popl{position:relative}.popl h2{margin-right:36px}
+/* property photo in the address card */
+.pcard.haspic{display:grid;grid-template-columns:92px minmax(0,1fr);column-gap:12px;align-items:start}
+.pcard.haspic>.proppic{grid-row:1/span 4;width:92px;height:72px;object-fit:cover;border-radius:8px;background:#e8efe6;cursor:zoom-in}
+.pcard.haspic>:not(.proppic):not(.gearwrap){grid-column:2}
 </style>
 </head>
 <body>
@@ -641,7 +649,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=194"></script>
+<script src="app.js?v=195"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

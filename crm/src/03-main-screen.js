@@ -332,8 +332,14 @@ function gearify() {
     g.bs.push(b);
   });
   groups.forEach(function (g) {
-    var w = gearMenu();
-    g.par.insertBefore(w, g.bs[0]);
+    var w = gearMenu(),
+      card = g.par.closest ? g.par.closest(".pcard,.rcard,.row,.card") : null;
+    if (card && !card.querySelector(":scope > .gearwrap.gcorner")) {
+      // the gear sits in the top right corner of the card it belongs to
+      w.classList.add("gcorner");
+      card.classList.add("hasgear");
+      card.insertBefore(w, card.firstChild);
+    } else g.par.insertBefore(w, g.bs[0]);
     g.bs.forEach(function (b) {
       w.menu.appendChild(b);
     });
