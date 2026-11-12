@@ -611,6 +611,9 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 .pcard.haspic{display:grid;grid-template-columns:92px minmax(0,1fr);column-gap:12px;align-items:start}
 .pcard.haspic>.proppic{grid-row:1/span 4;width:92px;height:72px;object-fit:cover;border-radius:8px;background:#e8efe6;cursor:zoom-in}
 .pcard.haspic>:not(.proppic):not(.gearwrap){grid-column:2}
+.popstreet{display:block;width:100%;height:120px;object-fit:cover;border-radius:8px;margin:2px 0 8px;cursor:pointer;background:#e8efe6}
+.streettest{display:block;width:100%;max-width:400px;border-radius:8px;margin-top:6px;cursor:pointer}
+.pcard.haspic>.proppic{cursor:pointer}
 </style>
 </head>
 <body>
@@ -649,7 +652,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=195"></script>
+<script src="app.js?v=197"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

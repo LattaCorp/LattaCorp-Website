@@ -148,6 +148,10 @@ function renderClients() {
   );
   tb.appendChild(document.createTextNode(" "));
   tb.appendChild(btn("Import CSV", "btn alt", openImport));
+  if (isOwner()) {
+    tb.appendChild(document.createTextNode(" "));
+    tb.appendChild(btn("Street View photos", "btn alt", openStreetSettings));
+  }
   var list = $("list");
   list.textContent = "";
   if (clientsErr) {
@@ -668,6 +672,13 @@ function drawProps(c, holder) {
         if (pcache[pph[0].path]) pim.src = pcache[pph[0].path].url;
       });
     }
+    else if (streetUrl(pr.address)) {
+      // no photo of our own yet: Google Street View fills in
+      card.classList.add("haspic");
+      card.appendChild(streetImg(pr.address, "proppic", function () {
+        card.classList.remove("haspic");
+      }));
+    }
     card.appendChild(el("b", null, (pr.label ? pr.label + ": " : "") + pr.address));
     if (pr.notes) card.appendChild(el("div", "note", pr.notes));
     var a = el("div", "acts"),
@@ -1150,4 +1161,93 @@ function openImport() {
     };
     rd.readAsText(f);
   });
+}
+
+/* ---- Street View photos of properties (Google Maps key saved in the business settings) ---- */
+function streetUrl(addr, w, h) {
+  var k = typeof bizv === "function" ? bizv("maps_key", "") : "";
+  if (!k || !addr) return "";
+  return (
+    "https://maps.googleapis.com/maps/api/streetview?size=" +
+    (w || 400) +
+    "x" +
+    (h || 300) +
+    "&fov=80&source=outdoor&return_error_code=true&location=" +
+    encodeURIComponent(addr) +
+    "&key=" +
+    encodeURIComponent(k)
+  );
+}
+function streetImg(addr, cls, onMissing) {
+  var im = document.createElement("img");
+  im.className = cls;
+  im.alt = "Street View of " + addr;
+  im.title = "Open in Google Maps";
+  im.loading = "lazy";
+  im.addEventListener("error", function () {
+    if (im.parentNode) im.parentNode.removeChild(im);
+    if (onMissing) onMissing();
+  });
+  im.addEventListener("click", function () {
+    window.open(mapsUrl(addr), "_blank", "noopener");
+  });
+  im.src = streetUrl(addr);
+  return im;
+}
+function openStreetSettings() {
+  var p = panel();
+  p.appendChild(el("h2", null, "Street View photos"));
+  p.appendChild(
+    el(
+      "p",
+      "note",
+      "Shows a Google Street View photo on each property that has no photo of your own. Paste your Google Maps key here. Leave it empty to turn Street View photos off."
+    )
+  );
+  var k = fld("Google Maps key", "text", bizv("maps_key", ""));
+  k.input.autocomplete = "off";
+  k.input.spellcheck = false;
+  p.appendChild(k);
+  var test = el("div");
+  test.style.marginTop = "10px";
+  p.appendChild(test);
+  var a = el("div", "actions"),
+    s = btn("Save", "btn", function () {
+      s.disabled = true;
+      (biz
+        ? sb.from("business").update({ maps_key: k.input.value.trim() }).eq("id", biz.id)
+        : sb.from("business").upsert({ id: 1, maps_key: k.input.value.trim() })
+      )
+        .select()
+        .single()
+        .then(function (r) {
+          s.disabled = false;
+          if (r.error || !r.data) {
+            alert("Could not save the key.");
+            return;
+          }
+          biz = r.data;
+          test.textContent = "";
+          if (!biz.maps_key) {
+            test.appendChild(el("div", "note", "Saved. Street View photos are off."));
+            return;
+          }
+          var ad = (props[0] && props[0].address) || "Kissimmee, FL";
+          test.appendChild(el("div", "note", "Saved. Test photo for " + ad + ":"));
+          test.appendChild(
+            streetImg(ad, "streettest", function () {
+              test.appendChild(
+                el(
+                  "div",
+                  "note",
+                  "Google did not return a photo. Check that the key is right, that the Street View Static API is turned on, and that billing is set up on the Google account."
+                )
+              );
+            })
+          );
+        });
+    });
+  a.appendChild(s);
+  a.appendChild(btn("Close", "btn alt", closeDetail));
+  p.appendChild(a);
 }

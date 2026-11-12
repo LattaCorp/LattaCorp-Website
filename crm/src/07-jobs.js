@@ -383,6 +383,7 @@ function openJob(id) {
     popLine(who, "Email", c.email, c.email ? "mailto:" + c.email : "");
   }
   if (pr) popLine(who, "Address", pr.address, mapsUrl(pr.address));
+  if (pr && streetUrl(pr.address)) who.insertBefore(streetImg(pr.address, "popstreet"), who.children[1] || null);
   if (c) {
     var cr = contactRow(c.phone || c.phone2, c.email);
     cr.classList.add("qacts");
