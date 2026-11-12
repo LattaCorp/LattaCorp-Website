@@ -805,6 +805,7 @@ function panel() {
   var p = $("panel");
   p.textContent = "";
   p.classList.remove("withprev");
+  p.classList.remove("pop");
   detailFull(false);
   optMark(null);
   lpFrame = null;
@@ -813,6 +814,65 @@ function panel() {
   p.scrollTop = 0;
   $("detail").scrollTop = 0;
   return p;
+}
+/* Pop-up layout for a client or a job: name and contact box on the left, tabs on the right. */
+function popPanel() {
+  var p = panel();
+  detailFull(true);
+  p.classList.add("pop");
+  var L = el("div", "popl"),
+    R = el("div", "popr");
+  p.appendChild(L);
+  p.appendChild(R);
+  return { p: p, L: L, R: R };
+}
+function popLine(box, label, value, href) {
+  if (!value) return;
+  var r = el("div", "popln");
+  r.appendChild(el("span", null, label));
+  if (href) {
+    var a = el("a", null, value);
+    a.href = href;
+    if (/^https?:/.test(href)) {
+      a.target = "_blank";
+      a.rel = "noopener";
+    }
+    r.appendChild(a);
+  } else r.appendChild(el("b", null, value));
+  box.appendChild(r);
+}
+function popTabs(R, TABS, cur, onPick) {
+  var bar = el("div", "ctabs"),
+    panes = {};
+  if (
+    !TABS.some(function (t) {
+      return t[0] === cur;
+    })
+  )
+    cur = TABS[0][0];
+  TABS.forEach(function (t) {
+    var b = el("button", t[0] === cur ? "on" : "", t[1]);
+    b.type = "button";
+    b.addEventListener("click", function () {
+      if (onPick) onPick(t[0]);
+      [].forEach.call(bar.children, function (x) {
+        x.classList.toggle("on", x === b);
+      });
+      Object.keys(panes).forEach(function (k) {
+        panes[k].hidden = k !== t[0];
+      });
+    });
+    bar.appendChild(b);
+    panes[t[0]] = el("div", "ctab");
+    panes[t[0]].hidden = t[0] !== cur;
+  });
+  R.appendChild(bar);
+  var body = el("div", "popbody");
+  TABS.forEach(function (t) {
+    body.appendChild(panes[t[0]]);
+  });
+  R.appendChild(body);
+  return panes;
 }
 /* Forms in the side panel: Enter (or finishing a drop-down or a full MM/DD/YYYY date) jumps to the next field. */
 (function () {
@@ -1778,15 +1838,35 @@ var clientTab = {};
 function openClient(id) {
   var c = byId(clients, id);
   if (!c) return;
-  var p = panel();
+  var pp = popPanel(),
+    p = pp.p,
+    L = pp.L;
   p.classList.add("qpanel");
-  p.appendChild(el("h2", null, c.name + (c.company ? " · " + c.company : "")));
+  L.appendChild(el("h2", null, c.name));
+  if (c.company) L.appendChild(el("div", "popsub", c.company));
   var hd = el("div", "qhead");
   if (c.account_no) hd.appendChild(el("span", "qnum", "Account " + c.account_no));
   hd.appendChild(el("span", "qst ty-" + (c.type || "residential"), tlabel(c.type)));
-  if (c.nickname) hd.appendChild(el("span", "note", 'Goes by "' + c.nickname + '"'));
   if (c.archived) hd.appendChild(el("span", "qst no", "Archived"));
-  p.appendChild(hd);
+  L.appendChild(hd);
+  if (c.nickname) L.appendChild(el("div", "note", 'Goes by "' + c.nickname + '"'));
+  var mp = clientProps(c.id)[0],
+    cb = el("div", "popbox");
+  cb.appendChild(el("h4", null, "Contact"));
+  popLine(cb, "Phone", c.phone, c.phone ? "tel:" + digits(c.phone) : "");
+  popLine(cb, "Phone 2", c.phone2, c.phone2 ? "tel:" + digits(c.phone2) : "");
+  popLine(cb, "Email", c.email, c.email ? "mailto:" + c.email : "");
+  popLine(cb, "Address", mp && mp.address, mp && mp.address ? mapsUrl(mp.address) : "");
+  if (!c.phone && !c.phone2 && !c.email && !(mp && mp.address)) cb.appendChild(el("div", "note", "No contact details yet."));
+  var cr = contactRow(c.phone || c.phone2, c.email);
+  cr.classList.add("qacts");
+  if (cr.firstChild) cb.appendChild(cr);
+  L.appendChild(cb);
+  L.appendChild(
+    btn("Edit details", "btn alt sm", function () {
+      openClientForm(c);
+    })
+  );
   // three numbers
   var bal = billErr ? 0 : clientBal(c.id) - (typeof creditOf === "function" ? creditOf(c.id) : 0),
     nv = visits
@@ -1810,51 +1890,24 @@ function openClient(id) {
     d.appendChild(el("b", x[2], x[1]));
     stats.appendChild(d);
   });
-  p.appendChild(stats);
-  var cr = contactRow(c.phone || c.phone2, c.email);
-  cr.classList.add("qacts");
-  var mp = clientProps(c.id)[0];
-  if (mp && mp.address) {
-    var ma = el("a", "btn alt", "Map");
-    ma.href = mapsUrl(mp.address);
-    ma.target = "_blank";
-    ma.rel = "noopener";
-    cr.appendChild(ma);
-  }
-  if (cr.firstChild) cr.firstChild.className = "btn";
-  p.appendChild(cr);
-  // tabs
-  var TABS = [
+  var panes = popTabs(
+    pp.R,
+    [
       ["overview", "Overview"],
+      ["jobs", "Jobs & quotes"],
       ["billing", "Billing"],
       ["history", "History"],
-      ["photos", "Photos"]
+      ["photos", "Photos"],
+      ["account", "Account"]
     ],
-    cur = clientTab[c.id] || "overview",
-    bar = el("div", "ctabs"),
-    panes = {};
-  TABS.forEach(function (t) {
-    var b = el("button", t[0] === cur ? "on" : "", t[1]);
-    b.type = "button";
-    b.addEventListener("click", function () {
-      clientTab[c.id] = t[0];
-      [].forEach.call(bar.children, function (x) {
-        x.classList.toggle("on", x === b);
-      });
-      Object.keys(panes).forEach(function (k) {
-        panes[k].hidden = k !== t[0];
-      });
-    });
-    bar.appendChild(b);
-    panes[t[0]] = el("div", "ctab");
-    panes[t[0]].hidden = t[0] !== cur;
-  });
-  p.appendChild(bar);
-  TABS.forEach(function (t) {
-    p.appendChild(panes[t[0]]);
-  });
+    clientTab[c.id] || "overview",
+    function (k) {
+      clientTab[c.id] = k;
+    }
+  );
   // Overview
   var ov = panes.overview;
+  ov.appendChild(stats);
   var sec = el("div", "sec"),
     h = el("h3", null, "Properties"),
     addp = btn("+ Add property", "btn alt sm", function () {
@@ -1866,8 +1919,8 @@ function openClient(id) {
   var holder = el("div");
   sec.appendChild(holder);
   drawProps(c, holder);
-  ov.appendChild(clientJobsSection(c));
-  if (!estErr) ov.appendChild(clientEstimatesSection(c));
+  panes.jobs.appendChild(clientJobsSection(c));
+  if (!estErr) panes.jobs.appendChild(clientEstimatesSection(c));
   ov.appendChild(clientContactsSection(c));
   var ls = leads.filter(function (l) {
     return l.client_id === c.id;
@@ -1912,15 +1965,21 @@ function openClient(id) {
     t.appendChild(tr);
   });
   det.appendChild(t);
-  ov.appendChild(det);
+  panes.account.appendChild(det);
+  if (c.notes) {
+    var ns = el("div", "sec");
+    ns.appendChild(el("h3", null, "Notes"));
+    var nb = el("div", "pcard", c.notes);
+    nb.style.whiteSpace = "pre-wrap";
+    ns.appendChild(nb);
+    ov.appendChild(ns);
+  }
   // Billing, History, Photos
   panes.billing.appendChild(clientBillingSection(c));
   panes.history.appendChild(historySection(c));
   panes.photos.appendChild(clientPhotosSection(c));
   // More: portal, archive, delete
-  var more = document.createElement("details");
-  more.className = "qmore";
-  more.appendChild(el("summary", null, "More (portal, archive, delete)"));
+  var more = panes.account;
   more.appendChild(clientPortalSection(c));
   var mr = el("div", "qacts");
   mr.style.marginTop = "10px";
@@ -1966,7 +2025,6 @@ function openClient(id) {
     })
   );
   more.appendChild(mr);
-  p.appendChild(more);
 }
 /* ---- other contacts on a client (spouse, board members...) ---- */
 function clientCC(id) {
@@ -3551,29 +3609,24 @@ function renderJobs() {
 }
 
 /* ---- job detail ---- */
+var jobTab = {};
 function openJob(id) {
   var j = byId(jobs, id);
   if (!j) return;
   var c = byId(clients, j.client_id),
     pr = byId(props, j.property_id),
-    p = panel();
-  p.appendChild(el("h2", null, j.title));
-  p.appendChild(
-    el(
-      "div",
-      "note",
-      flabel(j.frequency) +
-        " · " +
-        money(j.price) +
-        " per visit · " +
-        (j.status === "active" ? "Active" : j.status === "paused" ? "Paused" : "Ended") +
-        " · starts " +
-        dshort(j.start_date) +
-        (j.end_date ? " · ends " + dshort(j.end_date) : "")
-    )
+    pp = popPanel(),
+    p = pp.p,
+    L = pp.L;
+  L.appendChild(el("h2", null, j.title));
+  var hd = el("div", "qhead");
+  hd.appendChild(
+    el("span", "qst " + (j.status === "active" ? "ok" : j.status === "paused" ? "wait" : "no"), j.status === "active" ? "Active" : j.status === "paused" ? "Paused" : "Ended")
   );
-  var who = el("div", "pcard");
-  who.style.marginTop = "12px";
+  hd.appendChild(el("span", "qnum", flabel(j.frequency) + " · " + money(j.price) + " per visit"));
+  L.appendChild(hd);
+  var who = el("div", "popbox");
+  who.appendChild(el("h4", null, "Client"));
   if (c) {
     var cl = el("button", "link", c.name);
     cl.type = "button";
@@ -3581,24 +3634,49 @@ function openJob(id) {
       openClient(c.id);
     });
     who.appendChild(cl);
+    popLine(who, "Phone", c.phone || c.phone2, c.phone || c.phone2 ? "tel:" + digits(c.phone || c.phone2) : "");
+    popLine(who, "Email", c.email, c.email ? "mailto:" + c.email : "");
   }
-  if (pr) {
-    var ad = el("div", null, pr.address);
-    who.appendChild(ad);
-    if (pr.notes) who.appendChild(el("div", "note", pr.notes));
-    var m = el("a", "btn alt sm", "Map");
-    m.href = mapsUrl(pr.address);
-    m.target = "_blank";
-    m.rel = "noopener";
-    m.style.marginTop = "6px";
-    who.appendChild(m);
+  if (pr) popLine(who, "Address", pr.address, mapsUrl(pr.address));
+  if (c) {
+    var cr = contactRow(c.phone || c.phone2, c.email);
+    cr.classList.add("qacts");
+    if (cr.firstChild) who.appendChild(cr);
   }
-  p.appendChild(who);
-  if (j.instructions) {
-    var ins = el("div", "note", "Instructions: " + j.instructions);
-    ins.style.cssText = "margin-top:8px;white-space:pre-wrap";
-    p.appendChild(ins);
-  }
+  L.appendChild(who);
+  var panes = popTabs(
+    pp.R,
+    [
+      ["visits", "Upcoming visits"],
+      ["history", "History"],
+      ["details", "Details"]
+    ],
+    jobTab[j.id] || "visits",
+    function (k) {
+      jobTab[j.id] = k;
+    }
+  );
+  var dt = document.createElement("table");
+  [
+    ["How often", flabel(j.frequency)],
+    ["Price", money(j.price) + " per visit"],
+    ["Starts", dshort(j.start_date)],
+    ["Ends", j.end_date ? dshort(j.end_date) : ""],
+    ["Property notes", pr && pr.notes],
+    ["Instructions", j.instructions]
+  ].forEach(function (r) {
+    if (!r[1]) return;
+    var tr = document.createElement("tr");
+    tr.appendChild(el("td", null, r[0]));
+    var td = el("td", null, r[1]);
+    td.style.whiteSpace = "pre-wrap";
+    tr.appendChild(td);
+    dt.appendChild(tr);
+  });
+  var ds = el("div", "sec");
+  ds.appendChild(el("h3", null, "Job details"));
+  ds.appendChild(dt);
+  panes.details.appendChild(ds);
   var acts = el("div", "contact");
   acts.appendChild(
     btn("Edit", "btn alt sm", function () {
@@ -3629,10 +3707,9 @@ function openJob(id) {
         setJobStatus(j, "active");
       })
     );
-  p.appendChild(acts);
-  var sec = el("div", "sec");
-  sec.appendChild(el("h3", null, "Visits"));
-  p.appendChild(sec);
+  L.appendChild(acts);
+  var sec = panes.visits,
+    hsec = panes.history;
   var t = today(),
     mine = visits
       .filter(function (v) {
@@ -3645,14 +3722,15 @@ function openJob(id) {
       .filter(function (v) {
         return v.scheduled_date >= t || v.status === "scheduled";
       })
-      .slice(0, 8),
+      .slice(0, 12),
     past = mine
       .filter(function (v) {
         return upc.indexOf(v) < 0;
       })
       .reverse()
-      .slice(0, 6);
-  if (!upc.length && !past.length) sec.appendChild(el("div", "note", "No visits yet."));
+      .slice(0, 30);
+  if (!upc.length) sec.appendChild(el("div", "note", "No upcoming visits."));
+  if (!past.length) hsec.appendChild(el("div", "note", "No past visits yet."));
   function again() {
     render();
     openJob(j.id);
@@ -3664,14 +3742,13 @@ function openJob(id) {
     cd.insertBefore(d, cd.firstChild);
     sec.appendChild(cd);
   });
-  if (past.length) {
-    var h = el("div", "note", "Recent history");
-    h.style.margin = "10px 0 4px";
-    sec.appendChild(h);
-    past.forEach(function (v) {
-      sec.appendChild(visitCard(v, again, false));
-    });
-  }
+  past.forEach(function (v) {
+    var cd = visitCard(v, again, false);
+    var d = el("div", "note", dshort(v.scheduled_date));
+    d.style.fontWeight = "700";
+    cd.insertBefore(d, cd.firstChild);
+    hsec.appendChild(cd);
+  });
   var d = el("div", "actions");
   d.appendChild(el("span"));
   d.appendChild(
@@ -3696,7 +3773,7 @@ function openJob(id) {
         });
     })
   );
-  p.appendChild(d);
+  panes.details.appendChild(d);
 }
 function setJobStatus(j, s) {
   sb.from("jobs")

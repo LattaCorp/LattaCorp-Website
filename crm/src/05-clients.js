@@ -242,15 +242,35 @@ var clientTab = {};
 function openClient(id) {
   var c = byId(clients, id);
   if (!c) return;
-  var p = panel();
+  var pp = popPanel(),
+    p = pp.p,
+    L = pp.L;
   p.classList.add("qpanel");
-  p.appendChild(el("h2", null, c.name + (c.company ? " · " + c.company : "")));
+  L.appendChild(el("h2", null, c.name));
+  if (c.company) L.appendChild(el("div", "popsub", c.company));
   var hd = el("div", "qhead");
   if (c.account_no) hd.appendChild(el("span", "qnum", "Account " + c.account_no));
   hd.appendChild(el("span", "qst ty-" + (c.type || "residential"), tlabel(c.type)));
-  if (c.nickname) hd.appendChild(el("span", "note", 'Goes by "' + c.nickname + '"'));
   if (c.archived) hd.appendChild(el("span", "qst no", "Archived"));
-  p.appendChild(hd);
+  L.appendChild(hd);
+  if (c.nickname) L.appendChild(el("div", "note", 'Goes by "' + c.nickname + '"'));
+  var mp = clientProps(c.id)[0],
+    cb = el("div", "popbox");
+  cb.appendChild(el("h4", null, "Contact"));
+  popLine(cb, "Phone", c.phone, c.phone ? "tel:" + digits(c.phone) : "");
+  popLine(cb, "Phone 2", c.phone2, c.phone2 ? "tel:" + digits(c.phone2) : "");
+  popLine(cb, "Email", c.email, c.email ? "mailto:" + c.email : "");
+  popLine(cb, "Address", mp && mp.address, mp && mp.address ? mapsUrl(mp.address) : "");
+  if (!c.phone && !c.phone2 && !c.email && !(mp && mp.address)) cb.appendChild(el("div", "note", "No contact details yet."));
+  var cr = contactRow(c.phone || c.phone2, c.email);
+  cr.classList.add("qacts");
+  if (cr.firstChild) cb.appendChild(cr);
+  L.appendChild(cb);
+  L.appendChild(
+    btn("Edit details", "btn alt sm", function () {
+      openClientForm(c);
+    })
+  );
   // three numbers
   var bal = billErr ? 0 : clientBal(c.id) - (typeof creditOf === "function" ? creditOf(c.id) : 0),
     nv = visits
@@ -274,51 +294,24 @@ function openClient(id) {
     d.appendChild(el("b", x[2], x[1]));
     stats.appendChild(d);
   });
-  p.appendChild(stats);
-  var cr = contactRow(c.phone || c.phone2, c.email);
-  cr.classList.add("qacts");
-  var mp = clientProps(c.id)[0];
-  if (mp && mp.address) {
-    var ma = el("a", "btn alt", "Map");
-    ma.href = mapsUrl(mp.address);
-    ma.target = "_blank";
-    ma.rel = "noopener";
-    cr.appendChild(ma);
-  }
-  if (cr.firstChild) cr.firstChild.className = "btn";
-  p.appendChild(cr);
-  // tabs
-  var TABS = [
+  var panes = popTabs(
+    pp.R,
+    [
       ["overview", "Overview"],
+      ["jobs", "Jobs & quotes"],
       ["billing", "Billing"],
       ["history", "History"],
-      ["photos", "Photos"]
+      ["photos", "Photos"],
+      ["account", "Account"]
     ],
-    cur = clientTab[c.id] || "overview",
-    bar = el("div", "ctabs"),
-    panes = {};
-  TABS.forEach(function (t) {
-    var b = el("button", t[0] === cur ? "on" : "", t[1]);
-    b.type = "button";
-    b.addEventListener("click", function () {
-      clientTab[c.id] = t[0];
-      [].forEach.call(bar.children, function (x) {
-        x.classList.toggle("on", x === b);
-      });
-      Object.keys(panes).forEach(function (k) {
-        panes[k].hidden = k !== t[0];
-      });
-    });
-    bar.appendChild(b);
-    panes[t[0]] = el("div", "ctab");
-    panes[t[0]].hidden = t[0] !== cur;
-  });
-  p.appendChild(bar);
-  TABS.forEach(function (t) {
-    p.appendChild(panes[t[0]]);
-  });
+    clientTab[c.id] || "overview",
+    function (k) {
+      clientTab[c.id] = k;
+    }
+  );
   // Overview
   var ov = panes.overview;
+  ov.appendChild(stats);
   var sec = el("div", "sec"),
     h = el("h3", null, "Properties"),
     addp = btn("+ Add property", "btn alt sm", function () {
@@ -330,8 +323,8 @@ function openClient(id) {
   var holder = el("div");
   sec.appendChild(holder);
   drawProps(c, holder);
-  ov.appendChild(clientJobsSection(c));
-  if (!estErr) ov.appendChild(clientEstimatesSection(c));
+  panes.jobs.appendChild(clientJobsSection(c));
+  if (!estErr) panes.jobs.appendChild(clientEstimatesSection(c));
   ov.appendChild(clientContactsSection(c));
   var ls = leads.filter(function (l) {
     return l.client_id === c.id;
@@ -376,15 +369,21 @@ function openClient(id) {
     t.appendChild(tr);
   });
   det.appendChild(t);
-  ov.appendChild(det);
+  panes.account.appendChild(det);
+  if (c.notes) {
+    var ns = el("div", "sec");
+    ns.appendChild(el("h3", null, "Notes"));
+    var nb = el("div", "pcard", c.notes);
+    nb.style.whiteSpace = "pre-wrap";
+    ns.appendChild(nb);
+    ov.appendChild(ns);
+  }
   // Billing, History, Photos
   panes.billing.appendChild(clientBillingSection(c));
   panes.history.appendChild(historySection(c));
   panes.photos.appendChild(clientPhotosSection(c));
   // More: portal, archive, delete
-  var more = document.createElement("details");
-  more.className = "qmore";
-  more.appendChild(el("summary", null, "More (portal, archive, delete)"));
+  var more = panes.account;
   more.appendChild(clientPortalSection(c));
   var mr = el("div", "qacts");
   mr.style.marginTop = "10px";
@@ -430,7 +429,6 @@ function openClient(id) {
     })
   );
   more.appendChild(mr);
-  p.appendChild(more);
 }
 /* ---- other contacts on a client (spouse, board members...) ---- */
 function clientCC(id) {

@@ -263,6 +263,7 @@ function panel() {
   var p = $("panel");
   p.textContent = "";
   p.classList.remove("withprev");
+  p.classList.remove("pop");
   detailFull(false);
   optMark(null);
   lpFrame = null;
@@ -271,6 +272,65 @@ function panel() {
   p.scrollTop = 0;
   $("detail").scrollTop = 0;
   return p;
+}
+/* Pop-up layout for a client or a job: name and contact box on the left, tabs on the right. */
+function popPanel() {
+  var p = panel();
+  detailFull(true);
+  p.classList.add("pop");
+  var L = el("div", "popl"),
+    R = el("div", "popr");
+  p.appendChild(L);
+  p.appendChild(R);
+  return { p: p, L: L, R: R };
+}
+function popLine(box, label, value, href) {
+  if (!value) return;
+  var r = el("div", "popln");
+  r.appendChild(el("span", null, label));
+  if (href) {
+    var a = el("a", null, value);
+    a.href = href;
+    if (/^https?:/.test(href)) {
+      a.target = "_blank";
+      a.rel = "noopener";
+    }
+    r.appendChild(a);
+  } else r.appendChild(el("b", null, value));
+  box.appendChild(r);
+}
+function popTabs(R, TABS, cur, onPick) {
+  var bar = el("div", "ctabs"),
+    panes = {};
+  if (
+    !TABS.some(function (t) {
+      return t[0] === cur;
+    })
+  )
+    cur = TABS[0][0];
+  TABS.forEach(function (t) {
+    var b = el("button", t[0] === cur ? "on" : "", t[1]);
+    b.type = "button";
+    b.addEventListener("click", function () {
+      if (onPick) onPick(t[0]);
+      [].forEach.call(bar.children, function (x) {
+        x.classList.toggle("on", x === b);
+      });
+      Object.keys(panes).forEach(function (k) {
+        panes[k].hidden = k !== t[0];
+      });
+    });
+    bar.appendChild(b);
+    panes[t[0]] = el("div", "ctab");
+    panes[t[0]].hidden = t[0] !== cur;
+  });
+  R.appendChild(bar);
+  var body = el("div", "popbody");
+  TABS.forEach(function (t) {
+    body.appendChild(panes[t[0]]);
+  });
+  R.appendChild(body);
+  return panes;
 }
 /* Forms in the side panel: Enter (or finishing a drop-down or a full MM/DD/YYYY date) jumps to the next field. */
 (function () {

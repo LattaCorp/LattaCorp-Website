@@ -354,29 +354,24 @@ function renderJobs() {
 }
 
 /* ---- job detail ---- */
+var jobTab = {};
 function openJob(id) {
   var j = byId(jobs, id);
   if (!j) return;
   var c = byId(clients, j.client_id),
     pr = byId(props, j.property_id),
-    p = panel();
-  p.appendChild(el("h2", null, j.title));
-  p.appendChild(
-    el(
-      "div",
-      "note",
-      flabel(j.frequency) +
-        " · " +
-        money(j.price) +
-        " per visit · " +
-        (j.status === "active" ? "Active" : j.status === "paused" ? "Paused" : "Ended") +
-        " · starts " +
-        dshort(j.start_date) +
-        (j.end_date ? " · ends " + dshort(j.end_date) : "")
-    )
+    pp = popPanel(),
+    p = pp.p,
+    L = pp.L;
+  L.appendChild(el("h2", null, j.title));
+  var hd = el("div", "qhead");
+  hd.appendChild(
+    el("span", "qst " + (j.status === "active" ? "ok" : j.status === "paused" ? "wait" : "no"), j.status === "active" ? "Active" : j.status === "paused" ? "Paused" : "Ended")
   );
-  var who = el("div", "pcard");
-  who.style.marginTop = "12px";
+  hd.appendChild(el("span", "qnum", flabel(j.frequency) + " · " + money(j.price) + " per visit"));
+  L.appendChild(hd);
+  var who = el("div", "popbox");
+  who.appendChild(el("h4", null, "Client"));
   if (c) {
     var cl = el("button", "link", c.name);
     cl.type = "button";
@@ -384,24 +379,49 @@ function openJob(id) {
       openClient(c.id);
     });
     who.appendChild(cl);
+    popLine(who, "Phone", c.phone || c.phone2, c.phone || c.phone2 ? "tel:" + digits(c.phone || c.phone2) : "");
+    popLine(who, "Email", c.email, c.email ? "mailto:" + c.email : "");
   }
-  if (pr) {
-    var ad = el("div", null, pr.address);
-    who.appendChild(ad);
-    if (pr.notes) who.appendChild(el("div", "note", pr.notes));
-    var m = el("a", "btn alt sm", "Map");
-    m.href = mapsUrl(pr.address);
-    m.target = "_blank";
-    m.rel = "noopener";
-    m.style.marginTop = "6px";
-    who.appendChild(m);
+  if (pr) popLine(who, "Address", pr.address, mapsUrl(pr.address));
+  if (c) {
+    var cr = contactRow(c.phone || c.phone2, c.email);
+    cr.classList.add("qacts");
+    if (cr.firstChild) who.appendChild(cr);
   }
-  p.appendChild(who);
-  if (j.instructions) {
-    var ins = el("div", "note", "Instructions: " + j.instructions);
-    ins.style.cssText = "margin-top:8px;white-space:pre-wrap";
-    p.appendChild(ins);
-  }
+  L.appendChild(who);
+  var panes = popTabs(
+    pp.R,
+    [
+      ["visits", "Upcoming visits"],
+      ["history", "History"],
+      ["details", "Details"]
+    ],
+    jobTab[j.id] || "visits",
+    function (k) {
+      jobTab[j.id] = k;
+    }
+  );
+  var dt = document.createElement("table");
+  [
+    ["How often", flabel(j.frequency)],
+    ["Price", money(j.price) + " per visit"],
+    ["Starts", dshort(j.start_date)],
+    ["Ends", j.end_date ? dshort(j.end_date) : ""],
+    ["Property notes", pr && pr.notes],
+    ["Instructions", j.instructions]
+  ].forEach(function (r) {
+    if (!r[1]) return;
+    var tr = document.createElement("tr");
+    tr.appendChild(el("td", null, r[0]));
+    var td = el("td", null, r[1]);
+    td.style.whiteSpace = "pre-wrap";
+    tr.appendChild(td);
+    dt.appendChild(tr);
+  });
+  var ds = el("div", "sec");
+  ds.appendChild(el("h3", null, "Job details"));
+  ds.appendChild(dt);
+  panes.details.appendChild(ds);
   var acts = el("div", "contact");
   acts.appendChild(
     btn("Edit", "btn alt sm", function () {
@@ -432,10 +452,9 @@ function openJob(id) {
         setJobStatus(j, "active");
       })
     );
-  p.appendChild(acts);
-  var sec = el("div", "sec");
-  sec.appendChild(el("h3", null, "Visits"));
-  p.appendChild(sec);
+  L.appendChild(acts);
+  var sec = panes.visits,
+    hsec = panes.history;
   var t = today(),
     mine = visits
       .filter(function (v) {
@@ -448,14 +467,15 @@ function openJob(id) {
       .filter(function (v) {
         return v.scheduled_date >= t || v.status === "scheduled";
       })
-      .slice(0, 8),
+      .slice(0, 12),
     past = mine
       .filter(function (v) {
         return upc.indexOf(v) < 0;
       })
       .reverse()
-      .slice(0, 6);
-  if (!upc.length && !past.length) sec.appendChild(el("div", "note", "No visits yet."));
+      .slice(0, 30);
+  if (!upc.length) sec.appendChild(el("div", "note", "No upcoming visits."));
+  if (!past.length) hsec.appendChild(el("div", "note", "No past visits yet."));
   function again() {
     render();
     openJob(j.id);
@@ -467,14 +487,13 @@ function openJob(id) {
     cd.insertBefore(d, cd.firstChild);
     sec.appendChild(cd);
   });
-  if (past.length) {
-    var h = el("div", "note", "Recent history");
-    h.style.margin = "10px 0 4px";
-    sec.appendChild(h);
-    past.forEach(function (v) {
-      sec.appendChild(visitCard(v, again, false));
-    });
-  }
+  past.forEach(function (v) {
+    var cd = visitCard(v, again, false);
+    var d = el("div", "note", dshort(v.scheduled_date));
+    d.style.fontWeight = "700";
+    cd.insertBefore(d, cd.firstChild);
+    hsec.appendChild(cd);
+  });
   var d = el("div", "actions");
   d.appendChild(el("span"));
   d.appendChild(
@@ -499,7 +518,7 @@ function openJob(id) {
         });
     })
   );
-  p.appendChild(d);
+  panes.details.appendChild(d);
 }
 function setJobStatus(j, s) {
   sb.from("jobs")

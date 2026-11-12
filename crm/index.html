@@ -554,6 +554,29 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 #side button.more{display:none}
 @media(max-width:700px){#side button.more{display:flex}}
 .pwwrap{position:relative}.pwwrap input{padding-right:84px}.eyebtn{position:absolute;right:6px;top:50%;transform:translateY(-50%);display:flex;align-items:center;gap:5px;background:none;border:0;padding:4px 8px;border-radius:6px;color:#1b552b;font-weight:600;font-size:.85rem;font-family:inherit;cursor:pointer}.eyebtn:hover{background:#eef6ec}
+/* Pop-up for a client or a job: name + contact box on the left, tabs on the right */
+#detail.full .panel.pop,body.dock #detail.full .panel.pop{max-width:min(1180px,calc(100vw - 48px));margin:32px auto;padding:0;display:grid;grid-template-columns:310px minmax(0,1fr);height:calc(100vh - 64px);overflow:hidden}
+.panel.pop>.close{z-index:3}
+.popl{background:#f3f8f1;border-right:1px solid var(--line);padding:22px 20px;overflow:auto;border-radius:14px 0 0 14px}
+.popl h2{margin:0 26px 2px 0;font-size:1.45rem;line-height:1.2;overflow-wrap:anywhere}
+.popsub{color:var(--muted);font-weight:600;margin-bottom:4px}
+.popl .qhead{margin:6px 0 10px}
+.popbox{background:#fff;border:1.5px solid var(--forest);border-radius:12px;padding:12px 14px;margin:12px 0}
+.popbox h4{margin:0 0 6px;font-size:.72rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.popbox .link{font-weight:700;font-size:1.05rem;padding:0;margin-bottom:4px}
+.popln{display:grid;grid-template-columns:64px minmax(0,1fr);gap:8px;padding:5px 0;border-top:1px solid #eef2ec;font-size:.93rem}
+.popln:first-of-type{border-top:0}
+.popln span{color:var(--muted);font-size:.8rem;padding-top:2px}
+.popln a,.popln b{color:var(--ink);font-weight:600;overflow-wrap:anywhere;text-decoration:none}.popln a:hover{text-decoration:underline;color:var(--forest)}
+.popbox .contact{margin:10px 0 0;display:flex;flex-wrap:wrap;gap:6px}.popbox .contact .btn{padding:6px 12px;font-size:.88rem}
+.popl>.contact{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.popr{display:flex;flex-direction:column;min-width:0;min-height:0}
+.popr .ctabs{margin:0;padding:14px 54px 0 20px;flex:none}
+.popr .ctabs button{padding:10px 14px}
+.popbody{flex:1;overflow:auto;padding:16px 22px 24px}
+.popbody .ctab>.sec:first-child{margin-top:0}
+.popbody .cstats{margin:0 0 16px}
+@media (max-width:820px){#detail.full .panel.pop,body.dock #detail.full .panel.pop{display:block;height:auto;min-height:100%;margin:0;max-width:none;border-radius:0;overflow:visible}.popl{border-right:0;border-bottom:1px solid var(--line);border-radius:0;padding:16px 14px}.popr .ctabs{padding:8px 10px 0}.popbody{overflow:visible;padding:14px}}
 </style>
 </head>
 <body>
@@ -592,7 +615,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=192"></script>
+<script src="app.js?v=193"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
