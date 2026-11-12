@@ -146,7 +146,7 @@ header .brand.hc::before,header .brand.hc::after{content:"";position:absolute;to
 header .brand.hc::before{left:calc(-1 * clamp(14px,2vw,32px))}header .brand.hc::after{right:calc(-1 * clamp(14px,2vw,32px))}}
 
 #bgfx{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
-#bgfx .bgL{position:absolute;left:50%;top:50%;width:min(110vh,150vw);height:min(110vh,150vw);transform:translate(-50%,-50%);background:url(../assets/bg-L.png) center/contain no-repeat;opacity:.062}
+#bgfx .bgL{position:absolute;left:50%;top:50%;width:min(110vh,150vw);height:min(110vh,150vw);transform:translate(-50%,-50%);background:url(../assets/bg-L.png) center/contain no-repeat;opacity:.095}
 #sides{background:transparent;position:relative}footer{position:relative;z-index:1}
 .band{background:rgba(239,248,236,.8)}#shell{background:transparent}
 
@@ -419,10 +419,10 @@ header .hl a:not(.ddb),header .hr nav a:not(#n-community){padding:5px 7px}header
 header .hr nav a#n-portal .soon,header .hl a#n-portal .soon{font-size:.58rem}
 header .wrap.hgrid{gap:clamp(18px,2.4vw,36px);padding-left:20px;padding-right:20px}header .brand.hc img{height:42px}header .hgrid .lang{right:14px}}
 @media (min-width:1300px) and (max-width:1500px){header .hl,header .hr nav{gap:20px}html[lang=es] header .hr nav,html[lang=es] header .hl{gap:14px}}
-#bgfx .bgf{position:absolute;background:url(../assets/fronds.svg) left bottom/contain no-repeat;opacity:.11;width:min(48vw,560px);height:min(48vw,560px)}
+#bgfx .bgf{position:absolute;background:url(../assets/fronds.svg) left bottom/contain no-repeat;opacity:.17;width:min(48vw,560px);height:min(48vw,560px)}
 #bgfx .bgf.a{left:-2vw;bottom:-2vw}#bgfx .bgf.b{right:-2vw;bottom:-2vw;transform:scaleX(-1);width:min(38vw,430px);height:min(38vw,430px)}
 #bgfx .bgf.c{left:-2vw;top:60px;transform:scaleY(-1);width:min(34vw,380px);height:min(34vw,380px)}#bgfx .bgf.d{right:-2vw;top:60px;transform:scale(-1,-1);width:min(46vw,540px);height:min(46vw,540px)}
-@media (max-width:700px){#bgfx .bgf{opacity:.09}}
+@media (max-width:700px){#bgfx .bgf{opacity:.13}}
 #services .mint{background:transparent}
 
 .hp{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden}
