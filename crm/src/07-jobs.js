@@ -422,7 +422,9 @@ function openJob(id) {
   ds.appendChild(el("h3", null, "Job details"));
   ds.appendChild(dt);
   panes.details.appendChild(ds);
-  var acts = el("div", "contact");
+  var jg = gearMenu("Job options"),
+    acts = jg.menu;
+  jg.classList.add("popgear");
   acts.appendChild(
     btn("Edit", "btn alt sm", function () {
       openJobForm(c, j);
@@ -452,7 +454,7 @@ function openJob(id) {
         setJobStatus(j, "active");
       })
     );
-  L.appendChild(acts);
+  L.insertBefore(jg, L.firstChild);
   var sec = panes.visits,
     hsec = panes.history;
   var t = today(),

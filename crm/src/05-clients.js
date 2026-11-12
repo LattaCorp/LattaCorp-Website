@@ -266,11 +266,17 @@ function openClient(id) {
   cr.classList.add("qacts");
   if (cr.firstChild) cb.appendChild(cr);
   L.appendChild(cb);
-  L.appendChild(
+  var ng = gearMenu("Client options");
+  ng.classList.add("popgear");
+  ng.menu.appendChild(
     btn("Edit details", "btn alt sm", function () {
       openClientForm(c);
     })
   );
+  L.insertBefore(ng, L.firstChild);
+  var ccs = clientContactsSection(c);
+  ccs.classList.add("popcc");
+  L.appendChild(ccs);
   // three numbers
   var bal = billErr ? 0 : clientBal(c.id) - (typeof creditOf === "function" ? creditOf(c.id) : 0),
     nv = visits
@@ -325,7 +331,6 @@ function openClient(id) {
   drawProps(c, holder);
   panes.jobs.appendChild(clientJobsSection(c));
   if (!estErr) panes.jobs.appendChild(clientEstimatesSection(c));
-  ov.appendChild(clientContactsSection(c));
   var ls = leads.filter(function (l) {
     return l.client_id === c.id;
   });
@@ -476,7 +481,7 @@ function drawCC(c, holder) {
       el(
         "div",
         "note",
-        "None yet. Add a spouse, board member, property manager or anyone else you may need to reach."
+        "None yet. Add a spouse, board member or property manager."
       )
     );
     return;

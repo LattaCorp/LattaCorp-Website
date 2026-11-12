@@ -266,6 +266,7 @@ function calcWidget(use) {
       on.appendChild(ck);
       on.appendChild(document.createTextNode("Show this option"));
       var rm = btn("Remove", "btn danger sm", function () {
+        if (!confirm("Remove this option?")) return;
         r.remove();
         rows = rows.filter(function (x) {
           return x.r !== r;

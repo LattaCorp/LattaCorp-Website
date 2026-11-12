@@ -334,6 +334,9 @@ function openLightbox(rows, idx) {
       im = document.createElement("img");
     im.alt = photoLabel(ph);
     stage.appendChild(im);
+    stage.addEventListener("click", function (e) {
+      if (e.target === stage) close();
+    });
     var pv = btn("‹", "lbnav l", function () {
       go(-1);
     });

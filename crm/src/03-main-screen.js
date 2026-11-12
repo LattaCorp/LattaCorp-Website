@@ -264,6 +264,7 @@ function panel() {
   p.textContent = "";
   p.classList.remove("withprev");
   p.classList.remove("pop");
+  panelDirty = false;
   detailFull(false);
   optMark(null);
   lpFrame = null;
@@ -273,6 +274,79 @@ function panel() {
   $("detail").scrollTop = 0;
   return p;
 }
+/* ---- gear menus: editing options (Edit, Delete, Remove...) stay tucked behind a small gear until it is pressed ---- */
+var GEAR_SVG =
+  '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3h.1a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8v.1a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>';
+var gearOpen = null;
+function gearClose() {
+  if (gearOpen) {
+    gearOpen.classList.remove("on");
+    gearOpen = null;
+  }
+}
+function gearMenu(label) {
+  var w = el("span", "gearwrap"),
+    g = el("button", "gearbtn"),
+    m = el("div", "gearmenu");
+  g.type = "button";
+  g.innerHTML = GEAR_SVG;
+  g.setAttribute("aria-label", label || "Edit options");
+  g.title = label || "Edit options";
+  g.addEventListener("click", function (e) {
+    e.stopPropagation();
+    if (gearOpen === w) return gearClose();
+    gearClose();
+    w.classList.add("on");
+    gearOpen = w;
+    var r = g.getBoundingClientRect(),
+      mw = m.offsetWidth,
+      mh = m.offsetHeight,
+      x = Math.min(Math.max(8, r.right - mw), window.innerWidth - mw - 8),
+      y = r.bottom + 4;
+    if (y + mh > window.innerHeight - 8) y = Math.max(8, r.top - mh - 4);
+    m.style.left = x + "px";
+    m.style.top = y + "px";
+  });
+  w.appendChild(g);
+  w.appendChild(m);
+  w.menu = m;
+  return w;
+}
+document.addEventListener("click", function () {
+  gearClose();
+});
+window.addEventListener("resize", gearClose);
+document.addEventListener("scroll", gearClose, true);
+var GEAR_WORDS = /^(Edit|Delete|Remove|Rename)\b/;
+function gearify() {
+  var groups = [];
+  [].forEach.call(document.querySelectorAll("#app button.btn.sm,#panel button.btn.sm,#rightcol button.btn.sm"), function (b) {
+    if (b.closest(".gearmenu") || b.closest(".actions") || b.hidden) return;
+    if (!GEAR_WORDS.test((b.textContent || "").trim())) return;
+    var par = b.parentNode,
+      g = null;
+    groups.forEach(function (x) {
+      if (x.par === par) g = x;
+    });
+    if (!g) groups.push((g = { par: par, bs: [] }));
+    g.bs.push(b);
+  });
+  groups.forEach(function (g) {
+    var w = gearMenu();
+    g.par.insertBefore(w, g.bs[0]);
+    g.bs.forEach(function (b) {
+      w.menu.appendChild(b);
+    });
+  });
+}
+var gearTick = 0;
+new MutationObserver(function () {
+  if (gearTick) return;
+  gearTick = requestAnimationFrame(function () {
+    gearTick = 0;
+    gearify();
+  });
+}).observe(document.body, { childList: true, subtree: true });
 /* Pop-up layout for a client or a job: name and contact box on the left, tabs on the right. */
 function popPanel() {
   var p = panel();
@@ -403,15 +477,24 @@ function closeDetail() {
   $("detail").classList.remove("on");
   optMark(null);
 }
-/* Clicking the dim area outside a panel closes it, but not while a form is open (so a stray click or a drag that ends outside never loses what you typed). Use the X or Esc to close a form. */
+/* Clicking the dim area outside a pop-up closes it. If something was typed into a form, it asks first so a stray click never loses it. */
 var dnDown = null;
 $("detail").addEventListener("mousedown", function (e) {
   dnDown = e.target;
 });
 $("detail").addEventListener("click", function (e) {
   if (e.target !== $("detail") || dnDown !== $("detail")) return;
-  if ($("panel").querySelector("input:not([type=hidden]),textarea,select")) return;
+  if (panelDirty && !confirm("Close without saving what you typed?")) return;
   closeDetail();
+});
+/* Has anything been typed into the open form? Only then does closing by clicking outside ask first. */
+var panelDirty = false;
+$("panel").addEventListener("input", function (e) {
+  if (e.target && /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName) && e.target.type !== "search") panelDirty = true;
+});
+/* The invoice viewer also closes when you click the empty area around the page. */
+$("invview").addEventListener("click", function (e) {
+  if (e.target === $("invview") || e.target === $("invpaper")) hideInvoice();
 });
 document.addEventListener("keydown", function (e) {
   if (e.key === "Escape") {
