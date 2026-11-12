@@ -158,8 +158,15 @@ function jobSorter() {
       var v = nextVisit(j);
       return v ? v.scheduled_date : "9999-12-31";
     };
+  // HOA accounts first, then Commercial, then Residential (same as the Clients list); the chosen sort applies inside each
+  var TY = { hoa: 0, commercial: 1 },
+    ty = function (j) {
+      var c = byId(clients, j.client_id);
+      return c && TY[c.type] != null ? TY[c.type] : 2;
+    };
   return function (a, b) {
-    var r = 0;
+    var r = ty(a) - ty(b);
+    if (r) return r;
     if (JSORT === "next") r = nv(a) < nv(b) ? -1 : nv(a) > nv(b) ? 1 : 0;
     else if (JSORT === "price_desc") r = Number(b.price || 0) - Number(a.price || 0);
     else if (JSORT === "price") r = Number(a.price || 0) - Number(b.price || 0);
@@ -249,7 +256,7 @@ function jobLook(j, clientId) {
     ctype = jc && (jc.type === "hoa" || jc.type === "commercial") ? jc.type : "",
     plan = lawn ? "Lawn maintenance" + (title.split(/\s+-\s+/)[1] ? " \u00b7 " + title.split(/\s+-\s+/)[1] : "") : title || "Visit";
   return {
-    cls: "jl " + (lawn ? "lawn" : "other") + (tier ? " t-" + tier : "") + (ctype ? " ct-" + ctype : ""),
+    cls: "jl ty-" + ((jc && jc.type) || "residential") + " " + (lawn ? "lawn" : "other") + (tier ? " t-" + tier : "") + (ctype ? " ct-" + ctype : ""),
     tag: (ctype === "hoa" ? "HOA \u00b7 " : ctype === "commercial" ? "Commercial \u00b7 " : "") + plan,
     short: lawn ? (title.split(/\s+-\s+/)[1] || "Lawn") : title,
     mini: ctype
@@ -322,7 +329,7 @@ function renderJobs() {
             : "",
       jc = byId(clients, j.client_id),
       ctype = jc && (jc.type === "hoa" || jc.type === "commercial") ? jc.type : "",
-      b = el("button", "row client job " + (lawn ? "lawn" : "other") + (tier ? " t-" + tier : "") + (ctype ? " ct-" + ctype : ""));
+      b = el("button", "row client job ty-" + ((jc && jc.type) || "residential") + " " + (lawn ? "lawn" : "other") + (tier ? " t-" + tier : "") + (ctype ? " ct-" + ctype : ""));
     b.type = "button";
     var left = el("div");
     left.appendChild(el("b", null, cname(j.client_id)));

@@ -57,6 +57,22 @@ function pipeName(it) {
   var c = it.lead.client_id && byId(clients, it.lead.client_id);
   return c ? c.name : it.lead.name || "(no name)";
 }
+/* residential / hoa / commercial: from the linked client, or for a new website request from what they picked on the form */
+function pipeType(it) {
+  var cid = (it.est && it.est.client_id) || (it.lead && it.lead.client_id),
+    c = cid && byId(clients, cid);
+  if (c) return c.type || "residential";
+  var l = it.lead;
+  if (!l) return "residential";
+  var txt = [l.kind, l.service]
+    .concat(
+      (Array.isArray(l.fields) ? l.fields : []).map(function (f) {
+        return f && f.value;
+      })
+    )
+    .join(" ");
+  return /\bHOA\b/i.test(txt) ? "hoa" : /commercial/i.test(txt) ? "commercial" : "residential";
+}
 function pipeAddr(it) {
   if (it.est && it.est.property_id) return paddr(it.est.property_id);
   if (it.lead && it.lead.address) return it.lead.address;
@@ -179,7 +195,7 @@ function pipeCard(it) {
     l = it.lead,
     st = it.stage,
     fresh = e && e.response_seen === false;
-  var b = el("div", "row pipe st-" + st + (fresh ? " fresh" : ""));
+  var b = el("div", "row pipe st-" + st + " ty-" + pipeType(it) + (fresh ? " fresh" : ""));
   b.tabIndex = 0;
   b.setAttribute("role", "button");
   if (e) b.dataset.eid = e.id;

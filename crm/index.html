@@ -612,6 +612,17 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 .pcard.haspic>.proppic{grid-row:1/span 4;width:92px;height:72px;object-fit:cover;border-radius:8px;background:#e8efe6;cursor:zoom-in}
 .pcard.haspic>:not(.proppic):not(.gearwrap){grid-column:2}
 .ccl .cclt{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ccl.removed b{text-decoration:line-through;color:var(--muted)}
+/* Cards take the color of the client type everywhere (Clients, Jobs, Leads, Schedule): Residential green, HOA blue, Commercial purple */
+#list .row.job.ty-residential,.jl.ty-residential,#list .row.pipe.ty-residential{background:#e6f3e1;border-color:#c3dcbc}
+#list .row.job.ty-hoa,.jl.ty-hoa,#list .row.pipe.ty-hoa{background:#dae7fa;border-color:#b5cbee;border-left-color:#1d4f91}
+#list .row.job.ty-commercial,.jl.ty-commercial,#list .row.pipe.ty-commercial{background:#ecdcf8;border-color:#d4bde8;border-left-color:#5b2a86}
+#list .row.job.ty-residential:hover,#list .row.pipe.ty-residential:hover{background:#d9edd2}
+#list .row.job.ty-hoa:hover,#list .row.pipe.ty-hoa:hover{background:#cbdcf6}
+#list .row.job.ty-commercial:hover,#list .row.pipe.ty-commercial:hover{background:#e2cff3}
+#list .row.client.ty-residential{background:#e6f3e1;border-color:#c3dcbc}#list .row.client.ty-hoa{background:#dae7fa;border-color:#b5cbee}#list .row.client.ty-commercial{background:#ecdcf8;border-color:#d4bde8}
+#list .row.client.ty-residential:hover{background:#d9edd2}#list .row.client.ty-hoa:hover{background:#cbdcf6}#list .row.client.ty-commercial:hover{background:#e2cff3}
+/* Leads keep their stage color on the left edge; the card itself shows the client type */
+#list .row.pipe.st-new{border-left-color:var(--gold)}#list .row.pipe.st-quoted{border-left-color:#7aa7d6}#list .row.pipe.st-approved{border-left-color:var(--leaf)}#list .row.pipe.st-won{border-left-color:var(--forest)}
 </style>
 </head>
 <body>
@@ -650,7 +661,7 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=198"></script>
+<script src="app.js?v=199"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
