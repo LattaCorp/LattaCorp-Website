@@ -192,6 +192,11 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 .topic{font-family:var(--serif);color:var(--bark);font-size:1rem;margin:20px 0 8px}
 .loading{padding:60px 0;text-align:center;color:var(--muted)}
 @media (prefers-reduced-motion:no-preference){.band{animation:rise .35s ease-out}@keyframes rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}}
+.pacts{display:flex;flex-wrap:wrap;gap:6px;align-items:center;justify-content:flex-end}
+.btn.sm{min-height:34px;padding:0 12px;font-size:.88rem}.btn.alt.danger{color:var(--brick);border-color:var(--brick)}
+.prow{display:flex;gap:10px;flex-wrap:wrap}
+@media (max-width:620px){.list li:has(.pacts){flex-wrap:wrap}.list li .pacts{width:100%;justify-content:flex-start;margin-top:6px}}
+label.chk{display:flex;gap:10px;align-items:flex-start;margin:0 0 8px;font-weight:600;font-size:.95rem}label.chk input{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--forest)}
 </style>
 </head>
 <body>
@@ -254,6 +259,6 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../crm/config.js"></script>
 <script src="guides.js?v=2"></script>
-<script src="portal.js?v=13"></script>
+<script src="portal.js?v=14"></script>
 </body>
 </html>

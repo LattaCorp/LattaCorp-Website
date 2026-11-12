@@ -1958,6 +1958,14 @@ function openClient(id) {
       openClientForm(c);
     })
   );
+  ng.menu.appendChild(
+    btn("Contact archive", "btn alt sm", function () {
+      clientTab[c.id] = "account";
+      openClient(c.id);
+      var x = document.getElementById("ccarchive");
+      if (x) x.scrollIntoView({ block: "start" });
+    })
+  );
   L.insertBefore(ng, L.firstChild);
   var ccs = clientContactsSection(c);
   ccs.classList.add("popcc");
@@ -2074,6 +2082,7 @@ function openClient(id) {
   panes.photos.appendChild(clientPhotosSection(c));
   // More: portal, archive, delete
   var more = panes.account;
+  more.appendChild(contactArchiveSection(c));
   more.appendChild(clientPortalSection(c));
   var mr = el("div", "qacts");
   mr.style.marginTop = "10px";
@@ -2835,6 +2844,62 @@ function openImport() {
     };
     rd.readAsText(f);
   });
+}
+
+/* ---- Contact archive: every change to this client's contacts (by the client in the portal, or by staff) ---- */
+function contactArchiveSection(c) {
+  var sec = el("div", "sec"),
+    holder = el("div");
+  sec.id = "ccarchive";
+  sec.appendChild(el("h3", null, "Contact archive"));
+  sec.appendChild(
+    el("div", "note", "Every contact added, changed or removed on this account, including changes the client makes in the portal.")
+  );
+  sec.appendChild(holder);
+  holder.appendChild(el("div", "note", "Loading..."));
+  sb.from("client_contact_log")
+    .select("*")
+    .eq("client_id", c.id)
+    .order("created_at", { ascending: false })
+    .limit(200)
+    .then(function (r) {
+      holder.textContent = "";
+      if (r.error) {
+        holder.appendChild(el("div", "note", "The archive isn't set up yet. Run the Stage 42 SQL in Supabase, then press Refresh."));
+        return;
+      }
+      if (!(r.data || []).length) {
+        holder.appendChild(el("div", "note", "No changes yet."));
+        return;
+      }
+      r.data.forEach(function (x) {
+        var card = el("div", "pcard ccl " + x.action),
+          word = x.action === "added" ? "Added" : x.action === "removed" ? "Removed" : "Changed",
+          by = x.by_who === "client" ? "by the client" : x.by_who === "staff" ? "by staff" : "";
+        var top = el("div", "cclt");
+        top.appendChild(el("span", "chip " + (x.action === "removed" ? "lost" : x.action === "added" ? "won" : ""), word));
+        top.appendChild(el("b", null, (x.name || "(no name)") + (x.role ? " · " + x.role : "")));
+        card.appendChild(top);
+        var info = [x.phone, x.email, x.portal_access ? "Portal access" : ""].filter(Boolean).join(" · ");
+        if (info) card.appendChild(el("div", "note", info));
+        if (x.was) {
+          var w = x.was,
+            before = [w.name, w.role, w.phone, w.email, w.portal_access === true ? "Portal access" : ""].filter(Boolean).join(" · ");
+          if (before) card.appendChild(el("div", "note", "Before: " + before));
+        }
+        card.appendChild(
+          el(
+            "div",
+            "note",
+            new Date(x.created_at).toLocaleString([], { dateStyle: "medium", timeStyle: "short" }) +
+              (by ? " · " + by : "") +
+              (x.by_email ? " (" + x.by_email + ")" : "")
+          )
+        );
+        holder.appendChild(card);
+      });
+    });
+  return sec;
 }
 
 /* ======================= crm/src/06-search.js ======================= */

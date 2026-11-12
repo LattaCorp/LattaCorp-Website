@@ -24,6 +24,27 @@
   var qs = new URLSearchParams(location.search);
   var lang = qs.get("lang") === "es" ? "es" : store("lc-portal-lang") || ((navigator.language || "").slice(0, 2) === "es" ? "es" : "en");
   var ES = {
+    "People on this account": "Personas en esta cuenta",
+    "Please enter a name.": "Escriba un nombre.",
+    "An email is needed to sign in to the portal.": "Se necesita un correo para entrar al portal.",
+    "This account already has the most people allowed. Remove one first.": "Esta cuenta ya tiene el máximo de personas permitido. Quite una primero.",
+    "Change this person": "Cambiar esta persona",
+    "Add a person": "Agregar una persona",
+    "Name": "Nombre",
+    "Who they are (spouse, manager, board member...)": "Quién es (cónyuge, administrador, miembro de la junta...)",
+    "Can sign in to this portal with their email": "Puede entrar a este portal con su correo",
+    "People who can sign in see this account's visits, invoices, balance and photos.": "Las personas que pueden entrar ven las visitas, facturas, saldo y fotos de esta cuenta.",
+    "If you change your email, sign in with the new one next time.": "Si cambia su correo, entre con el nuevo la próxima vez.",
+    "Save": "Guardar",
+    "Cancel": "Cancelar",
+    "To change the email you sign in with, send us a note and we'll update it.": "Para cambiar el correo con el que entra, envíenos una nota y lo actualizamos.",
+    "Can sign in": "Puede entrar",
+    "Change": "Cambiar",
+    "Remove": "Quitar",
+    "Remove this person from the account?": "¿Quitar a esta persona de la cuenta?",
+    "you": "usted",
+    "Add a spouse, a property manager or anyone else who should be on your account. You choose who can sign in.": "Agregue a su cónyuge, un administrador o cualquier otra persona que deba estar en su cuenta. Usted decide quién puede entrar.",
+    "Change phone": "Cambiar teléfono",
     "Account number": "Número de cuenta", "Paid up": "Al día", "Amount due": "Monto pendiente", "Nothing due": "Nada pendiente", "Last invoice": "Última factura",
     "See invoices": "Ver facturas", "Total past due": "Total atrasado", "Total amount due": "Total pendiente", "For all": "Para las",
     "properties": "propiedades", "Each property is billed on its own; see the amounts below.": "Cada propiedad se factura por separado; vea los montos abajo.",
@@ -630,12 +651,8 @@
     var pp = panel(host, t("Properties")), pl = el("ul", "list");
     (data.properties || []).forEach(function (x) { li(pl, { title: x.address || x.label, sub: x.label && x.label !== x.address ? x.label : "" }); });
     if (!(data.properties || []).length) pp.appendChild(el("p", "muted", "–")); else pp.appendChild(pl);
-    if ((data.contacts || []).length) {
-      var pe = panel(host, t("People with access")), el2 = el("ul", "list");
-      li(el2, { title: c.name, sub: t("Account holder") });
-      data.contacts.forEach(function (x) { li(el2, { title: x.name, sub: x.role || "" }); });
-      pe.appendChild(el2);
-    }
+    var pe = panel(host, t("People on this account"));
+    people(pe, ci, cl);
     var ch = panel(host, t("Need to change something?"));
     ch.appendChild(el("p", "muted", t("Send us a note and we'll update your account.")));
     var cb = el("button", "btn alt", t("Ask for a change")); cb.type = "button";
@@ -644,6 +661,95 @@
     var so = panel(host);
     sb.auth.getSession().then(function (r) { var em = r.data && r.data.session && r.data.session.user.email; if (em) so.insertBefore(el("p", "muted small", t("Signed in as") + " " + em), so.firstChild); });
     var out = el("button", "btn alt", t("Sign out")); out.type = "button"; out.onclick = signOut; so.appendChild(out);
+  }
+  /* People on the account: the account holder can add, change and remove people; a contact can change their own entry. */
+  function people(pe, ci, cl) {
+    var box = el("div"); pe.appendChild(box);
+    var c = data.client, cid = c.id;
+    function fail(er, e) {
+      var m = String((e && e.message) || "");
+      er.textContent = t(/name_required/.test(m) ? "Please enter a name." : /bad_email/.test(m) ? "Enter a valid email." : /email_required/.test(m) ? "An email is needed to sign in to the portal." : /too_many/.test(m) ? "This account already has the most people allowed. Remove one first." : "Something went wrong. Please try again, or call or text 407-470-5309.");
+      er.classList.remove("hide");
+    }
+    function field(f, label, type, val, ac) { var l = el("label", "f"); l.appendChild(el("span", null, label)); var i = el("input"); i.type = type; if (ac) i.autocomplete = ac; i.value = val || ""; l.appendChild(i); f.appendChild(l); return i; }
+    function load() {
+      return sb.rpc("portal_contacts", { cid: cid }).then(function (r) {
+        if (r.error || !r.data) throw r.error || new Error("no data");
+        draw(r.data);
+      }).catch(function () {
+        // older database, or offline: fall back to the plain list
+        box.textContent = ""; var l = el("ul", "list"); li(l, { title: c.name, sub: t("Account holder") });
+        (data.contacts || []).forEach(function (x) { li(l, { title: x.name, sub: x.role || "" }); }); box.appendChild(l);
+      });
+    }
+    function form(d, x) {
+      box.textContent = "";
+      var own = !d.can_manage, f = el("form"); f.noValidate = true; box.appendChild(f);
+      f.appendChild(el("h3", null, t(x ? "Change this person" : "Add a person")));
+      var nm = field(f, t("Name"), "text", x && x.name, "off"),
+        rl = own ? null : field(f, t("Who they are (spouse, manager, board member...)"), "text", x && x.role, "off"),
+        ph = field(f, t("Phone"), "tel", x && x.phone, "off"),
+        em = field(f, t("Email"), "email", x && x.email, "off"), ac = null;
+      if (!own) {
+        var al = el("label", "chk"); ac = el("input"); ac.type = "checkbox"; ac.checked = x ? !!x.portal_access : true;
+        al.appendChild(ac); al.appendChild(el("span", null, t("Can sign in to this portal with their email"))); f.appendChild(al);
+        f.appendChild(el("p", "muted small", t("People who can sign in see this account's visits, invoices, balance and photos.")));
+      } else f.appendChild(el("p", "muted small", t("If you change your email, sign in with the new one next time.")));
+      var er = el("p", "err hide"); er.setAttribute("role", "alert"); f.appendChild(er);
+      var row = el("div", "prow"), sv = el("button", "btn", t("Save")); sv.type = "submit"; row.appendChild(sv);
+      var cn = el("button", "btn alt", t("Cancel")); cn.type = "button"; cn.onclick = load; row.appendChild(cn); f.appendChild(row);
+      f.addEventListener("submit", function (e) {
+        e.preventDefault(); er.classList.add("hide"); sv.disabled = true;
+        sb.rpc("portal_contact_save", { cid: cid, contact: x ? x.id : null, p_name: nm.value, p_role: rl ? rl.value : (x && x.role) || "", p_phone: ph.value, p_email: em.value, p_access: ac ? ac.checked : !!(x && x.portal_access) })
+          .then(function (r) { sv.disabled = false; if (r.error) return fail(er, r.error); load(); });
+      });
+      nm.focus();
+    }
+    function phoneForm(d) {
+      ci.textContent = ""; ci.appendChild(el("h2", null, t("Contact info")));
+      var f = el("form"); f.noValidate = true; ci.appendChild(f);
+      var p1 = field(f, t("Phone"), "tel", d.holder.phone, "tel"), p2 = field(f, t("Phone") + " 2", "tel", d.holder.phone2, "off");
+      f.appendChild(el("p", "muted small", t("To change the email you sign in with, send us a note and we'll update it.")));
+      var er = el("p", "err hide"); er.setAttribute("role", "alert"); f.appendChild(er);
+      var row = el("div", "prow"), sv = el("button", "btn", t("Save")); sv.type = "submit"; row.appendChild(sv);
+      var cn = el("button", "btn alt", t("Cancel")); cn.type = "button"; cn.onclick = function () { show("account"); }; row.appendChild(cn); f.appendChild(row);
+      f.addEventListener("submit", function (e) {
+        e.preventDefault(); sv.disabled = true;
+        sb.rpc("portal_holder_phone", { cid: cid, p_phone: p1.value, p_phone2: p2.value }).then(function (r) {
+          sv.disabled = false; if (r.error) return fail(er, r.error);
+          loadAccount();
+        });
+      });
+    }
+    function draw(d) {
+      box.textContent = "";
+      var l = el("ul", "list"); li(l, { title: d.holder.name || c.name, sub: t("Account holder") });
+      (d.contacts || []).forEach(function (x) {
+        var mine = d.my_contact_id && x.id === d.my_contact_id, acts = el("div", "pacts");
+        if (x.portal_access) acts.appendChild(pill(t("Can sign in")));
+        if (d.can_manage || mine) { var eb = el("button", "btn alt sm", t("Change")); eb.type = "button"; eb.onclick = function () { form(d, x); }; acts.appendChild(eb); }
+        if (d.can_manage) {
+          var rb = el("button", "btn alt sm danger", t("Remove")); rb.type = "button";
+          rb.onclick = function () {
+            if (!confirm(t("Remove this person from the account?") + "\n" + x.name)) return;
+            rb.disabled = true;
+            sb.rpc("portal_contact_remove", { cid: cid, contact: x.id }).then(function (r) { if (r.error) { rb.disabled = false; alert(t("Something went wrong. Please try again, or call or text 407-470-5309.")); return; } load(); });
+          };
+          acts.appendChild(rb);
+        }
+        li(l, { title: x.name + (mine ? " (" + t("you") + ")" : ""), sub: [x.role, x.email, x.phone].filter(Boolean).join(" · "), right: acts.firstChild ? acts : null });
+      });
+      box.appendChild(l);
+      if (d.can_manage) {
+        var ab = el("button", "btn", t("Add a person")); ab.type = "button"; ab.style.marginTop = "12px"; ab.onclick = function () { form(d, null); }; box.appendChild(ab);
+        box.appendChild(el("p", "muted small", t("Add a spouse, a property manager or anyone else who should be on your account. You choose who can sign in.")));
+        if (!ci.querySelector(".chg")) { var cb2 = el("button", "btn alt sm chg", t("Change phone")); cb2.type = "button"; cb2.style.marginTop = "10px"; cb2.onclick = function () { phoneForm(d); }; ci.appendChild(cb2); }
+      }
+    }
+    // show the plain list right away, then the live one with its buttons
+    var l0 = el("ul", "list"); li(l0, { title: c.name, sub: t("Account holder") });
+    (data.contacts || []).forEach(function (x) { li(l0, { title: x.name, sub: x.role || "" }); }); box.appendChild(l0);
+    load();
   }
   function signOut() { sb.auth.signOut().then(function () { data = null; accounts = []; store("lc-portal-acct", null); view = "home"; showSignin(); }); }
 
