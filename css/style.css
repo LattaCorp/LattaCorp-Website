@@ -772,3 +772,10 @@ footer .flab{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transfor
 #ctf button[type=submit].btn:hover{background:var(--mint)}
 #ctf .rnote{color:#e3f1e0}
 @media (min-width:701px){footer .flinks.fseo{justify-content:flex-start;flex-wrap:nowrap;width:fit-content;min-width:min(100%,540px);margin-left:auto;margin-right:auto}}
+/* Home: See all services beside the heading; neighborly-touch box kept inside the content column */
+.wwd{display:flex;align-items:center;justify-content:space-between;gap:14px 20px;flex-wrap:wrap;margin-bottom:18px}.wwd h2{margin:0}
+.wwd .btn{padding:9px 18px}
+#home .callout{margin-top:34px}
+.introsec{padding:0 0 46px}
+.introsec .intro{background:var(--mint);border-radius:14px;padding:26px 30px}
+.introsec .intro{max-width:952px;box-sizing:border-box;margin:0 auto}@media (max-width:1000px){.introsec .intro{margin:0 24px}}
