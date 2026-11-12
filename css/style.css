@@ -753,3 +753,22 @@ footer .brand.fbrand img.wword{width:100%;max-width:280px;min-width:170px}
 .hcard:not(:has(.hc-pic)){border-top:4px solid var(--leaf)}
 }
 @media (max-width:860px){.hbg .cyc button{display:none}}
+/* Footer rows: tabs, services, service areas each on their own centered line */
+footer .flinks{align-items:baseline;row-gap:6px;margin-bottom:12px}
+footer .flinks:first-child{margin-bottom:16px;padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.18)}
+footer .flinks.fseo{gap:6px 18px;margin-bottom:8px;align-items:baseline}
+footer .flinks.fseo:last-of-type{margin-bottom:16px}
+footer .flab{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:#bfe3c0;min-width:104px;text-align:right}
+@media (min-width:1301px){footer .flinks:first-child{flex-wrap:nowrap}}
+@media (max-width:700px){footer .flab{min-width:0;width:100%;text-align:center}}
+/* Home: no green tab on the quick quote box; dark green border on side cards */
+.hbg .quick{border-top:1px solid var(--line)}
+@media (min-width:1760px){.hcard,.hcard:not(:has(.hc-pic)){border:1.5px solid var(--forest)}}
+/* Contact form: green with white boxes */
+#ctf{background:var(--forest);border-color:var(--forest)}
+#ctf label{color:#fff}
+#ctf input,#ctf textarea{background:#fff;border-color:#fff}
+#ctf button[type=submit].btn{background:#fff;color:var(--forest);border-color:#fff}
+#ctf button[type=submit].btn:hover{background:var(--mint)}
+#ctf .rnote{color:#e3f1e0}
+@media (min-width:701px){footer .flinks.fseo{justify-content:flex-start;flex-wrap:nowrap;width:fit-content;min-width:min(100%,540px);margin-left:auto;margin-right:auto}}

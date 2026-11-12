@@ -1,5 +1,6 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"Service areas": "Áreas de servicio",
 "See your visits, invoices and balance any time.": "Vea sus visitas, facturas y saldo cuando quiera.",
 "Clean lines right up to the water.": "Líneas limpias hasta la orilla del agua.",
 "Entrances, clubhouses and shared grounds.": "Entradas, casas club y áreas compartidas.",
