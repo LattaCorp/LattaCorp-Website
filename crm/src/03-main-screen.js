@@ -317,7 +317,7 @@ document.addEventListener("click", function () {
 });
 window.addEventListener("resize", gearClose);
 document.addEventListener("scroll", gearClose, true);
-var GEAR_WORDS = /^(Edit|Delete|Remove|Rename)\b/;
+var GEAR_WORDS = /^(Edit|Delete|Remove|Rename|Make main)\b/;
 function gearify() {
   var groups = [];
   [].forEach.call(document.querySelectorAll("#app button.btn.sm,#panel button.btn.sm,#rightcol button.btn.sm"), function (b) {

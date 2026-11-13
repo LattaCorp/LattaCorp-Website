@@ -282,9 +282,32 @@ function openClient(id) {
     })
   );
   L.insertBefore(ng, L.firstChild);
-  var ccs = clientContactsSection(c);
-  ccs.classList.add("popcc");
-  L.appendChild(ccs);
+  // other contacts listed inside the Contact box; adding and editing them is in the Account tab
+  var ccMini = el("div", "popccm");
+  cb.appendChild(ccMini);
+  function drawMini() {
+    ccMini.textContent = "";
+    var list = ccErr ? [] : clientCC(c.id);
+    if (!list.length) return;
+    ccMini.appendChild(el("h4", null, "Other contacts"));
+    list.forEach(function (x) {
+      var r = el("div", "popccr");
+      r.appendChild(el("b", null, (x.name || "(no name)") + (x.role ? " · " + x.role : "")));
+      if (x.phone) {
+        var ph = el("a", null, x.phone);
+        ph.href = "tel:" + digits(x.phone);
+        r.appendChild(ph);
+      }
+      if (x.email) {
+        var em = el("a", null, x.email);
+        em.href = "mailto:" + x.email;
+        r.appendChild(em);
+      }
+      ccMini.appendChild(r);
+    });
+  }
+  drawMini();
+  ccMiniRedraw = drawMini;
   // three numbers
   var bal = billErr ? 0 : clientBal(c.id) - (typeof creditOf === "function" ? creditOf(c.id) : 0),
     nv = visits
@@ -397,6 +420,7 @@ function openClient(id) {
   panes.photos.appendChild(clientPhotosSection(c));
   // More: portal, archive, delete
   var more = panes.account;
+  more.appendChild(clientContactsSection(c));
   more.appendChild(contactArchiveSection(c));
   more.appendChild(clientPortalSection(c));
   var mr = el("div", "qacts");
@@ -472,8 +496,10 @@ function clientContactsSection(c) {
   drawCC(c, holder);
   return sec;
 }
+var ccMiniRedraw = null;
 function drawCC(c, holder) {
   holder.textContent = "";
+  if (ccMiniRedraw) ccMiniRedraw();
   if (ccErr) {
     holder.appendChild(
       el(
@@ -762,6 +788,21 @@ function propForm(c, pr, holder) {
       notes: nts.input.value.trim()
     };
     save.disabled = true;
+    // only one property can be Main: labeling this one Main takes it off the others
+    var otherMains = isMainProp(row)
+      ? clientProps(c.id).filter(function (o) {
+          return isMainProp(o) && (!pr || o.id !== pr.id);
+        })
+      : [];
+    otherMains.forEach(function (o) {
+      sb.from("properties")
+        .update({ label: "" })
+        .eq("id", o.id)
+        .then(function (r) {
+          if (!r.error) o.label = "";
+        });
+      o.label = "";
+    });
     var q = pr
       ? sb.from("properties").update(row).eq("id", pr.id).select().single()
       : sb
