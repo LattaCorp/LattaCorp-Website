@@ -627,6 +627,7 @@ function render() {
   nav.textContent = "";
   closeMoreSheet();
   $("app").classList.toggle("wide", view === "reports" || view === "inventory" || view === "expenses");
+  document.body.classList.toggle("v-expenses", view === "expenses");
   var tdy = today(),
     stops = visits.filter(function (v) {
       return v.status === "scheduled" && v.scheduled_date === tdy;
@@ -9119,6 +9120,8 @@ var LCOLS = [
   "Total"
 ];
 var LCSV = LCOLS.concat(["Tax description"]);
+/* order the columns are shown in on screen: Payment sits at the end, after Total */
+var LSHOW = [0, 1, 2, 3, 4, 6, 7, 8, 9, 5];
 function m2(n) {
   return (
     "$" + (Number(n) || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -9597,15 +9600,16 @@ function renderExpensesView() {
       t2 = document.createElement("table");
     t2.className = "exgrid";
     var cg = document.createElement("colgroup");
-    [5.5, 9.5, 9, 18, 13.5, 9, 10.5, 8.5, 7.5, 9].forEach(function (w) {
+    [4, 11, 12.5, 15, 11.5, 8.5, 10, 8, 10.5, 9].forEach(function (w) {
       var c = document.createElement("col");
       c.style.width = w + "%";
       cg.appendChild(c);
     });
     t2.appendChild(cg);
     var hr = document.createElement("tr");
-    LCOLS.forEach(function (c, i) {
-      var th = document.createElement("th");
+    LSHOW.forEach(function (i) {
+      var c = LCOLS[i],
+        th = document.createElement("th");
       if (i >= 7) th.className = "num";
       var on = exCol === i,
         fl = exF[i] != null && exF[i] !== "";
@@ -9625,8 +9629,10 @@ function renderExpensesView() {
     rows.slice(0, exShown).forEach(function (e) {
       var tr = document.createElement("tr");
       tr.tabIndex = 0;
-      expCells(e).forEach(function (v, i) {
-        var td = document.createElement("td");
+      var cells = expCells(e);
+      LSHOW.forEach(function (i) {
+        var v = cells[i],
+          td = document.createElement("td");
         td.textContent = v;
         if (i >= 7) td.className = "num";
         tr.appendChild(td);
@@ -9642,9 +9648,13 @@ function renderExpensesView() {
     t2.appendChild(tbd);
     var tf = document.createElement("tfoot"),
       fr = document.createElement("tr");
-    LCOLS.forEach(function (c, i) {
+    LSHOW.forEach(function (i) {
       var td = document.createElement("td");
-      if (i === 0) td.textContent = "Total";
+      if (i === 1) return; // "Total" spans the Code and Date columns
+      if (i === 0) {
+        td.textContent = "Total";
+        td.colSpan = 2;
+      }
       if (i === 7) {
         td.textContent = m2(r2(sn));
         td.className = "num";

@@ -85,6 +85,7 @@ function render() {
   nav.textContent = "";
   closeMoreSheet();
   $("app").classList.toggle("wide", view === "reports" || view === "inventory" || view === "expenses");
+  document.body.classList.toggle("v-expenses", view === "expenses");
   var tdy = today(),
     stops = visits.filter(function (v) {
       return v.status === "scheduled" && v.scheduled_date === tdy;
