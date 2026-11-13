@@ -627,6 +627,7 @@ function openJobForm(client, job, pre) {
   );
   var ti = fld("Job name", "text", job ? job.title : ""),
     pr = fld("Price ($)", "number", job ? job.price : "");
+  acTitles(ti.input, pr.input);
   pr.input.step = "0.01";
   pr.input.min = "0";
   pr.input.inputMode = "decimal";

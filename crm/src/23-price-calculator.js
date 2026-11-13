@@ -371,6 +371,7 @@ function openEstimateForm(cid, leadId, ex) {
   var ttl = fld("Job Title", "text", E ? E.title || "" : ""),
     scp = fld("Notes & Terms", "textarea", E ? E.scope || "" : ""),
     vd = fld("Valid for (days)", "number", String(vdays));
+  acTitles(ttl.input);
   if (E) cs.input.disabled = true;
   vd.classList.add("short");
   p.appendChild(cs);
@@ -407,6 +408,7 @@ function openEstimateForm(cid, leadId, ex) {
       d = fld("Description", "text", ""),
       q = fld("QTY", "text", ""),
       a = fld("Total ($)", "number", "");
+    acTitles(tt.input, a.input);
     a.input.step = "0.01";
     a.input.inputMode = "decimal";
     r.appendChild(tt);

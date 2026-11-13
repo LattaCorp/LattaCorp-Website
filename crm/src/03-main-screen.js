@@ -345,12 +345,32 @@ function gearify() {
     });
   });
 }
+/* a gear that would sit under a pop-up's X moves down just below it */
+function gearUnderX() {
+  var x = document.querySelector("#panel > .close");
+  if (!x || !$("detail").classList.contains("on")) return;
+  var xr = x.getBoundingClientRect();
+  if (!xr.width) return;
+  [].forEach.call(document.querySelectorAll("#panel .gearwrap"), function (w) {
+    if (w.dataset.ux) w.style.top = w.style.marginTop = "";
+    var r = w.getBoundingClientRect();
+    if (!r.width || r.left > xr.right || r.right < xr.left || r.top > xr.bottom || r.bottom < xr.top) return;
+    var push = Math.ceil(xr.bottom - r.top + 4);
+    w.dataset.ux = "1";
+    if (getComputedStyle(w).position === "absolute") w.style.top = parseFloat(getComputedStyle(w).top || 0) + push + "px";
+    else w.style.marginTop = push + "px";
+  });
+}
+window.addEventListener("resize", function () {
+  requestAnimationFrame(gearUnderX);
+});
 var gearTick = 0;
 new MutationObserver(function () {
   if (gearTick) return;
   gearTick = requestAnimationFrame(function () {
     gearTick = 0;
     gearify();
+    gearUnderX();
   });
 }).observe(document.body, { childList: true, subtree: true });
 /* Pop-up layout for a client or a job: name and contact box on the left, tabs on the right. */

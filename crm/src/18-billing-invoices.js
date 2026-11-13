@@ -239,6 +239,7 @@ function openInvoiceForm(cid, ex) {
   if (IV && IV.property_id) pps.input.value = IV.property_id;
   var ttl = fld("Job Title", "text", IV ? IV.title || "" : ""),
     nt = fld("Notes & Terms", "textarea", IV ? IV.terms || "" : "");
+  acTitles(ttl.input);
   p.appendChild(ttl);
   p.appendChild(nt);
   var terms = Number(bizv("terms_days", 10));
@@ -308,6 +309,7 @@ function openInvoiceForm(cid, ex) {
       d = fld("Description", "text", ""),
       q = fld("QTY", "text", ""),
       a = fld("Total ($)", "number", "");
+    acTitles(tt.input, a.input);
     a.input.step = "0.01";
     a.input.inputMode = "decimal";
     a.input.title = "Negative = discount, 0 = no charge";
