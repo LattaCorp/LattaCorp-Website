@@ -2024,6 +2024,9 @@ function openClient(id) {
         em.href = "mailto:" + x.email;
         r.appendChild(em);
       }
+      var xr = contactRow(x.phone, x.email);
+      xr.classList.add("qacts");
+      if (xr.firstChild) r.appendChild(xr);
       ccMini.appendChild(r);
     });
   }

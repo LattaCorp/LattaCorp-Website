@@ -637,6 +637,7 @@ body.dock #rightcol:has(#detail.on:not(.full)){width:min(640px,48vw)}
 .popccm h4{margin:10px 0 4px;padding-top:8px;border-top:1px solid #eef2ec}
 .popccr{padding:5px 0;font-size:.9rem;display:flex;flex-direction:column;gap:1px}
 .popccr b{color:var(--ink)}.popccr a{color:var(--ink);text-decoration:none;overflow-wrap:anywhere}.popccr a:hover{color:var(--forest);text-decoration:underline}
+.popccr .contact{margin:6px 0 4px}.popccr+.popccr{border-top:1px solid #eef2ec;padding-top:8px}
 </style>
 </head>
 <body>
@@ -675,7 +676,7 @@ body.dock #rightcol:has(#detail.on:not(.full)){width:min(640px,48vw)}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=203"></script>
+<script src="app.js?v=204"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
