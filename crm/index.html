@@ -642,6 +642,17 @@ body.dock #rightcol:has(#detail.on:not(.full)){width:min(640px,48vw)}
 body.dock.v-expenses #rightcol{width:360px}
 body.dock.v-expenses #rightcol:has(#detail.on:not(.full)){width:min(640px,48vw)}
 .exgrid tfoot td{font-size:.86rem;padding-left:5px;padding-right:5px}
+/* extra visits, add-ons, visit counts, batch email */
+.vkind{display:inline-block;margin:3px 0 2px;font-size:.82rem;font-weight:700;border-radius:6px;padding:2px 8px;background:#fff4d6;color:#7a5b00}
+.vkind.extra{background:#e4eefb;color:#1d4f91}
+.vcount div{font-size:.92rem;font-weight:600}
+.vcount .contact{margin-top:8px}
+.sub.vcnt{color:var(--forest);font-weight:600}
+.bdbar{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 12px}.bdpill{border:1px solid var(--line);background:#fff;color:var(--ink);border-radius:999px;padding:6px 14px;font:inherit;font-weight:600;cursor:pointer}.bdpill.on{background:var(--forest);border-color:var(--forest);color:#fff}
+.bdlist{padding:4px 10px}
+.bdrow{display:grid;grid-template-columns:22px minmax(0,1fr) auto;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #eef2ec;cursor:pointer}
+.bdrow:last-child{border-bottom:0}.bdrow input{width:18px;height:18px;accent-color:var(--forest)}
+.bdrow .note{display:block;overflow-wrap:anywhere}.bdamt{white-space:nowrap}
 </style>
 </head>
 <body>
@@ -680,7 +691,7 @@ body.dock.v-expenses #rightcol:has(#detail.on:not(.full)){width:min(640px,48vw)}
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=207"></script>
+<script src="app.js?v=209"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

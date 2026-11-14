@@ -327,7 +327,17 @@ function openClient(id) {
   [
     ["Balance", bal > 0 ? money(bal) : bal < 0 ? money(-bal) + " credit" : "$0.00", bal > 0 && acctStatus(c).key === "past_due" ? "red" : ""],
     ["Next visit", nv ? dshort(nv.scheduled_date) : "None", ""],
-    ["Active jobs", String(aj), ""]
+    ["Active jobs", String(aj), ""],
+    [
+      monthWord() + " visits",
+      (function () {
+        var k = visitCounts(function (v) {
+          return v.client_id === c.id;
+        });
+        return k.done + (k.addon ? " + " + k.addon + " add-on" + (k.addon > 1 ? "s" : "") : "");
+      })(),
+      ""
+    ]
   ].forEach(function (x) {
     var d = el("div");
     d.appendChild(el("span", null, x[0]));

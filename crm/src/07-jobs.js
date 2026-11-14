@@ -87,7 +87,7 @@ function topUp() {
   if (!rows.length) return Promise.resolve(0);
   return sb
     .from("visits")
-    .upsert(rows, { onConflict: "job_id,orig_date", ignoreDuplicates: true })
+    .upsert(rows, { onConflict: "job_id,orig_date,slot", ignoreDuplicates: true })
     .then(function (r) {
       if (r.error) return 0;
       return loadVisits().then(function () {
@@ -343,6 +343,10 @@ function renderJobs() {
         [paddr(j.property_id), flabel(j.frequency), money(j.price)].filter(Boolean).join(" · ")
       )
     );
+    var jcm = visitCounts(function (v) {
+      return v.job_id === j.id;
+    });
+    if (jcm.done || jcm.skipped || jcm.addon) left.appendChild(el("div", "sub vcnt", monthWord() + ": " + countText(jcm, true)));
     var right = el("div");
     right.style.textAlign = "right";
     if (j.status !== "active")
@@ -462,6 +466,29 @@ function openJob(id) {
       })
     );
   L.insertBefore(jg, L.firstChild);
+  var jcN = visitCounts(function (v) {
+    return v.job_id === j.id;
+  });
+  var jcb = el("div", "popbox vcount");
+  jcb.appendChild(el("h4", null, monthWord() + " so far"));
+  jcb.appendChild(el("div", null, countText(jcN)));
+  var jxa = el("div", "contact");
+  jxa.appendChild(
+    btn("+ Extra visit", "btn alt sm", function () {
+      openExtraForm(j, "extra", today(), function () {
+        openJob(j.id);
+      });
+    })
+  );
+  jxa.appendChild(
+    btn("+ Add-on", "btn alt sm", function () {
+      openExtraForm(j, "addon", today(), function () {
+        openJob(j.id);
+      });
+    })
+  );
+  jcb.appendChild(jxa);
+  L.appendChild(jcb);
   var sec = panes.visits,
     hsec = panes.history;
   var t = today(),

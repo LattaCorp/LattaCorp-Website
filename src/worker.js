@@ -310,7 +310,7 @@ const sbRest = (env, path, init = {}) => fetch(`${baseUrl(env)}/rest/v1/${path}`
 const bearer = (request) => (request.headers.get("authorization") || "").replace(/^Bearer\s+/i, "").trim();
 
 // Branded email (logo, green header, one big button). Used for sign-in codes and invitations.
-function portalEmail({ heading, lines, code, button, link, small, es }) {
+function portalEmail({ heading, lines, code, button, link, small, es, foot }) {
   const p = (t) => `<p style="margin:0 0 14px;font-size:16px;line-height:1.55;color:#1c2a20">${t}</p>`;
   return `<!doctype html><html><body style="margin:0;padding:0;background:#f3f7f1">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f7f1;padding:28px 12px"><tr><td align="center">
@@ -326,15 +326,15 @@ ${button ? `<p style="margin:0 0 22px"><a href="${link}" style="display:inline-b
 ${small ? `<p style="margin:0 0 18px;font-size:13px;line-height:1.5;color:#58675c">${small}</p>` : ""}
 </td></tr>
 <tr><td style="padding:16px 28px 22px;border-top:1px solid #e4ece1;font-family:Arial,sans-serif;font-size:13px;line-height:1.5;color:#58675c">
-${es ? "Este es un mensaje automático. Por favor no responda a este correo. ¿Preguntas? Escriba a" : "This is an automated message. Please don't reply to this email. Questions? Email"} <a href="mailto:${SUPPORT_EMAIL}" style="color:#1b552b">${SUPPORT_EMAIL}</a> ${es ? "o llame o envíe un texto al" : "or call or text"} <a href="tel:4074705309" style="color:#1b552b">407-470-5309</a>.<br>
+${foot || (es ? "Este es un mensaje automático. Por favor no responda a este correo. ¿Preguntas? Escriba a" : "This is an automated message. Please don't reply to this email. Questions? Email")} <a href="mailto:${SUPPORT_EMAIL}" style="color:#1b552b">${SUPPORT_EMAIL}</a> ${es ? "o llame o envíe un texto al" : "or call or text"} <a href="tel:4074705309" style="color:#1b552b">407-470-5309</a>.<br>
 Latta Corp of Central Florida · Kissimmee, FL · <a href="${SITE}" style="color:#1b552b">lattacorpfl.com</a></td></tr>
 </table></td></tr></table></body></html>`;
 }
 // Plain-text twin of portalEmail (mail filters trust messages that include one).
-function portalText({ heading, lines, code, button, link, small, es }) {
+function portalText({ heading, lines, code, button, link, small, es, foot }) {
   const strip = (s) => String(s).replace(/<br>/g, "\n").replace(/<[^>]+>/g, "").replace(/&amp;/g, "&");
   return [strip(heading), "", ...lines.map(strip), code ? "\n" + code + "\n" : "", button ? strip(button) + ": " + link : "", small ? "\n" + strip(small) : "",
-    "\n--", es ? "Este es un mensaje automático. Por favor no responda. ¿Preguntas? " + SUPPORT_EMAIL + " o 407-470-5309."
+    "\n--", foot ? foot.replace(/<[^>]+>/g, "") + " " + SUPPORT_EMAIL + " or 407-470-5309." : es ? "Este es un mensaje automático. Por favor no responda. ¿Preguntas? " + SUPPORT_EMAIL + " o 407-470-5309."
                : "This is an automated message. Please don't reply. Questions? " + SUPPORT_EMAIL + " or 407-470-5309.",
     "Latta Corp of Central Florida · Kissimmee, FL · lattacorpfl.com"].filter((x) => x !== "").join("\n");
 }
@@ -517,6 +517,86 @@ export async function handleQuoteApproved(request, env) {
   return json({ ok: true, sent: true });
 }
 
+// ---- Invoices emailed from Foreman in batches (staff only). The CRM sends up to 25 ids per call;
+// at most INVOICE_DAILY_LIMIT invoices go out per day (Eastern time) so the email plan's daily cap is never hit.
+const INVOICE_FROM = "Latta Corp Billing <billing@lattacorpfl.com>";
+function etMidnightIso() {
+  const now = new Date();
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(now);
+  const off = (new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", timeZoneName: "shortOffset" }).formatToParts(now)
+    .find((x) => x.type === "timeZoneName") || {}).value || "GMT-5";
+  const m = off.match(/GMT([+-])(\d{1,2})(?::(\d{2}))?/), sign = m ? m[1] : "-", hh = String(m ? m[2] : 5).padStart(2, "0"), mm = m && m[3] ? m[3] : "00";
+  return new Date(`${day}T00:00:00${sign}${hh}:${mm}`).toISOString();
+}
+const fmtDay = (d) => d ? new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" }) : "";
+const fmtMonth = (d) => d ? new Date(d + "T12:00:00Z").toLocaleDateString("en-US", { month: "long", year: "numeric", timeZone: "UTC" }) : "";
+export async function handleInvoiceEmail(request, env) {
+  if (!env.SUPABASE_SECRET_KEY || !env.RESEND_API_KEY) return json({ error: "Email is not set up on the server." }, 500);
+  const me = await callerEmail(request, env);
+  const who = me && await staffRow(env, me);
+  if (!who || (who.role !== "owner" && who.role !== "office")) return json({ error: "Not allowed." }, 403);
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const ids = Array.isArray(d && d.ids) ? d.ids.filter((x) => /^[0-9a-f-]{36}$/i.test(String(x))).slice(0, 25) : [];
+  if (!ids.length) return json({ error: "No invoices picked." }, 400);
+  const limit = Number(env.INVOICE_DAILY_LIMIT) > 0 ? Number(env.INVOICE_DAILY_LIMIT) : 90;
+  const cr = await sbRest(env, `invoices?emailed_at=gte.${encodeURIComponent(etMidnightIso())}&select=id`);
+  if (!cr.ok) return json({ error: "Run the Stage 43 SQL in Supabase first." }, 502);
+  const room = limit - ((await cr.json()) || []).length;
+  if (room <= 0) return json({ error: `Today's limit of ${limit} invoice emails is reached. Send the rest tomorrow.` }, 429);
+  const ir = await sbRest(env, `invoices?id=in.(${ids.join(",")})&select=id,number,total,due_date,period_end,share_token,client_id,status,emailed_at,title`);
+  if (!ir.ok) return json({ error: "Could not read the invoices." }, 502);
+  const invs = (await ir.json()) || [];
+  const cids = [...new Set(invs.map((i) => i.client_id))];
+  const cl = cids.length ? await (await sbRest(env, `clients?id=in.(${cids.join(",")})&select=id,name,email`)).json() : [];
+  let biz = {}; try { biz = ((await (await sbRest(env, "business?select=*&limit=1")).json()) || [])[0] || {}; } catch {}
+  const zelle = String(biz.zelle || "407-470-5309");
+  const failed = [], msgs = [], meta = [];
+  for (const inv of invs) {
+    const c = cl.find((x) => x.id === inv.client_id) || {};
+    const to = String(c.email || "").trim();
+    if (inv.emailed_at) { failed.push({ id: inv.id, error: "already emailed" }); continue; }
+    if (inv.status === "void") { failed.push({ id: inv.id, error: "void" }); continue; }
+    if (!EMAIL_RE.test(to)) { failed.push({ id: inv.id, error: "no email on file" }); continue; }
+    if (!inv.share_token) { failed.push({ id: inv.id, error: "no link" }); continue; }
+    if (msgs.length >= room) { failed.push({ id: inv.id, error: "over today's limit, send tomorrow" }); continue; }
+    const num = "LC-" + String(inv.number || 0).padStart(4, "0"), first = String(c.name || "").split(" ")[0] || "there";
+    const link = `${SITE}/d/?t=${inv.share_token}`, month = fmtMonth(inv.period_end);
+    const parts = {
+      heading: `Your invoice ${num}`,
+      lines: [`Hi ${esc(first)},`, `Your invoice${month ? " for " + esc(month) : ""} from Latta Corp of Central Florida is ready.`,
+        `<b>Amount due: ${money2(inv.total)}</b>${inv.due_date ? " · Due " + esc(fmtDay(inv.due_date)) : ""}`],
+      button: "View your invoice", link,
+      small: `Pay with Zelle to ${esc(zelle)} (please include ${num} in the note), or cash or check on our next visit. Thank you for letting us treat your lawn with a "Latta" love!`,
+      foot: "Questions about this invoice? Reply to this email, or write to",
+    };
+    msgs.push({ from: INVOICE_FROM, to: [to], reply_to: SUPPORT_EMAIL, subject: `Invoice ${num} from Latta Corp · ${money2(inv.total)}`,
+      html: portalEmail(parts), text: portalText(parts) });
+    meta.push({ id: inv.id, to });
+  }
+  const sent = [];
+  if (msgs.length) {
+    const post = (arr) => fetch("https://api.resend.com/emails/batch", { method: "POST",
+      headers: { Authorization: `Bearer ${env.RESEND_API_KEY}`, "content-type": "application/json" }, body: JSON.stringify(arr) });
+    let res = await post(msgs);
+    if (!res.ok && (res.status === 403 || res.status === 422)) {
+      console.log("billing sender refused, retrying from website@", res.status, (await res.text()).slice(0, 200));
+      res = await post(msgs.map((m) => ({ ...m, from: "Latta Corp Billing <website@lattacorpfl.com>" })));
+    }
+    if (!res.ok) {
+      console.log("invoice batch failed", res.status, (await res.text()).slice(0, 300));
+      meta.forEach((m) => failed.push({ id: m.id, error: "the email service refused it" }));
+    } else {
+      const at = new Date().toISOString();
+      for (const m of meta) {
+        await sbRest(env, `invoices?id=eq.${m.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ emailed_at: at, emailed_to: m.to }) });
+        await sbRest(env, `invoices?id=eq.${m.id}&sent_at=is.null`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ sent_at: at }) });
+        sent.push({ id: m.id, to: m.to, at });
+      }
+    }
+  }
+  return json({ ok: true, sent, failed, left: Math.max(0, room - sent.length) });
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -535,6 +615,10 @@ export default {
     if (url.pathname === "/api/team") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handleTeam(request, env);
+    }
+    if (url.pathname === "/api/invoices/email") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      return handleInvoiceEmail(request, env);
     }
     if (url.pathname === "/api/quote-approved") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);

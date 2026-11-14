@@ -74,6 +74,7 @@ function visitCard(v, after, showJob, opts) {
   nm.appendChild(document.createTextNode(cname(v.client_id)));
   l.appendChild(nm);
   l.appendChild(el("span", "jtype", look.tag));
+  if (vKind(v) !== "visit") l.appendChild(el("div", "vkind " + vKind(v), vKind(v) === "addon" ? "Add-on: " + vTitle(v) : "Extra visit"));
   l.appendChild(el("div", "note", [paddr(v.property_id), money(v.price)].filter(Boolean).join(" · ")));
   if (opts.detail) {
     var pp = byId(props, v.property_id),
@@ -244,6 +245,12 @@ function visitCard(v, after, showJob, opts) {
         }
       }
     }
+    if (v.status === "done" && j && vKind(v) !== "addon")
+      a.appendChild(
+        btn("+ Add-on", "btn alt sm", function () {
+          openExtraForm(j, "addon", v.scheduled_date);
+        })
+      );
     if (!photoErr && v.status !== "skipped") {
       var pb = btn("Photo", "btn alt sm", function () {
         pickPhotos(true, function (fs) {

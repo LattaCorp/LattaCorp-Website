@@ -820,7 +820,7 @@ function backfillCards(host) {
                     visit_id: v.id,
                     service_date: v.scheduled_date,
                     address: paddr(v.property_id),
-                    description: jobTitle(v.job_id),
+                    description: vTitle(v),
                     amount: Number(v.price)
                   })
                   .then(function (r2_) {

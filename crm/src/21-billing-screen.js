@@ -38,6 +38,12 @@ function renderBilling() {
   $("topbtns").appendChild(btn("Bill the month", "btn alt", openBillMonth));
   $("topbtns").appendChild(document.createTextNode(" "));
   $("topbtns").appendChild(
+    btn("Email invoices", "btn alt", function () {
+      openBatchDeliver(null);
+    })
+  );
+  $("topbtns").appendChild(document.createTextNode(" "));
+  $("topbtns").appendChild(
     btn("Record payment", "btn alt", function () {
       openPayment(null);
     })
@@ -232,7 +238,7 @@ function renderToBill(list, bg) {
         top.style.cssText =
           "display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap";
         var l = el("div");
-        l.appendChild(el("b", null, cname(v.client_id) + " \u00b7 " + jobTitle(v.job_id)));
+        l.appendChild(el("b", null, cname(v.client_id) + " \u00b7 " + vTitle(v)));
         l.appendChild(
           el("div", "note", [dshort(v.scheduled_date), paddr(v.property_id)].filter(Boolean).join(" \u00b7 "))
         );
@@ -423,7 +429,7 @@ function renderToBill(list, bg) {
           "note",
           dshort(v.scheduled_date) +
             " · " +
-            jobTitle(v.job_id) +
+            vTitle(v) +
             " · " +
             paddr(v.property_id) +
             " · " +
@@ -1113,7 +1119,8 @@ function openBillMonth() {
     var sum = el("div", "cstats");
     [
       ["Invoices", String(gv.order.length)],
-      ["Visits", String(vs.length)],
+      ["Visits", String(vs.filter(function (v) { return vKind(v) !== "addon"; }).length)],
+      ["Add-ons", String(vs.filter(function (v) { return vKind(v) === "addon"; }).length)],
       ["Total", money(tot)]
     ].forEach(function (x) {
       var d = el("div");
@@ -1131,7 +1138,26 @@ function openBillMonth() {
     gv.order.forEach(function (k) {
       var x = gv.g[k],
         r = el("div", "bmrow");
-      r.appendChild(el("span", null, groupTitle(x) + " \u00b7 " + x.vs.length + " visit" + (x.vs.length > 1 ? "s" : "")));
+      var nv = x.vs.filter(function (v) {
+          return vKind(v) !== "addon";
+        }).length,
+        na = x.vs.length - nv,
+        ne = x.vs.filter(function (v) {
+          return vKind(v) === "extra";
+        }).length;
+      r.appendChild(
+        el(
+          "span",
+          null,
+          groupTitle(x) +
+            " \u00b7 " +
+            nv +
+            " visit" +
+            (nv === 1 ? "" : "s") +
+            (ne ? " (" + ne + " extra)" : "") +
+            (na ? " + " + na + " add-on" + (na > 1 ? "s" : "") : "")
+        )
+      );
       r.appendChild(
         el(
           "b",
@@ -1187,7 +1213,16 @@ function openBillMonth() {
     thr.hidden = true;
     body.appendChild(el("div", "qban ok")).appendChild(el("b", null, "\u2713 Created " + made.length + " invoice" + (made.length === 1 ? "" : "s")));
     if (fails.length) body.appendChild(el("div", "note", "Could not create: " + fails.join("; ")));
-    body.appendChild(el("p", "note", "Send each one. A row turns green once it's sent."));
+    var ea = btn("Email them all", "btn", function () {
+      openBatchDeliver(
+        made.map(function (i) {
+          return i.id;
+        })
+      );
+    });
+    ea.style.margin = "4px 0 10px";
+    body.appendChild(ea);
+    body.appendChild(el("p", "note", "Or send each one yourself. A row turns green once it's sent."));
     made.forEach(function (inv) {
       var c = byId(clients, inv.client_id),
         msg = invMessage(inv, c),
