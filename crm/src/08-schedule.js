@@ -94,6 +94,7 @@ function visitCard(v, after, showJob, opts) {
     wn.style.color = "#1f5f9a";
     l.appendChild(wn);
   }
+  if (v.status === "done") doneInfo(v, l);
   top.appendChild(l);
   if (v.status !== "scheduled")
     top.appendChild(

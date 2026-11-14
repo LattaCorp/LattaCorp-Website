@@ -62,7 +62,7 @@ function isOwner() {
 var view = (function () {
     try {
       var g = new URLSearchParams(location.search).get("go");
-      if (g && /^(leads|clients|jobs|schedule|billing|expenses|reports|photos|inventory|todo|personnel|team)$/.test(g)) {
+      if (g && /^(leads|clients|jobs|schedule|billing|expenses|reports|photos|inventory|todo|personnel|team|route|forms|messages)$/.test(g)) {
         history.replaceState(null, "", location.pathname);
         return g;
       }
@@ -323,6 +323,7 @@ function start() {
   $("refresh").hidden = false;
   $("acct").hidden = false;
   load();
+  setTimeout(chatRefresh, 1500);
 }
 sb.auth.getSession().then(function (r) {
   if (r.data && r.data.session) afterSignIn();
@@ -594,50 +595,93 @@ var NAV_LABELS = {
 function navLabel(v) {
   return NAV_LABELS[v] || "More";
 }
+/* The menu is five groups. Computers: a group opens its tabs underneath it (like Cloudflare's menu).
+   Phones: the bottom bar shows the groups, and tapping one pops up a column of its tabs above it. */
+var GICONS = {
+  customers: ICONS.clients,
+  field:
+    '<svg viewBox="0 0 24 24"><path d="M12 21V11"/><path d="M12 11c0-4 3-7 8-7 0 5-3 8-8 7z"/><path d="M12 14c0-3-2.5-5.5-7-5.5 0 4 2.5 6.5 7 5.5z"/><path d="M5 21h14"/></svg>',
+  finances:
+    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.2c-.5-1-1.6-1.6-3-1.6-1.8 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2-1.5 0-2.7-.7-3.1-1.8M12 6v1.6M12 16.6V18"/></svg>',
+  office:
+    '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2M10 21v-3h4v3"/></svg>',
+  personnel: ICONS.personnel
+};
+ICONS.route = '<svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/></svg>';
+ICONS.forms =
+  '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>';
+ICONS.messages = '<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 13.5h4.5"/></svg>';
+var navOpen = {};
+function navGroups() {
+  return [
+    ["customers", "Customers", GICONS.customers, ["leads", "clients", "jobs"]],
+    ["field", "Field", GICONS.field, ["schedule", "route", "photos"]],
+    ["finances", "Finances", GICONS.finances, ["billing", "expenses", "reports"]],
+    ["office", "Office", GICONS.office, ["messages", "forms", "todo", "inventory"]],
+    ["personnel", "Personnel", GICONS.personnel, isOwner() ? ["personnel"] : []]
+  ];
+}
+function groupOf(v) {
+  var g = navGroups().filter(function (x) {
+    return x[3].indexOf(v) > -1;
+  })[0];
+  return g ? g[0] : "";
+}
+function phoneNav() {
+  return window.matchMedia("(max-width:700px)").matches;
+}
 function closeMoreSheet() {
   var s = document.getElementById("moresheet");
   if (s) s.remove();
 }
-function openMoreSheet(items) {
-  if (document.getElementById("moresheet")) return closeMoreSheet();
+function openGroupSheet(gb, g, kids) {
+  var was = document.getElementById("moresheet");
+  closeMoreSheet();
+  if (was && was.dataset.g === g[0]) return;
   var sh = el("div");
   sh.id = "moresheet";
+  sh.dataset.g = g[0];
   sh.addEventListener("click", function (e) {
     if (e.target === sh) closeMoreSheet();
   });
-  var box = el("div", "msbox");
-  box.setAttribute("role", "menu");
-  box.appendChild(el("div", "mshd", "All sections"));
-  var g = el("div", "msgrid");
-  items.forEach(function (v) {
+  var col = el("div", "gcol");
+  col.setAttribute("role", "menu");
+  col.appendChild(el("div", "mshd", g[1]));
+  kids.forEach(function (v) {
     var b = el("button", v[0] === view ? "on" : "");
     b.type = "button";
     b.setAttribute("role", "menuitem");
-    b.innerHTML = ICONS[v[0]];
+    b.innerHTML = ICONS[v[0]] || "";
     b.appendChild(el("span", null, v[1]));
-    if (v[2]) b.appendChild(el("span", "badge", String(v[2])));
+    if ((v[2] || 0) + (v[3] || 0)) b.appendChild(el("span", "badge", String((v[2] || 0) + (v[3] || 0))));
     b.addEventListener("click", function () {
       view = v[0];
       render();
       window.scrollTo(0, 0);
     });
-    g.appendChild(b);
+    col.appendChild(b);
   });
-  box.appendChild(g);
-  sh.appendChild(box);
+  sh.appendChild(col);
   document.body.appendChild(sh);
+  // sit right above the group's button, kept on screen
+  var r = gb.getBoundingClientRect(),
+    w = Math.max(230, r.width + 40),
+    left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+  col.style.width = w + "px";
+  col.style.left = left + "px";
+  col.style.bottom = window.innerHeight - r.top + 8 + "px";
 }
 document.addEventListener("keydown", function (e) {
   if (e.key === "Escape") closeMoreSheet();
 });
 function render() {
-  var nav = $("side"),
-    moreItems = [],
-    moreBadge = 0;
+  if (view === "team") view = "personnel";
+  var nav = $("side");
   nav.textContent = "";
   closeMoreSheet();
   $("app").classList.toggle("wide", view === "reports" || view === "inventory" || view === "expenses");
   document.body.classList.toggle("v-expenses", view === "expenses");
+  document.body.classList.toggle("noopts", view === "route" || view === "messages");
   var tdy = today(),
     stops = visits.filter(function (v) {
       return v.status === "scheduled" && v.scheduled_date === tdy;
@@ -645,40 +689,77 @@ function render() {
     newL = leads.filter(function (l) {
       return l.status === "new";
     }).length;
-  [
-    ["leads", "Leads", newL, newResponses().length],
-    ["clients", "Clients", 0],
-    ["jobs", "Jobs", 0],
-    ["schedule", "Schedule", stops],
-    ["billing", "Billing", invoices.filter(isOverdue).length],
-    ["expenses", "Expenses", receiptsToEnter().length],
-    ["reports", "Reports", 0],
-    ["photos", "Photos", 0],
-    ["inventory", "Inventory", 0],
-    [
+  var items = {
+    leads: ["leads", "Leads", newL, newResponses().length],
+    clients: ["clients", "Clients", 0],
+    jobs: ["jobs", "Jobs", 0],
+    schedule: ["schedule", "Schedule", stops],
+    route: ["route", "Route check-off", stops],
+    photos: ["photos", "Photos", 0],
+    billing: ["billing", "Billing", invoices.filter(isOverdue).length],
+    expenses: ["expenses", "Expenses", receiptsToEnter().length],
+    reports: ["reports", "Reports", 0],
+    messages: ["messages", "Messages", typeof msgUnread === "function" ? msgUnread() : 0],
+    forms: ["forms", "Forms", 0],
+    todo: [
       "todo",
       "To-Do",
       todos.filter(function (t) {
         return !t.done && t.due_date && t.due_date <= tdy;
       }).length
-    ]
-  ]
-    .concat(
-      isOwner()
-        ? [
-            ["personnel", "Personnel", 0],
-            ["team", "Team", 0]
-          ]
-        : []
-    )
-    .forEach(function (v) {
-      var b = el("button", v[0] === view ? "on" : "");
+    ],
+    inventory: ["inventory", "Inventory", 0],
+    personnel: ["personnel", "Personnel", 0]
+  };
+  var mine = navGroups().filter(function (g) {
+    return g[3].length;
+  });
+  var curG = groupOf(view);
+  mine.forEach(function (g) {
+    var kids = g[3].map(function (k) {
+        return items[k];
+      }),
+      sum = 0,
+      single = kids.length === 1;
+    kids.forEach(function (v) {
+      sum += (v[2] || 0) + (v[3] || 0);
+    });
+    var open = single ? false : navOpen[g[0]] != null ? navOpen[g[0]] : g[0] === curG;
+    var gb = el("button", "grp pri" + (g[0] === curG ? " cur" : "") + (single && view === g[3][0] ? " on" : "") + (open ? " open" : ""));
+    gb.type = "button";
+    gb.dataset.g = g[0];
+    gb.innerHTML = g[2];
+    gb.appendChild(el("span", "gl", g[1]));
+    if (sum && (!open || single)) gb.appendChild(el("span", "badge", String(sum)));
+    if (!single) {
+      var ch = el("i", "chev");
+      ch.setAttribute("aria-hidden", "true");
+      gb.appendChild(ch);
+      gb.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    gb.addEventListener("click", function () {
+      if (single) {
+        view = g[3][0];
+        render();
+        window.scrollTo(0, 0);
+        return;
+      }
+      if (phoneNav()) return openGroupSheet(gb, g, kids);
+      navOpen[g[0]] = !open;
+      render();
+    });
+    nav.appendChild(gb);
+    if (single || !open) return;
+    var box = el("div", "subs");
+    kids.forEach(function (v) {
+      var b = el("button", "sub" + (v[0] === view ? " on" : ""));
       b.type = "button";
       b.addEventListener("click", function () {
         view = v[0];
         render();
+        window.scrollTo(0, 0);
       });
-      b.innerHTML = ICONS[v[0]];
+      b.innerHTML = ICONS[v[0]] || "";
       b.appendChild(el("span", null, v[1]));
       b.dataset.v = v[0];
       if (v[2]) b.appendChild(el("span", "badge", String(v[2])));
@@ -688,24 +769,10 @@ function render() {
         b.appendChild(rb);
       }
       b.setAttribute("aria-current", v[0] === view ? "page" : "false");
-      if (NAV_MAIN.indexOf(v[0]) >= 0) b.classList.add("pri");
-      else {
-        moreBadge += (v[2] || 0) + (v[3] || 0);
-        moreItems.push(v);
-      }
-      nav.appendChild(b);
+      box.appendChild(b);
     });
-  /* Phones: the bottom bar keeps the four everyday sections and puts the rest under More. */
-  var mb = el("button", "more" + (NAV_MAIN.indexOf(view) < 0 ? " on" : ""));
-  mb.type = "button";
-  mb.innerHTML = ICONS.more;
-  mb.appendChild(el("span", null, NAV_MAIN.indexOf(view) < 0 ? navLabel(view) : "More"));
-  if (moreBadge) mb.appendChild(el("span", "badge", String(moreBadge)));
-  mb.setAttribute("aria-haspopup", "true");
-  mb.addEventListener("click", function () {
-    openMoreSheet(moreItems);
+    nav.appendChild(box);
   });
-  nav.appendChild(mb);
   $("topbtns").textContent = "";
   optMark(null);
   [].forEach.call(document.querySelectorAll(".rinbox"), function (x) {
@@ -729,7 +796,9 @@ function render() {
   else if (view === "photos") renderPhotoLib();
   else if (view === "inventory") renderInventory();
   else if (view === "personnel" && isOwner()) renderPersonnel();
-  else if (view === "team" && isOwner()) renderTeam();
+  else if (view === "route") renderRoute();
+  else if (view === "forms") renderForms();
+  else if (view === "messages") renderMessages();
   else renderSchedule();
 }
 
@@ -4725,6 +4794,7 @@ function visitCard(v, after, showJob, opts) {
     wn.style.color = "#1f5f9a";
     l.appendChild(wn);
   }
+  if (v.status === "done") doneInfo(v, l);
   top.appendChild(l);
   if (v.status !== "scheduled")
     top.appendChild(
@@ -6559,15 +6629,15 @@ function msgActions(r, c, body, subject, onUse) {
 /* Team tab (owners only): who can sign in and their role. */
 
 /* ---- Team: owners add office staff and co-owners ---- */
-function renderTeam() {
+function renderTeam(inPersonnel) {
   var tabs = $("tabs");
-  tabs.textContent = "";
+  if (!inPersonnel) tabs.textContent = "";
   var list = $("list");
   list.textContent = "";
   var intro = el(
     "div",
     "note",
-    "Everyone here signs in at this same address with their own email and password. Owners and co-owners can do everything. Office staff can use clients, jobs, schedule, billing and invoices, and email clients, but they can't add people, manage crew logins, or text from the CRM."
+    "Office staff and owners who can sign in to Foreman. Crew logins are under Crew logins & texting. Everyone signs in at this same address with their own email and password. Owners and co-owners can do everything. Office staff can use clients, jobs, schedule, billing and invoices, and email clients, but they can't add people, manage crew logins, or text from the CRM."
   );
   intro.style.marginBottom = "12px";
   list.appendChild(intro);
@@ -6755,7 +6825,8 @@ var DKINDS = [
   ["Insurance", "Insurance"],
   ["Other", "Other"]
 ];
-var pstCache = {};
+var pstCache = {},
+  teamRoles = null;
 function empId(p) {
   return "EMP-" + ("000" + p.emp_no).slice(-4);
 }
@@ -6845,6 +6916,9 @@ function syncTeam() {
         teamSyncing = false;
         return;
       }
+      var hadRoles = !!teamRoles;
+      teamRoles = res.data.members;
+      if (!hadRoles && view === "personnel") setTimeout(render, 0);
       var jobs = [];
       res.data.members.forEach(function (m) {
         var em = String(m.email || "")
@@ -6917,6 +6991,8 @@ function renderPersonnel() {
       openPerson(null);
     })
   );
+  $("topbtns").appendChild(document.createTextNode(" "));
+  $("topbtns").appendChild(btn("Crew logins & texting", "btn alt", openCrew));
   syncTeam();
   if (persErr) {
     list.appendChild(
@@ -6928,23 +7004,31 @@ function renderPersonnel() {
     );
     return;
   }
-  var counts = { all: 0, active: 0, team: 0, inactive: 0 };
+  var counts = { all: 0, inactive: 0 };
   people.forEach(function (p) {
-    counts[p.status] = (counts[p.status] || 0) + 1;
-    if (p.status !== "inactive") counts.all++;
+    if (p.status === "inactive") counts.inactive++;
+    else counts.all++;
   });
-  [["all", "All"]].concat(PSTAT).forEach(function (s) {
+  [
+    ["all", "People", counts.all],
+    ["inactive", "Former", counts.inactive],
+    ["access", "Sign-in & roles", null]
+  ].forEach(function (s) {
     var b = el("button", "tab" + (pfilter === s[0] ? " on" : ""), s[1]);
     b.type = "button";
-    b.appendChild(el("span", null, "(" + (counts[s[0]] || 0) + ")"));
+    if (s[2] != null) b.appendChild(el("span", null, "(" + s[2] + ")"));
     b.addEventListener("click", function () {
       pfilter = s[0];
       render();
     });
     tabs.appendChild(b);
   });
+  if (pfilter === "access") {
+    renderTeam(true);
+    return;
+  }
   var shown = people.filter(function (p) {
-    if (pfilter === "all" ? p.status === "inactive" : p.status !== pfilter) return false;
+    if (pfilter === "inactive" ? p.status !== "inactive" : p.status === "inactive") return false;
     if (!query) return true;
     return [p.full_name, empId(p), p.job_title, p.phone, p.email].join(" ").toLowerCase().indexOf(query) > -1;
   });
@@ -6967,13 +7051,8 @@ function renderPersonnel() {
     left.appendChild(t);
     var right = el("div");
     right.style.textAlign = "right";
-    right.appendChild(
-      el(
-        "span",
-        "chip " + (p.status === "inactive" ? "lost" : p.status === "team" ? "won" : ""),
-        pstatLabel(p.status)
-      )
-    );
+    var acc = personAccess(p);
+    right.appendChild(el("span", "chip " + (p.status === "inactive" ? "lost" : acc[1]), p.status === "inactive" ? "Former" : acc[0]));
     var yr = String(new Date().getFullYear());
     right.appendChild(el("div", "sub", "Paid " + yr + ": " + money(sumAmt(paidBy(p.id, yr)))));
     b.appendChild(left);
@@ -6983,6 +7062,22 @@ function renderPersonnel() {
     });
     list.appendChild(b);
   });
+}
+// what this person can sign in to: office/owner login, crew login, or none
+function personAccess(p) {
+  var em = String(p.login_email || p.email || "").toLowerCase();
+  if (em) {
+    var t = (teamRoles || team || []).filter(function (m) {
+      return String(m.email || "").toLowerCase() === em;
+    })[0];
+    if (t) return t.role === "owner" ? ["Owner", "won"] : ["Office login", "won"];
+    var c = (crew || []).filter(function (m) {
+      return m.kind === "login" && String(m.email || "").toLowerCase() === em;
+    })[0];
+    if (c) return ["Crew login", ""];
+  }
+  if (p.status === "team") return ["Office login", "won"];
+  return ["No login", "lost"];
 }
 function pRow(p) {
   for (var i = 0; i < people.length; i++)
@@ -12530,20 +12625,139 @@ function startCrewApp(me) {
   $("signout").hidden = false;
   $("acct").hidden = false;
   $("refresh").hidden = false;
+  crewHeaderText();
   renderCrewApp();
+  chatRefresh().then(function () {
+    if (msgUnread() && crewTab === "route") renderCrewApp();
+  });
 }
+/* ---- crew screen in English or Spanish (each phone remembers its choice) ---- */
+var CREW_ES = {
+  "Hi, ": "Hola, ",
+  "Upload receipt": "Subir recibo",
+  "What was it for? (optional)": "¿Para qué fue? (opcional)",
+  "Loading...": "Cargando...",
+  "Could not load your route. Pull to refresh or sign in again.": "No se pudo cargar tu ruta. Actualiza o vuelve a iniciar sesión.",
+  "No stops for this day.": "No hay paradas este día.",
+  stop: "parada",
+  stops: "paradas",
+  done: "listas",
+  "Start route": "Iniciar ruta",
+  Map: "Mapa",
+  Done: "Listo",
+  Undo: "Deshacer",
+  "Save": "Guardar",
+  "Cancel": "Cancelar",
+  "Edit": "Editar",
+  "Could not save that. Try again.": "No se pudo guardar. Inténtalo de nuevo.",
+  "Hedge trimming": "Recorte de arbustos",
+  "Weed killing": "Control de maleza",
+  "Note for the client (shows on the invoice)": "Nota para el cliente (aparece en la factura)",
+  "(no charge)": "(sin cargo)",
+  Today: "Hoy",
+  Route: "Ruta",
+  Messages: "Mensajes",
+  "Uploading...": "Subiendo...",
+  "Please sign in again.": "Vuelve a iniciar sesión.",
+  "✓ Receipt sent to the office.": "✓ Recibo enviado a la oficina.",
+  "Could not upload. Try again.": "No se pudo subir. Inténtalo de nuevo.",
+  "Phone notifications": "Notificaciones",
+  "Log out": "Cerrar sesión",
+  "Signed in": "Sesión iniciada",
+  "On an invoice": "Ya facturado",
+  Everyone: "Todos",
+  Office: "Oficina",
+  Chats: "Chats",
+  Back: "Atr\u00e1s",
+  Send: "Enviar",
+  Photo: "Foto",
+  "Type a message...": "Escribe un mensaje...",
+  "Message someone...": "Escribirle a alguien...",
+  "No messages yet. Say hi!": "A\u00fan no hay mensajes. \u00a1Saluda!",
+  "Could not send. Try again.": "No se pudo enviar. Int\u00e9ntalo de nuevo.",
+  "This phone can't get notifications. Open Foreman in Chrome and install it, then open it from the home screen.":
+    "Este tel\u00e9fono no puede recibir notificaciones. Abre Foreman en Chrome, inst\u00e1lalo y \u00e1brelo desde la pantalla de inicio.",
+  "\u2713 Notifications are on for this phone.": "\u2713 Las notificaciones est\u00e1n activadas en este tel\u00e9fono.",
+  "Send a test": "Enviar prueba",
+  "Sent.": "Enviada.",
+  "Turn off": "Desactivar",
+  "Turn on notifications": "Activar notificaciones",
+  "Notifications weren't allowed.": "No se permitieron las notificaciones.",
+  "\u2713 Turned on.": "\u2713 Activadas."
+};
+var crewLang = (function () {
+  try {
+    return localStorage.getItem("crewLang") === "es" ? "es" : "en";
+  } catch (e) {
+    return "en";
+  }
+})();
+function crewT(s) {
+  return crewMe && crewLang === "es" && CREW_ES[s] ? CREW_ES[s] : s;
+}
+function crewLangBar(host) {
+  var w = el("div", "langsw");
+  [
+    ["en", "English"],
+    ["es", "Español"]
+  ].forEach(function (x) {
+    var b = btn(x[1], "langbtn" + (crewLang === x[0] ? " on" : ""), function () {
+      crewLang = x[0];
+      try {
+        localStorage.setItem("crewLang", x[0]);
+      } catch (e) {}
+      crewHeaderText();
+      renderCrewApp();
+    });
+    b.setAttribute("aria-pressed", crewLang === x[0] ? "true" : "false");
+    w.appendChild(b);
+  });
+  host.appendChild(w);
+}
+function crewHeaderText() {
+  var so = $("signout"),
+    mn = $("menuNotify");
+  if (so && so.lastChild) so.lastChild.textContent = crewT("Log out");
+  if (mn && mn.lastChild) mn.lastChild.textContent = crewT("Phone notifications");
+}
+var crewTab = "route";
 function renderCrewApp() {
   var box = $("crewapp"),
     d = cwDate,
     t = today();
   box.textContent = "";
-  box.appendChild(el("h2", null, "Hi, " + String(crewMe.name || "").split(" ")[0]));
+  document.documentElement.lang = crewLang;
+  var top = el("div", "cwtop");
+  top.appendChild(el("h2", null, crewT("Hi, ") + String(crewMe.name || "").split(" ")[0]));
+  crewLangBar(top);
+  box.appendChild(top);
+  var tb = el("div", "tabs cwtabs");
+  [
+    ["route", crewT("Route")],
+    ["messages", crewT("Messages")]
+  ].forEach(function (x) {
+    var b = el("button", "tab" + (crewTab === x[0] ? " on" : ""), x[1]);
+    b.type = "button";
+    if (x[0] === "messages" && typeof msgUnread === "function" && msgUnread()) b.appendChild(el("i", "tnew", String(msgUnread())));
+    b.addEventListener("click", function () {
+      crewTab = x[0];
+      renderCrewApp();
+    });
+    tb.appendChild(b);
+  });
+  box.appendChild(tb);
+  if (crewTab === "messages") {
+    var mh = el("div");
+    box.appendChild(mh);
+    renderChat(mh);
+    return;
+  }
   // snap a receipt: it goes to the office's Receipts to enter
   var rb = el("div", "qacts cwrcpt");
   var rst = el("span", "note");
   rb.appendChild(
-    btn("Upload receipt", "btn alt sm", function () {
-      var note = prompt("What was it for? (optional)", "") || "";
+    btn(crewT("Upload receipt"), "btn alt sm", function () {
+      var note = prompt(crewT("What was it for? (optional)"), "") || "";
       pickPhotos(true, function (fs) {
         crewReceipts(fs, note, rst);
       });
@@ -12551,37 +12765,39 @@ function renderCrewApp() {
   );
   rb.appendChild(rst);
   box.appendChild(rb);
-  box.appendChild(
-    calNav(
-      longDate(d),
-      function () {
-        cwDate = addDays(d, -1);
-        renderCrewApp();
-      },
-      function () {
-        cwDate = addDays(d, 1);
-        renderCrewApp();
-      },
-      function () {
-        cwDate = t;
-        renderCrewApp();
-      },
-      d !== t
-    )
+  var nav = calNav(
+    pd(d).toLocaleDateString(crewLang === "es" ? "es-US" : undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }),
+    function () {
+      cwDate = addDays(d, -1);
+      renderCrewApp();
+    },
+    function () {
+      cwDate = addDays(d, 1);
+      renderCrewApp();
+    },
+    function () {
+      cwDate = t;
+      renderCrewApp();
+    },
+    d !== t
   );
+  [].forEach.call(nav.querySelectorAll("button"), function (b) {
+    if (b.textContent === "Today") b.textContent = crewT("Today");
+  });
+  box.appendChild(nav);
   var body = el("div");
-  body.appendChild(el("div", "note", "Loading..."));
+  body.appendChild(el("div", "note", crewT("Loading...")));
   box.appendChild(body);
   sb.rpc("crew_route", { p_from: d, p_to: d }).then(function (r) {
-    if (cwDate !== d) return;
+    if (cwDate !== d || crewTab !== "route") return;
     body.textContent = "";
     if (r.error) {
-      body.appendChild(el("div", "note", "Could not load your route. Pull to refresh or sign in again."));
+      body.appendChild(el("div", "note", crewT("Could not load your route. Pull to refresh or sign in again.")));
       return;
     }
     var rows = r.data || [];
     if (!rows.length) {
-      body.appendChild(el("div", "empty", "No stops for this day."));
+      body.appendChild(el("div", "empty", crewT("No stops for this day.")));
       return;
     }
     var todo = rows.filter(function (x) {
@@ -12593,7 +12809,7 @@ function renderCrewApp() {
       el(
         "b",
         null,
-        rows.length + " stop" + (rows.length > 1 ? "s" : "") + (done ? " · " + done + " done" : "")
+        rows.length + " " + crewT(rows.length > 1 ? "stops" : "stop") + (done ? " · " + done + " " + crewT("done") : "")
       )
     );
     var addrs = todo
@@ -12603,7 +12819,7 @@ function renderCrewApp() {
       .filter(Boolean)
       .slice(0, 10);
     if (addrs.length) {
-      var a = el("a", "btn sm", "Start route");
+      var a = el("a", "btn sm", crewT("Start route"));
       a.href =
         "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" +
         encodeURIComponent(addrs[addrs.length - 1]) +
@@ -12614,7 +12830,8 @@ function renderCrewApp() {
     }
     body.appendChild(sum);
     rows.forEach(function (x, i) {
-      var card = el("div", "pcard cwstop" + (x.status === "done" ? " isdone" : ""));
+      var isDone = x.status === "done";
+      var card = el("div", "pcard cwstop" + (isDone ? " isdone" : ""));
       card.appendChild(el("div", "cwtitle", i + 1 + ". " + x.job_title));
       card.appendChild(el("div", "cwaddr", x.address));
       var tips = [x.property_notes, x.instructions].filter(Boolean).join("\n");
@@ -12623,22 +12840,57 @@ function renderCrewApp() {
         n.style.cssText = "color:#7a5b00;white-space:pre-wrap;margin-top:4px";
         card.appendChild(n);
       }
+      function save(doneNow, pick) {
+        sb.rpc("crew_set_done", {
+          p_visit: x.visit_id,
+          p_done: doneNow,
+          p_extras: pick ? pick.extras : null,
+          p_note: pick ? pick.note : null
+        }).then(function (r2) {
+          if (r2.error) alert(crewT("Could not save that. Try again."));
+          else if (doneNow && !isDone) callApi("/api/push", "client-visit", { id: x.visit_id });
+          renderCrewApp();
+        });
+      }
       var acts = el("div", "acts"),
-        m = el("a", "btn alt", "Map");
+        m = el("a", "btn alt", crewT("Map"));
       m.href = mapsUrl(x.address);
       m.target = "_blank";
       m.rel = "noopener";
       acts.appendChild(m);
-      var isDone = x.status === "done";
-      acts.appendChild(
-        btn(isDone ? "Undo" : "Done", isDone ? "btn alt" : "btn", function () {
-          sb.rpc("crew_set_done", { p_visit: x.visit_id, p_done: !isDone }).then(function (r2) {
-            if (r2.error) alert("Could not save that. Try again.");
-            else if (!isDone) callApi("/api/push", "client-visit", { id: x.visit_id });
-            renderCrewApp();
-          });
-        })
-      );
+      if (isDone) {
+        var ex = (x.done_extras || []).map(function (k) {
+          return crewT(extraLabel(k));
+        });
+        if (ex.length) card.appendChild(el("div", "donex", "✓ " + ex.join(" · ") + " " + crewT("(no charge)")));
+        if (x.done_note) card.appendChild(el("div", "donenote", "“" + x.done_note + "”"));
+        acts.appendChild(
+          btn(crewT("Edit"), "btn alt", function () {
+            acts.textContent = "";
+            var get = extrasPicker(card, x.done_extras, x.done_note, true);
+            card.appendChild(acts);
+            acts.appendChild(
+              btn(crewT("Save"), "btn", function () {
+                save(true, get());
+              })
+            );
+            acts.appendChild(btn(crewT("Cancel"), "btn alt", renderCrewApp));
+          })
+        );
+        acts.appendChild(
+          btn(crewT("Undo"), "btn alt", function () {
+            save(false, null);
+          })
+        );
+      } else {
+        var getP = extrasPicker(card, x.done_extras, x.done_note, true);
+        card.appendChild(acts);
+        acts.appendChild(
+          btn(crewT("Done"), "btn rdone", function () {
+            save(true, getP());
+          })
+        );
+      }
       card.appendChild(acts);
       body.appendChild(card);
     });
@@ -12648,11 +12900,11 @@ function renderCrewApp() {
 function crewReceipts(files, note, st) {
   files = Array.prototype.slice.call(files || []);
   if (!files.length) return;
-  st.textContent = "Uploading...";
+  st.textContent = crewT("Uploading...");
   sb.auth.getSession().then(function (ss) {
     var uidv = ss && ss.data && ss.data.session && ss.data.session.user && ss.data.session.user.id;
     if (!uidv) {
-      st.textContent = "Please sign in again.";
+      st.textContent = crewT("Please sign in again.");
       return;
     }
     var ok = 0;
@@ -12685,7 +12937,7 @@ function crewReceipts(files, note, st) {
         });
       }, Promise.resolve())
       .then(function () {
-        st.textContent = ok ? "\u2713 Receipt sent to the office." : "Could not upload. Try again.";
+        st.textContent = ok ? crewT("\u2713 Receipt sent to the office.") : crewT("Could not upload. Try again.");
         if (ok) callApi("/api/push", "receipt", {}); // pings the office phones
       });
   });
@@ -12842,7 +13094,7 @@ function createInvoice(cid, vs, through, pid) {
           visit_id: v.id,
           service_date: v.scheduled_date,
           address: paddr(v.property_id),
-          description: vTitle(v),
+          description: invLineDesc(v),
           amount: v.price
         };
       });
@@ -14061,7 +14313,7 @@ function backfillCards(host) {
                     visit_id: v.id,
                     service_date: v.scheduled_date,
                     address: paddr(v.property_id),
-                    description: vTitle(v),
+                    description: invLineDesc(v),
                     amount: Number(v.price)
                   })
                   .then(function (r2_) {
@@ -21968,7 +22220,6 @@ function acctMenu(open) {
     w.textContent = "";
     w.appendChild(el("b", null, crewMe ? crewMe.name || "Crew" : (typeof team !== "undefined" && (team.filter(function (x) { return x.email === myEmail; })[0] || {}).name) || "Signed in"));
     w.appendChild(document.createTextNode(myEmail || ""));
-    $("menuNotify").hidden = !!crewMe;
   }
   m.hidden = !open;
   b.setAttribute("aria-expanded", open ? "true" : "false");
@@ -21988,14 +22239,18 @@ document.addEventListener("keydown", function (e) {
 });
 $("menuNotify").addEventListener("click", function () {
   acctMenu(false);
-  openNotifySettings();
+  if (crewMe) crewNotify();
+  else openNotifySettings();
 });
 if ("serviceWorker" in navigator)
   navigator.serviceWorker.addEventListener("message", function (e) {
     var g = e.data && e.data.go;
-    if (g && /^(leads|clients|jobs|schedule|billing|expenses|reports|photos|inventory|todo|personnel|team)$/.test(g) && !crewMe) {
+    if (g && /^(leads|clients|jobs|schedule|billing|expenses|reports|photos|inventory|todo|personnel|team|route|forms|messages)$/.test(g) && !crewMe) {
       view = g;
       load();
+    } else if (g === "messages" && crewMe) {
+      crewTab = "messages";
+      renderCrewApp();
     }
   });
 
@@ -22060,6 +22315,784 @@ function openNewsForm() {
   a.appendChild(btn("Close", "btn alt", closeDetail));
   p.appendChild(a);
   ti.input.focus();
+}
+
+/* ======================= crm/src/29-forms.js ======================= */
+/* Forms tab: every "start something" form in one place. The same forms stay on their own tabs too. */
+function formGroups() {
+  var own = isOwner();
+  return [
+    [
+      "Customers",
+      [
+        ["New client", "Add a client and their property", function () { openClientForm(null); }],
+        ["New job", "Set up recurring or one-time work", function () { openJobForm(null, null); }],
+        ["New quote", "Write a quote for a client or lead", function () { openEstimateForm(null); }],
+        ["Price calculator", "Work out a price before you quote", openCalc],
+        ["Import clients", "Bring clients in from a CSV file", openImport]
+      ]
+    ],
+    [
+      "Field",
+      [
+        ["Add event", "Put something on the schedule", function () { openEventForm(null, today()); }],
+        ["Add photos", "Upload job or property photos", openAddPhotos],
+        own ? ["Crew & route texting", "Crew logins and texting a route", openCrew] : null,
+        ["Schedule settings", "How the schedule works for you", openSchedSettings]
+      ]
+    ],
+    [
+      "Finances",
+      [
+        ["New invoice", "Bill a client", function () { openInvoiceForm(null); }],
+        ["Bill the month", "Make this month's invoices from visits", openBillMonth],
+        ["Email invoices", "Send invoices in batches", function () { openBatchDeliver(null); }],
+        ["Record payment", "A check, cash, Zelle or card payment", function () { openPayment(null); }],
+        ["Add expense", "Type in a purchase", function () { openExpense(null); }],
+        ["Upload receipt", "Snap or upload a receipt", openReceiptUpload],
+        ["Paste expenses from Excel", "Bring in many expenses at once", openExpPaste]
+      ]
+    ],
+    [
+      "Office",
+      [
+        ["New task", "A to-do with a due date", function () { openTodo(null); }],
+        ["Send news to clients", "Shows in their portal and on their phones", openNewsForm],
+        ["New inventory category", "Track equipment or supplies", openInvCatForm],
+        ["Phone notifications", "What pings your phone", openNotifySettings]
+      ]
+    ],
+    own
+      ? [
+          "Personnel",
+          [
+            ["Add person", "A new employee or contractor record", function () { openPerson(null); }],
+            ["Billing settings", "Business info printed on invoices", openBizSettings]
+          ]
+        ]
+      : null
+  ].filter(Boolean);
+}
+function renderForms() {
+  $("tabs").textContent = "";
+  var list = $("list");
+  list.textContent = "";
+  var wrap = el("div", "formsgrid");
+  formGroups().forEach(function (g) {
+    var card = el("section", "card formsec");
+    card.appendChild(el("h3", null, g[0]));
+    g[1].filter(Boolean).forEach(function (f) {
+      var b = el("button", "formbtn");
+      b.type = "button";
+      b.appendChild(el("b", null, f[0]));
+      b.appendChild(el("span", null, f[1]));
+      b.addEventListener("click", function () {
+        f[2]();
+      });
+      card.appendChild(b);
+    });
+    wrap.appendChild(card);
+  });
+  list.appendChild(wrap);
+}
+
+/* ======================= crm/src/30-route.js ======================= */
+/* Route check-off: tap Done on each home, tick the free extras (hedge trimming, weed killing) and leave a note.
+   The extras never change the price; they and the note print on that visit's invoice line. */
+var ROUTE_EXTRAS = [
+  ["hedge", "Hedge trimming"],
+  ["weeds", "Weed killing"]
+];
+function extraLabel(k) {
+  var x = ROUTE_EXTRAS.filter(function (e) {
+    return e[0] === k;
+  })[0];
+  return x ? x[1] : k;
+}
+/* the invoice line for a visit: its name, then what else was done at no charge and the crew's note */
+function invLineDesc(v) {
+  var parts = [vTitle(v)],
+    ex = (v && v.done_extras) || [];
+  if (ex.length)
+    parts.push(
+      "Also done at no charge: " +
+        ex
+          .map(function (k) {
+            return extraLabel(k).toLowerCase();
+          })
+          .join(", ")
+    );
+  if (v && v.done_note) parts.push("Note: " + v.done_note);
+  return parts.join(" · ");
+}
+/* the small "also done / note" lines under a finished visit */
+function doneInfo(v, host) {
+  var ex = (v.done_extras || []).map(extraLabel);
+  if (ex.length) host.appendChild(el("div", "donex", "✓ " + ex.join(" · ") + " (no charge)"));
+  if (v.done_note) host.appendChild(el("div", "donenote", "“" + v.done_note + "”"));
+}
+/* the extras checkboxes + note box; returns a getter for what's picked */
+function extrasPicker(host, cur, note, es) {
+  var t = es
+    ? function (s) {
+        return crewT(s);
+      }
+    : function (s) {
+        return s;
+      };
+  var w = el("div", "rxtra"),
+    boxes = {};
+  ROUTE_EXTRAS.forEach(function (e) {
+    var lb = el("label", "chk rxchk"),
+      cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = (cur || []).indexOf(e[0]) > -1;
+    boxes[e[0]] = cb;
+    lb.appendChild(cb);
+    lb.appendChild(document.createTextNode(" " + t(e[1])));
+    w.appendChild(lb);
+  });
+  host.appendChild(w);
+  var ta = document.createElement("textarea");
+  ta.rows = 2;
+  ta.maxLength = 500;
+  ta.className = "rnote";
+  ta.placeholder = t("Note for the client (shows on the invoice)");
+  ta.value = note || "";
+  host.appendChild(ta);
+  return function () {
+    return {
+      extras: ROUTE_EXTRAS.map(function (e) {
+        return e[0];
+      }).filter(function (k) {
+        return boxes[k].checked;
+      }),
+      note: ta.value.trim()
+    };
+  };
+}
+/* staff marking a visit done (or undoing it) from Route check-off */
+function finishVisit(v, done, pick, cb) {
+  var p = done
+    ? { status: "done", completed_at: new Date().toISOString(), done_extras: pick.extras, done_note: pick.note || null }
+    : { status: "scheduled", completed_at: null };
+  sb.from("visits")
+    .update(p)
+    .eq("id", v.id)
+    .then(function (r) {
+      if (r.error) {
+        alert(
+          /done_extras|done_note/.test(r.error.message || "")
+            ? "Run the Stage 46 SQL in Supabase first."
+            : "Could not save that."
+        );
+        return;
+      }
+      Object.assign(v, p);
+      if (done) callApi("/api/push", "client-visit", { id: v.id });
+      var j = byId(jobs, v.job_id),
+        jobStep = Promise.resolve();
+      if (j && j.frequency === "once") {
+        var ns = done ? "ended" : "active";
+        if (j.status !== ns && (j.status === "active" || j.status === "ended"))
+          jobStep = sb
+            .from("jobs")
+            .update({ status: ns })
+            .eq("id", j.id)
+            .then(function () {
+              j.status = ns;
+            });
+      }
+      jobStep.then(function () {
+        return billErr ? null : loadUnbilled();
+      }).then(cb, cb);
+    });
+}
+var routeDate = null,
+  routeCrew = "";
+function renderRoute() {
+  var tabs = $("tabs"),
+    list = $("list");
+  tabs.textContent = "";
+  list.textContent = "";
+  var d = routeDate || today();
+  list.appendChild(
+    calNav(
+      longDate(d),
+      function () {
+        routeDate = addDays(d, -1);
+        render();
+      },
+      function () {
+        routeDate = addDays(d, 1);
+        render();
+      },
+      function () {
+        routeDate = null;
+        render();
+      },
+      d !== today()
+    )
+  );
+  if (s3 && crew.length) {
+    var sel = fld("Crew", "select", routeCrew, [["", "Everyone"], ["none", "Not assigned"]].concat(
+      crew.filter(function (c) {
+        return c.active !== false;
+      }).map(function (c) {
+        return [c.id, c.name];
+      })
+    ));
+    sel.classList.add("rcrew");
+    sel.input.addEventListener("change", function () {
+      routeCrew = sel.input.value;
+      render();
+    });
+    list.appendChild(sel);
+  }
+  var day = visits
+    .filter(function (v) {
+      if (v.scheduled_date !== d || v.status === "skipped") return false;
+      if (routeCrew === "none") return !v.crew_id;
+      if (routeCrew) return v.crew_id === routeCrew;
+      return true;
+    })
+    .sort(function (a, b) {
+      return (a.sort_order || 0) - (b.sort_order || 0) || String(a.created_at).localeCompare(String(b.created_at));
+    });
+  if (!day.length) {
+    list.appendChild(el("div", "empty", "No stops for this day."));
+    return;
+  }
+  var done = day.filter(function (v) {
+    return v.status === "done";
+  }).length;
+  var sum = el("div", "daysum");
+  sum.appendChild(el("b", null, day.length + " stop" + (day.length > 1 ? "s" : "") + " · " + done + " done"));
+  var bar = el("div", "rbar"),
+    fill = el("i");
+  fill.style.width = Math.round((done / day.length) * 100) + "%";
+  bar.appendChild(fill);
+  sum.appendChild(bar);
+  list.appendChild(sum);
+  day.forEach(function (v, i) {
+    var j = byId(jobs, v.job_id),
+      look = jobLook(j, v.client_id),
+      isDone = v.status === "done",
+      card = el("div", "pcard rstop " + look.cls + (isDone ? " isdone" : ""));
+    var hd = el("div", "rhd");
+    hd.appendChild(el("span", "vnum", String(i + 1)));
+    var nm = el("div");
+    nm.appendChild(el("b", null, cname(v.client_id)));
+    nm.appendChild(el("div", "note", vTitle(v) + (s3 && v.crew_id && crewName(v.crew_id) ? " · " + crewName(v.crew_id) : "")));
+    hd.appendChild(nm);
+    if (isDone) hd.appendChild(el("span", "chip won", "Done"));
+    card.appendChild(hd);
+    var ad = el("a", "raddr", paddr(v.property_id));
+    ad.href = mapsUrl(paddr(v.property_id));
+    ad.target = "_blank";
+    ad.rel = "noopener";
+    card.appendChild(ad);
+    var pp = byId(props, v.property_id),
+      tips = [pp && pp.notes, j && j.instructions].filter(Boolean).join("  |  ");
+    if (tips) {
+      var tn = el("div", "note", "⚠ " + tips);
+      tn.style.cssText = "color:#7a5b00;white-space:pre-wrap;margin-top:4px";
+      card.appendChild(tn);
+    }
+    var acts = el("div", "acts");
+    if (isDone) {
+      doneInfo(v, card);
+      if (!v.invoice_id && !v.paid_at) {
+        acts.appendChild(
+          btn("Edit extras / note", "btn alt sm", function () {
+            acts.textContent = "";
+            var get = extrasPicker(card, v.done_extras, v.done_note);
+            card.appendChild(acts);
+            acts.appendChild(
+              btn("Save", "btn sm", function () {
+                finishVisit(v, true, get(), render);
+              })
+            );
+            acts.appendChild(btn("Cancel", "btn alt sm", render));
+          })
+        );
+        acts.appendChild(
+          btn("Undo", "btn alt sm", function () {
+            finishVisit(v, false, null, render);
+          })
+        );
+      } else acts.appendChild(el("span", "note", "On an invoice"));
+    } else {
+      var getP = extrasPicker(card, v.done_extras, v.done_note);
+      acts.appendChild(
+        btn("✓ Done", "btn rdone", function () {
+          finishVisit(v, true, getP(), render);
+        })
+      );
+    }
+    card.appendChild(acts);
+    list.appendChild(card);
+  });
+}
+
+/* ======================= crm/src/31-messages.js ======================= */
+/* Messages: an "Everyone" group (crew too), an "Office" group (owners + office), and one-on-one chats.
+   Photos go in a private bucket. New messages ping the other people's phones (if they turned notifications on). */
+var chatMeta = { rooms: [], people: [], me: null, at: 0 },
+  chatRoom = null,
+  chatTimer = null;
+function msgUnread() {
+  var n = 0;
+  chatMeta.rooms.forEach(function (r) {
+    n += r.unread || 0;
+  });
+  return n;
+}
+function chatMyId() {
+  if (chatMeta.me) return Promise.resolve(chatMeta.me);
+  return sb.auth.getSession().then(function (ss) {
+    var u = ss && ss.data && ss.data.session && ss.data.session.user;
+    chatMeta.me = u ? u.id : null;
+    return chatMeta.me;
+  });
+}
+function chatMyName() {
+  if (crewMe) return crewMe.name || "Crew";
+  var t = (teamRoles || team || []).filter(function (m) {
+    return String(m.email || "").toLowerCase() === String(myEmail || "").toLowerCase();
+  })[0];
+  return (t && t.name) || String(myEmail || "").split("@")[0] || "Office";
+}
+function chatRefresh() {
+  return Promise.all([chatMyId(), sb.rpc("chat_rooms"), chatMeta.people.length ? null : sb.rpc("chat_people")]).then(
+    function (rs) {
+      if (rs[1] && !rs[1].error) chatMeta.rooms = rs[1].data || [];
+      if (rs[2] && !rs[2].error) chatMeta.people = rs[2].data || [];
+      chatMeta.at = Date.now();
+      chatBadges();
+    },
+    function () {}
+  );
+}
+/* keep the Messages badge current without redrawing the screen */
+function chatBadges() {
+  var n = msgUnread();
+  var b = document.querySelector('#side [data-v="messages"]');
+  if (b) {
+    var bd = b.querySelector(".badge");
+    if (n && !bd) b.appendChild(el("span", "badge", String(n)));
+    else if (bd && n) bd.textContent = String(n);
+    else if (bd) bd.remove();
+  }
+}
+setInterval(function () {
+  if (document.hidden || !sb) return;
+  if (!crewMe && $("layout").hidden) return;
+  chatRefresh();
+}, 60000);
+function chatT(s) {
+  return crewMe ? crewT(s) : s;
+}
+function dmRoom(a, b) {
+  return a < b ? "dm:" + a + ":" + b : "dm:" + b + ":" + a;
+}
+function roomTitle(room) {
+  if (room === "all") return chatT("Everyone");
+  if (room === "office") return chatT("Office");
+  var ids = room.split(":").slice(1),
+    other = ids[0] === chatMeta.me ? ids[1] : ids[0],
+    p = chatMeta.people.filter(function (x) {
+      return x.user_id === other;
+    })[0];
+  return p ? p.name : "Chat";
+}
+function renderMessages() {
+  $("tabs").textContent = "";
+  var list = $("list");
+  list.textContent = "";
+  var h = el("div");
+  list.appendChild(h);
+  renderChat(h);
+}
+function renderChat(host) {
+  host.textContent = "";
+  host.className = "chatwrap" + (chatRoom ? " inroom" : "");
+  var side = el("div", "chatside"),
+    main = el("div", "chatmain");
+  host.appendChild(side);
+  host.appendChild(main);
+  side.appendChild(el("div", "note", chatT("Loading...")));
+  chatRefresh().then(function () {
+    if (!document.body.contains(host)) return;
+    drawRooms(side, host);
+    if (chatRoom) openRoom(main, host, side);
+    else if (window.innerWidth > 700) {
+      chatRoom = "all";
+      host.classList.add("inroom");
+      drawRooms(side, host);
+      openRoom(main, host, side);
+    }
+  });
+}
+function drawRooms(side, host) {
+  side.textContent = "";
+  side.appendChild(el("h3", null, chatT("Chats")));
+  var byRoom = {};
+  chatMeta.rooms.forEach(function (r) {
+    byRoom[r.room] = r;
+  });
+  var rows = [["all", chatT("Everyone")]];
+  if (!crewMe) rows.push(["office", chatT("Office")]);
+  chatMeta.rooms.forEach(function (r) {
+    if (/^dm:/.test(r.room)) rows.push([r.room, roomTitle(r.room)]);
+  });
+  function row(room, name) {
+    var r = byRoom[room],
+      b = el("button", "chatroom" + (room === chatRoom ? " on" : ""));
+    b.type = "button";
+    var t = el("div");
+    t.appendChild(el("b", null, name));
+    if (r) t.appendChild(el("div", "note", (r.last_name ? r.last_name + ": " : "") + r.last_body));
+    b.appendChild(t);
+    if (r && r.unread) b.appendChild(el("span", "badge", String(r.unread)));
+    b.addEventListener("click", function () {
+      chatRoom = room;
+      renderChat(host);
+    });
+    side.appendChild(b);
+  }
+  rows.forEach(function (x) {
+    row(x[0], x[1]);
+  });
+  // start a one-on-one chat
+  var others = chatMeta.people.filter(function (p) {
+    return p.user_id !== chatMeta.me;
+  });
+  if (others.length) {
+    var s = document.createElement("select");
+    s.className = "chatnew";
+    s.appendChild(new Option(chatT("Message someone..."), ""));
+    others.forEach(function (p) {
+      s.appendChild(new Option(p.name + (p.kind === "crew" ? " (crew)" : ""), p.user_id));
+    });
+    s.addEventListener("change", function () {
+      if (!s.value || !chatMeta.me) return;
+      chatRoom = dmRoom(chatMeta.me, s.value);
+      renderChat(host);
+    });
+    side.appendChild(s);
+  }
+  if (!crewMe || pushSupported()) {
+    var nb = btn(chatT("Phone notifications"), "btn alt sm chatnotif", function () {
+      if (crewMe) crewNotify();
+      else openNotifySettings();
+    });
+    side.appendChild(nb);
+  }
+}
+function openRoom(main, host, side) {
+  var room = chatRoom;
+  clearInterval(chatTimer);
+  main.textContent = "";
+  var hd = el("div", "chathd");
+  hd.appendChild(
+    btn("‹ " + chatT("Back"), "btn alt sm chatback", function () {
+      chatRoom = null;
+      clearInterval(chatTimer);
+      renderChat(host);
+    })
+  );
+  hd.appendChild(el("b", null, roomTitle(room)));
+  main.appendChild(hd);
+  var feed = el("div", "chatfeed");
+  main.appendChild(feed);
+  var last = null,
+    seen = {};
+  function bubble(m) {
+    if (seen[m.id]) return;
+    seen[m.id] = 1;
+    var mine = m.sender_id === chatMeta.me,
+      b = el("div", "bub" + (mine ? " mine" : ""));
+    if (!mine) b.appendChild(el("div", "bname", m.sender_name || ""));
+    if (m.photo_path) {
+      var im = document.createElement("img");
+      im.alt = "Photo";
+      im.className = "bimg";
+      sb.storage
+        .from("chat")
+        .createSignedUrl(m.photo_path, 3600)
+        .then(function (r) {
+          if (r && r.data) {
+            im.src = r.data.signedUrl;
+            im.addEventListener("click", function () {
+              window.open(r.data.signedUrl, "_blank", "noopener");
+            });
+          }
+        });
+      b.appendChild(im);
+    }
+    if (m.body) b.appendChild(el("div", "btxt", m.body));
+    if (m.ref_kind && m.ref_id && !crewMe) {
+      var nm = m.ref_kind === "client" ? cname(m.ref_id) : jobTitle(m.ref_id);
+      if (nm)
+        b.appendChild(
+          btn((m.ref_kind === "client" ? "Client: " : "Job: ") + nm, "bref", function () {
+            if (m.ref_kind === "client") openClient(m.ref_id);
+            else openJob(m.ref_id);
+          })
+        );
+    }
+    var when = new Date(m.created_at);
+    b.appendChild(
+      el(
+        "div",
+        "btime",
+        (when.toDateString() === new Date().toDateString() ? "" : when.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + " ") +
+          when.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+      )
+    );
+    feed.appendChild(b);
+    last = m.created_at;
+  }
+  function markRead() {
+    sb.from("chat_reads")
+      .upsert({ room: room, read_at: new Date().toISOString() }, { onConflict: "user_id,room" })
+      .then(function () {
+        chatMeta.rooms.forEach(function (r) {
+          if (r.room === room) r.unread = 0;
+        });
+        chatBadges();
+        if (side && document.body.contains(side)) drawRooms(side, host);
+      });
+  }
+  function pull(first) {
+    var q = sb.from("messages").select("*").eq("room", room);
+    if (last) q = q.gt("created_at", last);
+    q.order("created_at", { ascending: false })
+      .limit(first ? 80 : 50)
+      .then(function (r) {
+        if (chatRoom !== room || !document.body.contains(feed)) {
+          clearInterval(chatTimer);
+          return;
+        }
+        if (r.error) {
+          if (first) feed.appendChild(el("div", "empty", "Messages aren't set up yet. Run the Stage 46 SQL in Supabase."));
+          return;
+        }
+        var rows = (r.data || []).reverse(),
+          atEnd = feed.scrollHeight - feed.scrollTop - feed.clientHeight < 80;
+        if (first && !rows.length) feed.appendChild(el("div", "empty chatempty", chatT("No messages yet. Say hi!")));
+        if (rows.length) {
+          var e0 = feed.querySelector(".chatempty");
+          if (e0) e0.remove();
+        }
+        rows.forEach(bubble);
+        if (first || atEnd) feed.scrollTop = feed.scrollHeight;
+        if (rows.length) markRead();
+      });
+  }
+  pull(true);
+  chatTimer = setInterval(function () {
+    if (!document.hidden) pull(false);
+  }, 8000);
+  // composer
+  var form = el("form", "chatbox"),
+    ta = document.createElement("textarea"),
+    ref = null,
+    refTag = el("div", "chatref");
+  ta.rows = 1;
+  ta.maxLength = 4000;
+  ta.placeholder = chatT("Type a message...");
+  ta.addEventListener("keydown", function (e) {
+    if (e.key === "Enter" && !e.shiftKey && window.innerWidth > 700) {
+      e.preventDefault();
+      send();
+    }
+  });
+  var ph = btn("📷", "btn alt chatph", function () {
+    pickPhotos(false, function (fs) {
+      sendPhotos(fs);
+    });
+  });
+  ph.title = chatT("Photo");
+  ph.setAttribute("aria-label", chatT("Photo"));
+  var go = el("button", "btn", chatT("Send"));
+  go.type = "submit";
+  form.appendChild(ph);
+  if (!crewMe) {
+    var lk = btn("🔗", "btn alt chatph", function () {
+      var q = prompt("Link a client or job: type part of the name", "");
+      if (!q) return;
+      q = q.toLowerCase();
+      var c = clients.filter(function (x) {
+          return String(x.name || "").toLowerCase().indexOf(q) > -1;
+        })[0],
+        j = c
+          ? null
+          : jobs.filter(function (x) {
+              return String(x.title || "").toLowerCase().indexOf(q) > -1;
+            })[0];
+      if (!c && !j) return alert("Nothing matches that.");
+      ref = c ? { kind: "client", id: c.id, name: c.name } : { kind: "job", id: j.id, name: j.title };
+      refTag.textContent = "";
+      refTag.appendChild(document.createTextNode((ref.kind === "client" ? "Client: " : "Job: ") + ref.name + " "));
+      refTag.appendChild(
+        btn("×", "chatrefx", function () {
+          ref = null;
+          refTag.textContent = "";
+        })
+      );
+    });
+    lk.title = "Link a client or job";
+    lk.setAttribute("aria-label", "Link a client or job");
+    form.appendChild(lk);
+  }
+  form.appendChild(ta);
+  form.appendChild(go);
+  main.appendChild(refTag);
+  main.appendChild(form);
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    send();
+  });
+  function post(row) {
+    row.room = room;
+    row.sender_name = chatMyName();
+    if (ref) {
+      row.ref_kind = ref.kind;
+      row.ref_id = ref.id;
+    }
+    return sb
+      .from("messages")
+      .insert(row)
+      .select()
+      .single()
+      .then(function (r) {
+        if (r.error || !r.data) {
+          alert(chatT("Could not send. Try again."));
+          return false;
+        }
+        bubble(r.data);
+        feed.scrollTop = feed.scrollHeight;
+        ref = null;
+        refTag.textContent = "";
+        callApi("/api/push", "chat", { id: r.data.id });
+        return true;
+      });
+  }
+  function send() {
+    var t = ta.value.trim();
+    if (!t) return;
+    go.disabled = true;
+    post({ body: t }).then(function (ok) {
+      go.disabled = false;
+      if (ok) ta.value = "";
+      ta.focus();
+    });
+  }
+  function sendPhotos(fs) {
+    go.disabled = true;
+    fs.slice(0, 6)
+      .reduce(function (pr, f) {
+        return pr.then(function () {
+          return loadImg(f)
+            .then(function (img) {
+              return toJpeg(img, 1600, 0.82);
+            })
+            .then(function (j) {
+              var path = room + "/" + uid() + ".jpg";
+              return sb.storage
+                .from("chat")
+                .upload(path, j.blob, { contentType: "image/jpeg" })
+                .then(function (u) {
+                  if (u.error) throw new Error("up");
+                  return post({ body: "", photo_path: path });
+                });
+            })
+            .catch(function () {
+              alert(chatT("Could not send. Try again."));
+            });
+        });
+      }, Promise.resolve())
+      .then(function () {
+        go.disabled = false;
+      });
+  }
+}
+/* crew phones: turn message notifications on or off */
+function crewNotify() {
+  var p = panel();
+  p.appendChild(el("h2", null, crewT("Phone notifications")));
+  var msg = el("div", "note"),
+    here = el("div", "pcard");
+  p.appendChild(here);
+  p.appendChild(msg);
+  function say(t, bad) {
+    msg.textContent = t;
+    msg.style.color = bad ? "var(--red)" : "var(--forest)";
+  }
+  function draw() {
+    here.textContent = "";
+    if (!pushSupported()) {
+      here.appendChild(el("div", "note", crewT("This phone can't get notifications. Open Foreman in Chrome and install it, then open it from the home screen.")));
+      return;
+    }
+    pushMySub().then(function (sub) {
+      if (sub) {
+        here.appendChild(el("div", "note", crewT("✓ Notifications are on for this phone.")));
+        here.appendChild(
+          btn(crewT("Send a test"), "btn alt sm", function () {
+            callApi("/api/push", "test", {}).then(function (r) {
+              say(r.ok ? crewT("Sent.") : r.error, !r.ok);
+            });
+          })
+        );
+        here.appendChild(document.createTextNode(" "));
+        here.appendChild(
+          btn(crewT("Turn off"), "btn alt sm", function () {
+            var ep = sub.endpoint;
+            sub.unsubscribe().then(function () {
+              callApi("/api/push", "unsubscribe", { endpoint: ep }).then(draw);
+            });
+          })
+        );
+      } else {
+        var on = btn(crewT("Turn on notifications"), "btn", function () {
+          on.disabled = true;
+          Notification.requestPermission().then(function (perm) {
+            if (perm !== "granted") {
+              on.disabled = false;
+              return say(crewT("Notifications weren't allowed."), true);
+            }
+            callApi("/api/push", "key", {}).then(function (k) {
+              if (!k.ok) {
+                on.disabled = false;
+                return say(k.error, true);
+              }
+              navigator.serviceWorker.ready
+                .then(function (reg) {
+                  return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pushKeyBytes(k.data.key) });
+                })
+                .then(function (s) {
+                  return callApi("/api/push", "subscribe", { sub: s.toJSON(), label: deviceLabel() });
+                })
+                .then(function (r) {
+                  if (!r.ok) throw new Error(r.error);
+                  say(crewT("✓ Turned on."));
+                  draw();
+                })
+                .catch(function (e) {
+                  on.disabled = false;
+                  say(String((e && e.message) || "Error"), true);
+                });
+            });
+          });
+        });
+        here.appendChild(on);
+      }
+    });
+  }
+  draw();
 }
 
 })();

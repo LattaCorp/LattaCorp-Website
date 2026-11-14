@@ -446,20 +446,139 @@ function startCrewApp(me) {
   $("signout").hidden = false;
   $("acct").hidden = false;
   $("refresh").hidden = false;
+  crewHeaderText();
   renderCrewApp();
+  chatRefresh().then(function () {
+    if (msgUnread() && crewTab === "route") renderCrewApp();
+  });
 }
+/* ---- crew screen in English or Spanish (each phone remembers its choice) ---- */
+var CREW_ES = {
+  "Hi, ": "Hola, ",
+  "Upload receipt": "Subir recibo",
+  "What was it for? (optional)": "¿Para qué fue? (opcional)",
+  "Loading...": "Cargando...",
+  "Could not load your route. Pull to refresh or sign in again.": "No se pudo cargar tu ruta. Actualiza o vuelve a iniciar sesión.",
+  "No stops for this day.": "No hay paradas este día.",
+  stop: "parada",
+  stops: "paradas",
+  done: "listas",
+  "Start route": "Iniciar ruta",
+  Map: "Mapa",
+  Done: "Listo",
+  Undo: "Deshacer",
+  "Save": "Guardar",
+  "Cancel": "Cancelar",
+  "Edit": "Editar",
+  "Could not save that. Try again.": "No se pudo guardar. Inténtalo de nuevo.",
+  "Hedge trimming": "Recorte de arbustos",
+  "Weed killing": "Control de maleza",
+  "Note for the client (shows on the invoice)": "Nota para el cliente (aparece en la factura)",
+  "(no charge)": "(sin cargo)",
+  Today: "Hoy",
+  Route: "Ruta",
+  Messages: "Mensajes",
+  "Uploading...": "Subiendo...",
+  "Please sign in again.": "Vuelve a iniciar sesión.",
+  "✓ Receipt sent to the office.": "✓ Recibo enviado a la oficina.",
+  "Could not upload. Try again.": "No se pudo subir. Inténtalo de nuevo.",
+  "Phone notifications": "Notificaciones",
+  "Log out": "Cerrar sesión",
+  "Signed in": "Sesión iniciada",
+  "On an invoice": "Ya facturado",
+  Everyone: "Todos",
+  Office: "Oficina",
+  Chats: "Chats",
+  Back: "Atr\u00e1s",
+  Send: "Enviar",
+  Photo: "Foto",
+  "Type a message...": "Escribe un mensaje...",
+  "Message someone...": "Escribirle a alguien...",
+  "No messages yet. Say hi!": "A\u00fan no hay mensajes. \u00a1Saluda!",
+  "Could not send. Try again.": "No se pudo enviar. Int\u00e9ntalo de nuevo.",
+  "This phone can't get notifications. Open Foreman in Chrome and install it, then open it from the home screen.":
+    "Este tel\u00e9fono no puede recibir notificaciones. Abre Foreman en Chrome, inst\u00e1lalo y \u00e1brelo desde la pantalla de inicio.",
+  "\u2713 Notifications are on for this phone.": "\u2713 Las notificaciones est\u00e1n activadas en este tel\u00e9fono.",
+  "Send a test": "Enviar prueba",
+  "Sent.": "Enviada.",
+  "Turn off": "Desactivar",
+  "Turn on notifications": "Activar notificaciones",
+  "Notifications weren't allowed.": "No se permitieron las notificaciones.",
+  "\u2713 Turned on.": "\u2713 Activadas."
+};
+var crewLang = (function () {
+  try {
+    return localStorage.getItem("crewLang") === "es" ? "es" : "en";
+  } catch (e) {
+    return "en";
+  }
+})();
+function crewT(s) {
+  return crewMe && crewLang === "es" && CREW_ES[s] ? CREW_ES[s] : s;
+}
+function crewLangBar(host) {
+  var w = el("div", "langsw");
+  [
+    ["en", "English"],
+    ["es", "Español"]
+  ].forEach(function (x) {
+    var b = btn(x[1], "langbtn" + (crewLang === x[0] ? " on" : ""), function () {
+      crewLang = x[0];
+      try {
+        localStorage.setItem("crewLang", x[0]);
+      } catch (e) {}
+      crewHeaderText();
+      renderCrewApp();
+    });
+    b.setAttribute("aria-pressed", crewLang === x[0] ? "true" : "false");
+    w.appendChild(b);
+  });
+  host.appendChild(w);
+}
+function crewHeaderText() {
+  var so = $("signout"),
+    mn = $("menuNotify");
+  if (so && so.lastChild) so.lastChild.textContent = crewT("Log out");
+  if (mn && mn.lastChild) mn.lastChild.textContent = crewT("Phone notifications");
+}
+var crewTab = "route";
 function renderCrewApp() {
   var box = $("crewapp"),
     d = cwDate,
     t = today();
   box.textContent = "";
-  box.appendChild(el("h2", null, "Hi, " + String(crewMe.name || "").split(" ")[0]));
+  document.documentElement.lang = crewLang;
+  var top = el("div", "cwtop");
+  top.appendChild(el("h2", null, crewT("Hi, ") + String(crewMe.name || "").split(" ")[0]));
+  crewLangBar(top);
+  box.appendChild(top);
+  var tb = el("div", "tabs cwtabs");
+  [
+    ["route", crewT("Route")],
+    ["messages", crewT("Messages")]
+  ].forEach(function (x) {
+    var b = el("button", "tab" + (crewTab === x[0] ? " on" : ""), x[1]);
+    b.type = "button";
+    if (x[0] === "messages" && typeof msgUnread === "function" && msgUnread()) b.appendChild(el("i", "tnew", String(msgUnread())));
+    b.addEventListener("click", function () {
+      crewTab = x[0];
+      renderCrewApp();
+    });
+    tb.appendChild(b);
+  });
+  box.appendChild(tb);
+  if (crewTab === "messages") {
+    var mh = el("div");
+    box.appendChild(mh);
+    renderChat(mh);
+    return;
+  }
   // snap a receipt: it goes to the office's Receipts to enter
   var rb = el("div", "qacts cwrcpt");
   var rst = el("span", "note");
   rb.appendChild(
-    btn("Upload receipt", "btn alt sm", function () {
-      var note = prompt("What was it for? (optional)", "") || "";
+    btn(crewT("Upload receipt"), "btn alt sm", function () {
+      var note = prompt(crewT("What was it for? (optional)"), "") || "";
       pickPhotos(true, function (fs) {
         crewReceipts(fs, note, rst);
       });
@@ -467,37 +586,39 @@ function renderCrewApp() {
   );
   rb.appendChild(rst);
   box.appendChild(rb);
-  box.appendChild(
-    calNav(
-      longDate(d),
-      function () {
-        cwDate = addDays(d, -1);
-        renderCrewApp();
-      },
-      function () {
-        cwDate = addDays(d, 1);
-        renderCrewApp();
-      },
-      function () {
-        cwDate = t;
-        renderCrewApp();
-      },
-      d !== t
-    )
+  var nav = calNav(
+    pd(d).toLocaleDateString(crewLang === "es" ? "es-US" : undefined, { weekday: "long", month: "long", day: "numeric", year: "numeric" }),
+    function () {
+      cwDate = addDays(d, -1);
+      renderCrewApp();
+    },
+    function () {
+      cwDate = addDays(d, 1);
+      renderCrewApp();
+    },
+    function () {
+      cwDate = t;
+      renderCrewApp();
+    },
+    d !== t
   );
+  [].forEach.call(nav.querySelectorAll("button"), function (b) {
+    if (b.textContent === "Today") b.textContent = crewT("Today");
+  });
+  box.appendChild(nav);
   var body = el("div");
-  body.appendChild(el("div", "note", "Loading..."));
+  body.appendChild(el("div", "note", crewT("Loading...")));
   box.appendChild(body);
   sb.rpc("crew_route", { p_from: d, p_to: d }).then(function (r) {
-    if (cwDate !== d) return;
+    if (cwDate !== d || crewTab !== "route") return;
     body.textContent = "";
     if (r.error) {
-      body.appendChild(el("div", "note", "Could not load your route. Pull to refresh or sign in again."));
+      body.appendChild(el("div", "note", crewT("Could not load your route. Pull to refresh or sign in again.")));
       return;
     }
     var rows = r.data || [];
     if (!rows.length) {
-      body.appendChild(el("div", "empty", "No stops for this day."));
+      body.appendChild(el("div", "empty", crewT("No stops for this day.")));
       return;
     }
     var todo = rows.filter(function (x) {
@@ -509,7 +630,7 @@ function renderCrewApp() {
       el(
         "b",
         null,
-        rows.length + " stop" + (rows.length > 1 ? "s" : "") + (done ? " · " + done + " done" : "")
+        rows.length + " " + crewT(rows.length > 1 ? "stops" : "stop") + (done ? " · " + done + " " + crewT("done") : "")
       )
     );
     var addrs = todo
@@ -519,7 +640,7 @@ function renderCrewApp() {
       .filter(Boolean)
       .slice(0, 10);
     if (addrs.length) {
-      var a = el("a", "btn sm", "Start route");
+      var a = el("a", "btn sm", crewT("Start route"));
       a.href =
         "https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=" +
         encodeURIComponent(addrs[addrs.length - 1]) +
@@ -530,7 +651,8 @@ function renderCrewApp() {
     }
     body.appendChild(sum);
     rows.forEach(function (x, i) {
-      var card = el("div", "pcard cwstop" + (x.status === "done" ? " isdone" : ""));
+      var isDone = x.status === "done";
+      var card = el("div", "pcard cwstop" + (isDone ? " isdone" : ""));
       card.appendChild(el("div", "cwtitle", i + 1 + ". " + x.job_title));
       card.appendChild(el("div", "cwaddr", x.address));
       var tips = [x.property_notes, x.instructions].filter(Boolean).join("\n");
@@ -539,22 +661,57 @@ function renderCrewApp() {
         n.style.cssText = "color:#7a5b00;white-space:pre-wrap;margin-top:4px";
         card.appendChild(n);
       }
+      function save(doneNow, pick) {
+        sb.rpc("crew_set_done", {
+          p_visit: x.visit_id,
+          p_done: doneNow,
+          p_extras: pick ? pick.extras : null,
+          p_note: pick ? pick.note : null
+        }).then(function (r2) {
+          if (r2.error) alert(crewT("Could not save that. Try again."));
+          else if (doneNow && !isDone) callApi("/api/push", "client-visit", { id: x.visit_id });
+          renderCrewApp();
+        });
+      }
       var acts = el("div", "acts"),
-        m = el("a", "btn alt", "Map");
+        m = el("a", "btn alt", crewT("Map"));
       m.href = mapsUrl(x.address);
       m.target = "_blank";
       m.rel = "noopener";
       acts.appendChild(m);
-      var isDone = x.status === "done";
-      acts.appendChild(
-        btn(isDone ? "Undo" : "Done", isDone ? "btn alt" : "btn", function () {
-          sb.rpc("crew_set_done", { p_visit: x.visit_id, p_done: !isDone }).then(function (r2) {
-            if (r2.error) alert("Could not save that. Try again.");
-            else if (!isDone) callApi("/api/push", "client-visit", { id: x.visit_id });
-            renderCrewApp();
-          });
-        })
-      );
+      if (isDone) {
+        var ex = (x.done_extras || []).map(function (k) {
+          return crewT(extraLabel(k));
+        });
+        if (ex.length) card.appendChild(el("div", "donex", "✓ " + ex.join(" · ") + " " + crewT("(no charge)")));
+        if (x.done_note) card.appendChild(el("div", "donenote", "“" + x.done_note + "”"));
+        acts.appendChild(
+          btn(crewT("Edit"), "btn alt", function () {
+            acts.textContent = "";
+            var get = extrasPicker(card, x.done_extras, x.done_note, true);
+            card.appendChild(acts);
+            acts.appendChild(
+              btn(crewT("Save"), "btn", function () {
+                save(true, get());
+              })
+            );
+            acts.appendChild(btn(crewT("Cancel"), "btn alt", renderCrewApp));
+          })
+        );
+        acts.appendChild(
+          btn(crewT("Undo"), "btn alt", function () {
+            save(false, null);
+          })
+        );
+      } else {
+        var getP = extrasPicker(card, x.done_extras, x.done_note, true);
+        card.appendChild(acts);
+        acts.appendChild(
+          btn(crewT("Done"), "btn rdone", function () {
+            save(true, getP());
+          })
+        );
+      }
       card.appendChild(acts);
       body.appendChild(card);
     });
@@ -564,11 +721,11 @@ function renderCrewApp() {
 function crewReceipts(files, note, st) {
   files = Array.prototype.slice.call(files || []);
   if (!files.length) return;
-  st.textContent = "Uploading...";
+  st.textContent = crewT("Uploading...");
   sb.auth.getSession().then(function (ss) {
     var uidv = ss && ss.data && ss.data.session && ss.data.session.user && ss.data.session.user.id;
     if (!uidv) {
-      st.textContent = "Please sign in again.";
+      st.textContent = crewT("Please sign in again.");
       return;
     }
     var ok = 0;
@@ -601,7 +758,7 @@ function crewReceipts(files, note, st) {
         });
       }, Promise.resolve())
       .then(function () {
-        st.textContent = ok ? "\u2713 Receipt sent to the office." : "Could not upload. Try again.";
+        st.textContent = ok ? crewT("\u2713 Receipt sent to the office.") : crewT("Could not upload. Try again.");
         if (ok) callApi("/api/push", "receipt", {}); // pings the office phones
       });
   });

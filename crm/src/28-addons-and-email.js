@@ -597,7 +597,6 @@ function acctMenu(open) {
     w.textContent = "";
     w.appendChild(el("b", null, crewMe ? crewMe.name || "Crew" : (typeof team !== "undefined" && (team.filter(function (x) { return x.email === myEmail; })[0] || {}).name) || "Signed in"));
     w.appendChild(document.createTextNode(myEmail || ""));
-    $("menuNotify").hidden = !!crewMe;
   }
   m.hidden = !open;
   b.setAttribute("aria-expanded", open ? "true" : "false");
@@ -617,14 +616,18 @@ document.addEventListener("keydown", function (e) {
 });
 $("menuNotify").addEventListener("click", function () {
   acctMenu(false);
-  openNotifySettings();
+  if (crewMe) crewNotify();
+  else openNotifySettings();
 });
 if ("serviceWorker" in navigator)
   navigator.serviceWorker.addEventListener("message", function (e) {
     var g = e.data && e.data.go;
-    if (g && /^(leads|clients|jobs|schedule|billing|expenses|reports|photos|inventory|todo|personnel|team)$/.test(g) && !crewMe) {
+    if (g && /^(leads|clients|jobs|schedule|billing|expenses|reports|photos|inventory|todo|personnel|team|route|forms|messages)$/.test(g) && !crewMe) {
       view = g;
       load();
+    } else if (g === "messages" && crewMe) {
+      crewTab = "messages";
+      renderCrewApp();
     }
   });
 

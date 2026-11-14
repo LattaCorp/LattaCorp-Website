@@ -1,15 +1,15 @@
 /* Team tab (owners only): who can sign in and their role. */
 
 /* ---- Team: owners add office staff and co-owners ---- */
-function renderTeam() {
+function renderTeam(inPersonnel) {
   var tabs = $("tabs");
-  tabs.textContent = "";
+  if (!inPersonnel) tabs.textContent = "";
   var list = $("list");
   list.textContent = "";
   var intro = el(
     "div",
     "note",
-    "Everyone here signs in at this same address with their own email and password. Owners and co-owners can do everything. Office staff can use clients, jobs, schedule, billing and invoices, and email clients, but they can't add people, manage crew logins, or text from the CRM."
+    "Office staff and owners who can sign in to Foreman. Crew logins are under Crew logins & texting. Everyone signs in at this same address with their own email and password. Owners and co-owners can do everything. Office staff can use clients, jobs, schedule, billing and invoices, and email clients, but they can't add people, manage crew logins, or text from the CRM."
   );
   intro.style.marginBottom = "12px";
   list.appendChild(intro);

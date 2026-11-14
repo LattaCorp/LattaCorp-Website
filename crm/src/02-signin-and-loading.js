@@ -30,6 +30,7 @@ function start() {
   $("refresh").hidden = false;
   $("acct").hidden = false;
   load();
+  setTimeout(chatRefresh, 1500);
 }
 sb.auth.getSession().then(function (r) {
   if (r.data && r.data.session) afterSignIn();

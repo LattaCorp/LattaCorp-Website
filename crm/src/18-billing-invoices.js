@@ -148,7 +148,7 @@ function createInvoice(cid, vs, through, pid) {
           visit_id: v.id,
           service_date: v.scheduled_date,
           address: paddr(v.property_id),
-          description: vTitle(v),
+          description: invLineDesc(v),
           amount: v.price
         };
       });

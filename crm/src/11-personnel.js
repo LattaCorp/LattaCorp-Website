@@ -27,7 +27,8 @@ var DKINDS = [
   ["Insurance", "Insurance"],
   ["Other", "Other"]
 ];
-var pstCache = {};
+var pstCache = {},
+  teamRoles = null;
 function empId(p) {
   return "EMP-" + ("000" + p.emp_no).slice(-4);
 }
@@ -117,6 +118,9 @@ function syncTeam() {
         teamSyncing = false;
         return;
       }
+      var hadRoles = !!teamRoles;
+      teamRoles = res.data.members;
+      if (!hadRoles && view === "personnel") setTimeout(render, 0);
       var jobs = [];
       res.data.members.forEach(function (m) {
         var em = String(m.email || "")
@@ -189,6 +193,8 @@ function renderPersonnel() {
       openPerson(null);
     })
   );
+  $("topbtns").appendChild(document.createTextNode(" "));
+  $("topbtns").appendChild(btn("Crew logins & texting", "btn alt", openCrew));
   syncTeam();
   if (persErr) {
     list.appendChild(
@@ -200,23 +206,31 @@ function renderPersonnel() {
     );
     return;
   }
-  var counts = { all: 0, active: 0, team: 0, inactive: 0 };
+  var counts = { all: 0, inactive: 0 };
   people.forEach(function (p) {
-    counts[p.status] = (counts[p.status] || 0) + 1;
-    if (p.status !== "inactive") counts.all++;
+    if (p.status === "inactive") counts.inactive++;
+    else counts.all++;
   });
-  [["all", "All"]].concat(PSTAT).forEach(function (s) {
+  [
+    ["all", "People", counts.all],
+    ["inactive", "Former", counts.inactive],
+    ["access", "Sign-in & roles", null]
+  ].forEach(function (s) {
     var b = el("button", "tab" + (pfilter === s[0] ? " on" : ""), s[1]);
     b.type = "button";
-    b.appendChild(el("span", null, "(" + (counts[s[0]] || 0) + ")"));
+    if (s[2] != null) b.appendChild(el("span", null, "(" + s[2] + ")"));
     b.addEventListener("click", function () {
       pfilter = s[0];
       render();
     });
     tabs.appendChild(b);
   });
+  if (pfilter === "access") {
+    renderTeam(true);
+    return;
+  }
   var shown = people.filter(function (p) {
-    if (pfilter === "all" ? p.status === "inactive" : p.status !== pfilter) return false;
+    if (pfilter === "inactive" ? p.status !== "inactive" : p.status === "inactive") return false;
     if (!query) return true;
     return [p.full_name, empId(p), p.job_title, p.phone, p.email].join(" ").toLowerCase().indexOf(query) > -1;
   });
@@ -239,13 +253,8 @@ function renderPersonnel() {
     left.appendChild(t);
     var right = el("div");
     right.style.textAlign = "right";
-    right.appendChild(
-      el(
-        "span",
-        "chip " + (p.status === "inactive" ? "lost" : p.status === "team" ? "won" : ""),
-        pstatLabel(p.status)
-      )
-    );
+    var acc = personAccess(p);
+    right.appendChild(el("span", "chip " + (p.status === "inactive" ? "lost" : acc[1]), p.status === "inactive" ? "Former" : acc[0]));
     var yr = String(new Date().getFullYear());
     right.appendChild(el("div", "sub", "Paid " + yr + ": " + money(sumAmt(paidBy(p.id, yr)))));
     b.appendChild(left);
@@ -255,6 +264,22 @@ function renderPersonnel() {
     });
     list.appendChild(b);
   });
+}
+// what this person can sign in to: office/owner login, crew login, or none
+function personAccess(p) {
+  var em = String(p.login_email || p.email || "").toLowerCase();
+  if (em) {
+    var t = (teamRoles || team || []).filter(function (m) {
+      return String(m.email || "").toLowerCase() === em;
+    })[0];
+    if (t) return t.role === "owner" ? ["Owner", "won"] : ["Office login", "won"];
+    var c = (crew || []).filter(function (m) {
+      return m.kind === "login" && String(m.email || "").toLowerCase() === em;
+    })[0];
+    if (c) return ["Crew login", ""];
+  }
+  if (p.status === "team") return ["Office login", "won"];
+  return ["No login", "lost"];
 }
 function pRow(p) {
   for (var i = 0; i < people.length; i++)

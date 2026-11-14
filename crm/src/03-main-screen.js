@@ -42,50 +42,93 @@ var NAV_LABELS = {
 function navLabel(v) {
   return NAV_LABELS[v] || "More";
 }
+/* The menu is five groups. Computers: a group opens its tabs underneath it (like Cloudflare's menu).
+   Phones: the bottom bar shows the groups, and tapping one pops up a column of its tabs above it. */
+var GICONS = {
+  customers: ICONS.clients,
+  field:
+    '<svg viewBox="0 0 24 24"><path d="M12 21V11"/><path d="M12 11c0-4 3-7 8-7 0 5-3 8-8 7z"/><path d="M12 14c0-3-2.5-5.5-7-5.5 0 4 2.5 6.5 7 5.5z"/><path d="M5 21h14"/></svg>',
+  finances:
+    '<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M15 9.2c-.5-1-1.6-1.6-3-1.6-1.8 0-3 .9-3 2.2 0 3 6 1.6 6 4.6 0 1.3-1.3 2.2-3 2.2-1.5 0-2.7-.7-3.1-1.8M12 6v1.6M12 16.6V18"/></svg>',
+  office:
+    '<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="1.5"/><path d="M8 7h2M14 7h2M8 11h2M14 11h2M8 15h2M14 15h2M10 21v-3h4v3"/></svg>',
+  personnel: ICONS.personnel
+};
+ICONS.route = '<svg viewBox="0 0 24 24"><path d="M9 11l2 2 4-4"/><path d="M12 22s7-6.2 7-12a7 7 0 0 0-14 0c0 5.8 7 12 7 12z"/></svg>';
+ICONS.forms =
+  '<svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>';
+ICONS.messages = '<svg viewBox="0 0 24 24"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.6A8 8 0 1 1 21 12z"/><path d="M8.5 10.5h7M8.5 13.5h4.5"/></svg>';
+var navOpen = {};
+function navGroups() {
+  return [
+    ["customers", "Customers", GICONS.customers, ["leads", "clients", "jobs"]],
+    ["field", "Field", GICONS.field, ["schedule", "route", "photos"]],
+    ["finances", "Finances", GICONS.finances, ["billing", "expenses", "reports"]],
+    ["office", "Office", GICONS.office, ["messages", "forms", "todo", "inventory"]],
+    ["personnel", "Personnel", GICONS.personnel, isOwner() ? ["personnel"] : []]
+  ];
+}
+function groupOf(v) {
+  var g = navGroups().filter(function (x) {
+    return x[3].indexOf(v) > -1;
+  })[0];
+  return g ? g[0] : "";
+}
+function phoneNav() {
+  return window.matchMedia("(max-width:700px)").matches;
+}
 function closeMoreSheet() {
   var s = document.getElementById("moresheet");
   if (s) s.remove();
 }
-function openMoreSheet(items) {
-  if (document.getElementById("moresheet")) return closeMoreSheet();
+function openGroupSheet(gb, g, kids) {
+  var was = document.getElementById("moresheet");
+  closeMoreSheet();
+  if (was && was.dataset.g === g[0]) return;
   var sh = el("div");
   sh.id = "moresheet";
+  sh.dataset.g = g[0];
   sh.addEventListener("click", function (e) {
     if (e.target === sh) closeMoreSheet();
   });
-  var box = el("div", "msbox");
-  box.setAttribute("role", "menu");
-  box.appendChild(el("div", "mshd", "All sections"));
-  var g = el("div", "msgrid");
-  items.forEach(function (v) {
+  var col = el("div", "gcol");
+  col.setAttribute("role", "menu");
+  col.appendChild(el("div", "mshd", g[1]));
+  kids.forEach(function (v) {
     var b = el("button", v[0] === view ? "on" : "");
     b.type = "button";
     b.setAttribute("role", "menuitem");
-    b.innerHTML = ICONS[v[0]];
+    b.innerHTML = ICONS[v[0]] || "";
     b.appendChild(el("span", null, v[1]));
-    if (v[2]) b.appendChild(el("span", "badge", String(v[2])));
+    if ((v[2] || 0) + (v[3] || 0)) b.appendChild(el("span", "badge", String((v[2] || 0) + (v[3] || 0))));
     b.addEventListener("click", function () {
       view = v[0];
       render();
       window.scrollTo(0, 0);
     });
-    g.appendChild(b);
+    col.appendChild(b);
   });
-  box.appendChild(g);
-  sh.appendChild(box);
+  sh.appendChild(col);
   document.body.appendChild(sh);
+  // sit right above the group's button, kept on screen
+  var r = gb.getBoundingClientRect(),
+    w = Math.max(230, r.width + 40),
+    left = Math.min(Math.max(8, r.left + r.width / 2 - w / 2), window.innerWidth - w - 8);
+  col.style.width = w + "px";
+  col.style.left = left + "px";
+  col.style.bottom = window.innerHeight - r.top + 8 + "px";
 }
 document.addEventListener("keydown", function (e) {
   if (e.key === "Escape") closeMoreSheet();
 });
 function render() {
-  var nav = $("side"),
-    moreItems = [],
-    moreBadge = 0;
+  if (view === "team") view = "personnel";
+  var nav = $("side");
   nav.textContent = "";
   closeMoreSheet();
   $("app").classList.toggle("wide", view === "reports" || view === "inventory" || view === "expenses");
   document.body.classList.toggle("v-expenses", view === "expenses");
+  document.body.classList.toggle("noopts", view === "route" || view === "messages");
   var tdy = today(),
     stops = visits.filter(function (v) {
       return v.status === "scheduled" && v.scheduled_date === tdy;
@@ -93,40 +136,77 @@ function render() {
     newL = leads.filter(function (l) {
       return l.status === "new";
     }).length;
-  [
-    ["leads", "Leads", newL, newResponses().length],
-    ["clients", "Clients", 0],
-    ["jobs", "Jobs", 0],
-    ["schedule", "Schedule", stops],
-    ["billing", "Billing", invoices.filter(isOverdue).length],
-    ["expenses", "Expenses", receiptsToEnter().length],
-    ["reports", "Reports", 0],
-    ["photos", "Photos", 0],
-    ["inventory", "Inventory", 0],
-    [
+  var items = {
+    leads: ["leads", "Leads", newL, newResponses().length],
+    clients: ["clients", "Clients", 0],
+    jobs: ["jobs", "Jobs", 0],
+    schedule: ["schedule", "Schedule", stops],
+    route: ["route", "Route check-off", stops],
+    photos: ["photos", "Photos", 0],
+    billing: ["billing", "Billing", invoices.filter(isOverdue).length],
+    expenses: ["expenses", "Expenses", receiptsToEnter().length],
+    reports: ["reports", "Reports", 0],
+    messages: ["messages", "Messages", typeof msgUnread === "function" ? msgUnread() : 0],
+    forms: ["forms", "Forms", 0],
+    todo: [
       "todo",
       "To-Do",
       todos.filter(function (t) {
         return !t.done && t.due_date && t.due_date <= tdy;
       }).length
-    ]
-  ]
-    .concat(
-      isOwner()
-        ? [
-            ["personnel", "Personnel", 0],
-            ["team", "Team", 0]
-          ]
-        : []
-    )
-    .forEach(function (v) {
-      var b = el("button", v[0] === view ? "on" : "");
+    ],
+    inventory: ["inventory", "Inventory", 0],
+    personnel: ["personnel", "Personnel", 0]
+  };
+  var mine = navGroups().filter(function (g) {
+    return g[3].length;
+  });
+  var curG = groupOf(view);
+  mine.forEach(function (g) {
+    var kids = g[3].map(function (k) {
+        return items[k];
+      }),
+      sum = 0,
+      single = kids.length === 1;
+    kids.forEach(function (v) {
+      sum += (v[2] || 0) + (v[3] || 0);
+    });
+    var open = single ? false : navOpen[g[0]] != null ? navOpen[g[0]] : g[0] === curG;
+    var gb = el("button", "grp pri" + (g[0] === curG ? " cur" : "") + (single && view === g[3][0] ? " on" : "") + (open ? " open" : ""));
+    gb.type = "button";
+    gb.dataset.g = g[0];
+    gb.innerHTML = g[2];
+    gb.appendChild(el("span", "gl", g[1]));
+    if (sum && (!open || single)) gb.appendChild(el("span", "badge", String(sum)));
+    if (!single) {
+      var ch = el("i", "chev");
+      ch.setAttribute("aria-hidden", "true");
+      gb.appendChild(ch);
+      gb.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+    gb.addEventListener("click", function () {
+      if (single) {
+        view = g[3][0];
+        render();
+        window.scrollTo(0, 0);
+        return;
+      }
+      if (phoneNav()) return openGroupSheet(gb, g, kids);
+      navOpen[g[0]] = !open;
+      render();
+    });
+    nav.appendChild(gb);
+    if (single || !open) return;
+    var box = el("div", "subs");
+    kids.forEach(function (v) {
+      var b = el("button", "sub" + (v[0] === view ? " on" : ""));
       b.type = "button";
       b.addEventListener("click", function () {
         view = v[0];
         render();
+        window.scrollTo(0, 0);
       });
-      b.innerHTML = ICONS[v[0]];
+      b.innerHTML = ICONS[v[0]] || "";
       b.appendChild(el("span", null, v[1]));
       b.dataset.v = v[0];
       if (v[2]) b.appendChild(el("span", "badge", String(v[2])));
@@ -136,24 +216,10 @@ function render() {
         b.appendChild(rb);
       }
       b.setAttribute("aria-current", v[0] === view ? "page" : "false");
-      if (NAV_MAIN.indexOf(v[0]) >= 0) b.classList.add("pri");
-      else {
-        moreBadge += (v[2] || 0) + (v[3] || 0);
-        moreItems.push(v);
-      }
-      nav.appendChild(b);
+      box.appendChild(b);
     });
-  /* Phones: the bottom bar keeps the four everyday sections and puts the rest under More. */
-  var mb = el("button", "more" + (NAV_MAIN.indexOf(view) < 0 ? " on" : ""));
-  mb.type = "button";
-  mb.innerHTML = ICONS.more;
-  mb.appendChild(el("span", null, NAV_MAIN.indexOf(view) < 0 ? navLabel(view) : "More"));
-  if (moreBadge) mb.appendChild(el("span", "badge", String(moreBadge)));
-  mb.setAttribute("aria-haspopup", "true");
-  mb.addEventListener("click", function () {
-    openMoreSheet(moreItems);
+    nav.appendChild(box);
   });
-  nav.appendChild(mb);
   $("topbtns").textContent = "";
   optMark(null);
   [].forEach.call(document.querySelectorAll(".rinbox"), function (x) {
@@ -177,7 +243,9 @@ function render() {
   else if (view === "photos") renderPhotoLib();
   else if (view === "inventory") renderInventory();
   else if (view === "personnel" && isOwner()) renderPersonnel();
-  else if (view === "team" && isOwner()) renderTeam();
+  else if (view === "route") renderRoute();
+  else if (view === "forms") renderForms();
+  else if (view === "messages") renderMessages();
   else renderSchedule();
 }
 

@@ -618,6 +618,7 @@ const PUSH_EVENTS = {
   portal: "Requests from the client portal",
   quote: "Quotes approved by clients",
   receipt: "Receipts uploaded by the crew",
+  chat: "New messages",
 };
 const PUSH_SUBJECT = "mailto:Support@LattaCorpFL.com";
 async function vapidKeys(env) {
@@ -856,6 +857,87 @@ export async function handlePortalPush(request, env) {
   return json({ error: "bad action" }, 400);
 }
 
+// ---- Messages: notify everyone in the room except the sender ----
+async function crewPushAction(env, action, d, u) {
+  if (action === "key") {
+    const k = await vapidKeys(env);
+    return k ? json({ ok: true, key: k.publicKey }) : json({ error: "Notifications are not set up yet." }, 502);
+  }
+  if (action === "subscribe") {
+    const sub = d.sub || {}, keys = sub.keys || {};
+    const endpoint = String(sub.endpoint || "");
+    if (!/^https:\/\/[^\s]{10,900}$/.test(endpoint) || !/^[A-Za-z0-9_-]{40,200}$/.test(String(keys.p256dh || "")) || !/^[A-Za-z0-9_-]{10,60}$/.test(String(keys.auth || "")))
+      return json({ error: "bad subscription" }, 400);
+    const row = { email: u.email, endpoint, p256dh: keys.p256dh, auth: keys.auth, label: String(d.label || "").slice(0, 80), kind: "crew" };
+    const r = await sbRest(env, "push_devices?on_conflict=endpoint", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(row) });
+    return r.ok ? json({ ok: true }) : json({ error: "Could not save this phone." }, 502);
+  }
+  if (action === "unsubscribe") {
+    const endpoint = String(d.endpoint || "");
+    if (!endpoint) return json({ error: "bad request" }, 400);
+    await sbRest(env, `push_devices?endpoint=eq.${encodeURIComponent(endpoint)}&email=eq.${encodeURIComponent(u.email)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    return json({ ok: true });
+  }
+  // test
+  const n = await pushTo(env, [u.email], ["crew"], { title: "Notifications are on ✓", body: "New messages will show up here.", url: "/crm/?go=messages", tag: "test" });
+  return n ? json({ ok: true, sent: n }) : json({ error: "No phone got it. Turn notifications on for this phone first." }, 404);
+}
+// sends one message to every phone of these emails (of the given device kinds); returns how many got it
+async function pushTo(env, emails, kinds, msg) {
+  const keys = await vapidKeys(env);
+  if (!keys || !emails.length) return 0;
+  const want = new Set(emails.map((e) => String(e).toLowerCase()));
+  const dr = await sbRest(env, `push_devices?kind=in.(${kinds.join(",")})&select=id,email,endpoint,p256dh,auth`);
+  if (!dr.ok) return 0;
+  const devs = ((await dr.json()) || []).filter((x) => want.has(String(x.email).toLowerCase()));
+  let ok = 0;
+  await Promise.all(devs.map(async (x) => {
+    const st = await sendPush(x, msg, keys, PUSH_SUBJECT);
+    if (st >= 200 && st < 300) ok++;
+    else if (st === 404 || st === 410) await sbRest(env, `push_devices?id=eq.${x.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+  }));
+  return ok;
+}
+async function handleChatPush(env, d, u) {
+  const id = String(d.id || "");
+  if (!UUID.test(id)) return json({ error: "bad request" }, 400);
+  const mr = await sbRest(env, `messages?id=eq.${id}&select=room,sender_id,sender_name,body,photo_path,created_at`);
+  const m = mr.ok ? ((await mr.json()) || [])[0] : null;
+  if (!m || m.sender_id !== u.id) return json({ error: "Not allowed." }, 403);
+  if (Date.now() - new Date(m.created_at).getTime() > 5 * 60 * 1000) return json({ ok: true, sent: 0 });
+  const [sr, cr, pr] = await Promise.all([
+    sbRest(env, "staff?select=email,role,user_id"),
+    sbRest(env, "crew?active=eq.true&kind=eq.login&select=email,user_id"),
+    sbRest(env, "push_prefs?select=email,prefs"),
+  ]);
+  const staff = sr.ok ? (await sr.json()) || [] : [];
+  const crewRows = cr.ok ? (await cr.json()) || [] : [];
+  const prefs = pr.ok ? (await pr.json()) || [] : [];
+  const wantsChat = (e) => prefsOn((prefs.find((x) => String(x.email).toLowerCase() === String(e).toLowerCase()) || {}).prefs, "chat");
+  let to = [];
+  if (m.room === "all") to = staff.map((x) => x.email).concat(crewRows.map((x) => x.email));
+  else if (m.room === "office") to = staff.map((x) => x.email);
+  else if (/^dm:/.test(m.room)) {
+    const other = m.room.split(":").slice(1).find((x) => x !== u.id);
+    let em = (staff.find((x) => x.user_id === other) || crewRows.find((x) => x.user_id === other) || {}).email;
+    if (!em && UUID.test(other || "")) {
+      const ar = await fetch(`${baseUrl(env)}/auth/v1/admin/users/${other}`, { headers: { apikey: env.SUPABASE_SECRET_KEY, Authorization: `Bearer ${env.SUPABASE_SECRET_KEY}` } });
+      if (ar.ok) em = (await ar.json()).email;
+    }
+    if (em) to = [em];
+  }
+  const isStaff = (e) => staff.some((x) => String(x.email).toLowerCase() === String(e).toLowerCase());
+  to = to.filter((e) => e && String(e).toLowerCase() !== u.email && (!isStaff(e) || wantsChat(e)));
+  const roomName = m.room === "all" ? "Everyone" : m.room === "office" ? "Office" : "";
+  const sent = await pushTo(env, to, ["staff", "crew"], {
+    title: String((m.sender_name || "New message") + (roomName ? " · " + roomName : "")).slice(0, 120),
+    body: String(m.body || (m.photo_path ? "📷 Photo" : "")).slice(0, 240),
+    url: "/crm/?go=messages",
+    tag: "chat-" + m.room,
+  });
+  return json({ ok: true, sent });
+}
+
 export async function handlePush(request, env) {
   if (!env.SUPABASE_SECRET_KEY) return json({ error: "Notifications are not set up on the server." }, 500);
   let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
@@ -878,8 +960,16 @@ export async function handlePush(request, env) {
     await notify(env, "receipt", "Receipt uploaded", `${c.name || "A crew member"} uploaded a receipt to enter.`, "/crm/?go=expenses");
     return json({ ok: true });
   }
+  if (action === "chat") return handleChatPush(env, d, u);
   const who = await staffRow(env, u.email);
-  if (!who || (who.role !== "owner" && who.role !== "office")) return json({ error: "Not allowed." }, 403);
+  if (!who || (who.role !== "owner" && who.role !== "office")) {
+    // crew logins can turn on notifications for their own phone (for Messages)
+    if (["key", "subscribe", "unsubscribe", "test"].includes(action)) {
+      const cr = await sbRest(env, `crew?user_id=eq.${u.id}&active=eq.true&kind=eq.login&select=id`);
+      if (cr.ok && ((await cr.json()) || []).length) return crewPushAction(env, action, d, u);
+    }
+    return json({ error: "Not allowed." }, 403);
+  }
   const me = u.email;
   if (/^client-|^news$/.test(action)) return handleClientPush(env, action, d, u, who.role);
   if (action === "key") {
