@@ -28,6 +28,7 @@ function start() {
   $("layout").hidden = false;
   $("signout").hidden = false;
   $("refresh").hidden = false;
+  $("bell").hidden = false;
   load();
 }
 sb.auth.getSession().then(function (r) {

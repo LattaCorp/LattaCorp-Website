@@ -53,7 +53,16 @@ var role = "owner",
 function isOwner() {
   return role === "owner";
 }
-var view = "leads",
+var view = (function () {
+    try {
+      var g = new URLSearchParams(location.search).get("go");
+      if (g && /^(leads|clients|jobs|schedule|billing|expenses|reports|photos|inventory|todo|personnel|team)$/.test(g)) {
+        history.replaceState(null, "", location.pathname);
+        return g;
+      }
+    } catch (e) {}
+    return "leads";
+  })(),
   lfilter = "open",
   cfilter = "active",
   jfilter = "active",

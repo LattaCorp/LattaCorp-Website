@@ -371,3 +371,228 @@ function openBatchDeliver(onlyIds) {
   }
   draw();
 }
+
+/* ---- Phone notifications: each person picks what pings their phone ---- */
+function pushKeyBytes(b64) {
+  var s = b64.replace(/-/g, "+").replace(/_/g, "/");
+  while (s.length % 4) s += "=";
+  var bin = atob(s),
+    out = new Uint8Array(bin.length);
+  for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
+}
+function pushSupported() {
+  return "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
+}
+function pushMySub() {
+  if (!pushSupported()) return Promise.resolve(null);
+  var t = new Promise(function (res) {
+    setTimeout(function () {
+      res(null);
+    }, 2500);
+  });
+  return Promise.race([
+    navigator.serviceWorker.ready.then(function (reg) {
+      return reg.pushManager.getSubscription();
+    }),
+    t
+  ]);
+}
+function deviceLabel() {
+  var u = navigator.userAgent,
+    m = u.match(/Android[^;)]*;\s*([^;)]+?)(?:\sBuild|\))/);
+  if (m) return m[1].trim();
+  if (/iPhone/.test(u)) return "iPhone";
+  if (/iPad/.test(u)) return "iPad";
+  if (/Windows/.test(u)) return "Windows computer";
+  if (/Mac/.test(u)) return "Mac";
+  return "This device";
+}
+function openNotifySettings() {
+  if (crewMe) return;
+  var p = panel();
+  p.appendChild(el("h2", null, "Phone notifications"));
+  p.appendChild(el("p", "note", "Get a notification on your phone when something happens. Each person picks their own."));
+  var here = el("div", "pcard nbox"),
+    evbox = el("div", "sec"),
+    devbox = el("div", "sec"),
+    febox = el("div", "sec"),
+    msg = el("div", "note");
+  p.appendChild(here);
+  p.appendChild(evbox);
+  p.appendChild(febox);
+  p.appendChild(devbox);
+  p.appendChild(msg);
+  var state = null;
+  function say(t, bad) {
+    msg.textContent = t;
+    msg.style.color = bad ? "var(--red)" : "var(--forest)";
+  }
+  function drawHere() {
+    here.textContent = "";
+    here.appendChild(el("b", null, "This phone"));
+    if (!pushSupported()) {
+      here.appendChild(
+        el("div", "note", "This browser can't get notifications. On Android, open Foreman in Chrome and install it (menu ⋮ → Install app), then open it from the home screen.")
+      );
+      return;
+    }
+    if (Notification.permission === "denied") {
+      here.appendChild(
+        el("div", "note", "Notifications are blocked for Foreman on this phone. Long-press the Foreman icon → App info → Notifications → Allow, then come back here.")
+      );
+      return;
+    }
+    pushMySub().then(function (sub) {
+      if (sub) {
+        here.appendChild(el("div", "note", "✓ Notifications are on for this phone."));
+        var row = el("div", "qacts");
+        row.appendChild(
+          btn("Send a test", "btn alt sm", function () {
+            say("Sending...");
+            callApi("/api/push", "test", {}).then(function (r) {
+              say(r.ok ? "Sent. It should pop up in a few seconds." : r.error, !r.ok);
+            });
+          })
+        );
+        row.appendChild(
+          btn("Turn off on this phone", "btn alt sm", function () {
+            var ep = sub.endpoint;
+            sub.unsubscribe().then(function () {
+              callApi("/api/push", "unsubscribe", { endpoint: ep }).then(load);
+            });
+          })
+        );
+        here.appendChild(row);
+      } else {
+        var on = btn("Turn on notifications for this phone", "btn", function () {
+          on.disabled = true;
+          say("");
+          Notification.requestPermission().then(function (perm) {
+            if (perm !== "granted") {
+              on.disabled = false;
+              return say("Notifications weren't allowed. Tap the button again and choose Allow.", true);
+            }
+            callApi("/api/push", "key", {}).then(function (k) {
+              if (!k.ok) {
+                on.disabled = false;
+                return say(k.error, true);
+              }
+              navigator.serviceWorker.ready
+                .then(function (reg) {
+                  return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: pushKeyBytes(k.data.key) });
+                })
+                .then(function (s) {
+                  return callApi("/api/push", "subscribe", { sub: s.toJSON(), label: deviceLabel() });
+                })
+                .then(function (r) {
+                  if (!r.ok) throw new Error(r.error);
+                  say("✓ Turned on. Try Send a test.");
+                  load();
+                })
+                .catch(function (e) {
+                  on.disabled = false;
+                  say("Could not turn on notifications here. " + String((e && e.message) || ""), true);
+                });
+            });
+          });
+        });
+        here.appendChild(el("div", "note", "Notifications are off for this phone."));
+        here.appendChild(on);
+      }
+    });
+  }
+  function save() {
+    var prefs = {};
+    state.events.forEach(function (e) {
+      prefs[e.key] = e.on;
+    });
+    callApi("/api/push", "set", { prefs: prefs, formEmails: state.formEmails }).then(function (r) {
+      say(r.ok ? "Saved ✓" : r.error, !r.ok);
+    });
+  }
+  function drawRest() {
+    evbox.textContent = "";
+    evbox.appendChild(el("h3", null, "Notify me about"));
+    state.events.forEach(function (e) {
+      var l = el("label", "chk"),
+        c = el("input");
+      c.type = "checkbox";
+      c.checked = e.on;
+      c.addEventListener("change", function () {
+        e.on = c.checked;
+        save();
+      });
+      l.appendChild(c);
+      l.appendChild(el("span", null, e.label));
+      evbox.appendChild(l);
+    });
+    febox.textContent = "";
+    if (state.formEmails != null) {
+      febox.appendChild(el("h3", null, "Website form emails"));
+      febox.appendChild(
+        el("div", "note", "Every form is saved in Leads either way. Photos people attach only come by email for now, so \"Only with photos\" keeps those.")
+      );
+      [
+        ["all", "Email me every form (as now)"],
+        ["photos", "Only email forms that have photos"],
+        ["off", "Don't email forms, notifications only"]
+      ].forEach(function (o) {
+        var l = el("label", "chk"),
+          r = el("input");
+        r.type = "radio";
+        r.name = "fe";
+        r.checked = state.formEmails === o[0];
+        r.addEventListener("change", function () {
+          state.formEmails = o[0];
+          save();
+        });
+        l.appendChild(r);
+        l.appendChild(el("span", null, o[1]));
+        febox.appendChild(l);
+      });
+    }
+    devbox.textContent = "";
+    if (state.devices.length) {
+      devbox.appendChild(el("h3", null, "Your phones and computers"));
+      pushMySub().then(function (mine) {
+        state.devices.forEach(function (d) {
+          var r = el("div", "pcard ndev");
+          var l = el("div");
+          l.appendChild(el("b", null, (d.label || "Device") + (mine && mine.endpoint === d.endpoint ? " (this one)" : "")));
+          l.appendChild(el("div", "note", "Added " + dshort(String(d.created_at).slice(0, 10)) + (d.last_ok_at ? " · last notified " + dshort(String(d.last_ok_at).slice(0, 10)) : "")));
+          r.appendChild(l);
+          r.appendChild(
+            btn("Remove", "btn alt sm danger", function () {
+              if (!confirm("Stop notifications on " + (d.label || "this device") + "?")) return;
+              callApi("/api/push", "unsubscribe", { id: d.id }).then(load);
+            })
+          );
+          devbox.appendChild(r);
+        });
+      });
+    }
+  }
+  function load() {
+    drawHere();
+    callApi("/api/push", "get", {}).then(function (r) {
+      if (!r.ok) {
+        evbox.textContent = "";
+        evbox.appendChild(el("div", "note", r.error));
+        return;
+      }
+      state = r.data;
+      drawRest();
+    });
+  }
+  load();
+}
+$("bell").addEventListener("click", openNotifySettings);
+if ("serviceWorker" in navigator)
+  navigator.serviceWorker.addEventListener("message", function (e) {
+    var g = e.data && e.data.go;
+    if (g && /^(leads|clients|jobs|schedule|billing|expenses|reports|photos|inventory|todo|personnel|team)$/.test(g) && !crewMe) {
+      view = g;
+      load();
+    }
+  });

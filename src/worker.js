@@ -1,3 +1,4 @@
+import { makeVapidKeys, sendPush } from "./push.js";
 // Latta Corp website server code (Cloudflare Worker).
 // The static website is served automatically. This file only handles form submissions sent to /api/submit:
 // it emails them to the business through Resend. Settings: TO_EMAIL (wrangler.jsonc) and RESEND_API_KEY (a secret
@@ -164,10 +165,16 @@ export async function handleSubmit(request, env) {
   if (emailOk) payload.reply_to = email;
   if (attachments.length) payload.attachments = attachments;
 
-  // Save to the CRM and send the email at the same time. The visitor sees success if at least one of them worked.
-  const sendEmail = () => sendViaResend(env, payload);
-  const [emailed, saved] = await Promise.all([sendEmail(), saveLead(env, kind, data.lang, fields, attachments.length)]);
+  // Save to the CRM and (depending on the setting in Foreman) email it at the same time, then ping the office phones.
+  // The visitor sees success if at least one of them worked. If saving to Foreman fails, the email always goes out.
+  const fe = await formEmailSetting(env);
+  const wantEmail = fe === "all" || (fe === "photos" && attachments.length > 0);
+  const saved = await saveLead(env, kind, data.lang, fields, attachments.length);
+  const emailed = wantEmail || !saved ? await sendViaResend(env, payload) : false;
   if (!emailed && !saved) return json({ error: "email failed" }, 502);
+  const ev = kind === "Service request" ? "service" : kind === "Contact message" ? "contact" : "lead";
+  const what = pick(/^service(s)?\b|which services/i) || pick(/community/i) || pick(/address/i);
+  await notify(env, ev, `${kind}: ${name || "New"}`, [what, attachments.length ? attachments.length + " photo" + (attachments.length > 1 ? "s" : "") : ""].filter(Boolean).join(" · ") || "Open Foreman to see it.", "/crm/?go=leads");
   return json({ ok: true });
 }
 
@@ -429,8 +436,11 @@ export async function handlePortalRequest(request, env) {
     html: `<div style="font-family:Arial,sans-serif;font-size:15px"><h2 style="color:#1b552b;margin:0 0 12px">${esc(kind)} (client portal)</h2><table>${rows}</table></div>`,
   };
   if (EMAIL_RE.test(email)) payload.reply_to = email;
-  const [emailed, saved] = await Promise.all([sendViaResend(env, payload), saveLead(env, kind, d.lang, fields, 0, acct.client.id)]);
+  const fe = await formEmailSetting(env);
+  const saved = await saveLead(env, kind, d.lang, fields, 0, acct.client.id);
+  const emailed = fe === "all" || !saved ? await sendViaResend(env, payload) : false;
   if (!emailed && !saved) return json({ error: "Could not send. Please call or text 407-470-5309." }, 502);
+  await notify(env, "portal", `Portal request: ${acct.client.name || "a client"}`, kind, "/crm/?go=leads");
   return json({ ok: true });
 }
 
@@ -507,6 +517,7 @@ export async function handleQuoteApproved(request, env) {
 <p style="margin:0"><a href="${link}" style="display:inline-block;background:#1b552b;color:#fff;text-decoration:none;font-weight:700;padding:11px 20px;border-radius:6px">See the signed ${word.toLowerCase()}</a>
 &nbsp; <a href="${SITE}/crm/" style="color:#1b552b">Open Foreman</a></p></td></tr></table></body></html>`;
   const text = [`${word} approved`, "", `${who} signed ${word.toLowerCase()} ${num}${e.title ? ` ("${e.title}")` : ""} for ${money2(e.total)}.`, ...rows.map((r) => `${r[0]}: ${r[1]}`), "", `See the signed ${word.toLowerCase()}: ${link}`].join("\n");
+  await notify(env, "quote", `${word} approved ✓`, `${who} · ${num} · ${money2(e.total)}`, "/crm/?go=leads");
   const ok = await sendViaResend(env, { from: "Foreman <website@lattacorpfl.com>", to: [env.TO_EMAIL || DEFAULT_TO],
     subject: `${word} approved: ${who} · ${num} · ${money2(e.total)}`, html, text, headers: AUTO_HEADERS });
   if (!ok) {
@@ -597,6 +608,150 @@ export async function handleInvoiceEmail(request, env) {
   return json({ ok: true, sent, failed, left: Math.max(0, room - sent.length) });
 }
 
+
+// ---- Phone notifications (Web Push) for owners and office staff ----
+const PUSH_EVENTS = {
+  lead: "New quote requests",
+  service: "Service requests from communities",
+  contact: "Contact messages",
+  portal: "Requests from the client portal",
+  quote: "Quotes approved by clients",
+  receipt: "Receipts uploaded by the crew",
+};
+const PUSH_SUBJECT = "mailto:Support@LattaCorpFL.com";
+async function vapidKeys(env) {
+  const get = async () => {
+    const r = await sbRest(env, "app_secrets?name=in.(vapid_public,vapid_private)&select=name,value");
+    if (!r.ok) return null;
+    const rows = (await r.json()) || [], f = (n) => (rows.find((x) => x.name === n) || {}).value;
+    return f("vapid_public") && f("vapid_private") ? { publicKey: f("vapid_public"), privateKey: f("vapid_private") } : null;
+  };
+  let k = await get();
+  if (k) return k;
+  // first use: make the key pair once and keep it (if two calls race, the first one saved wins)
+  const nk = await makeVapidKeys();
+  await sbRest(env, "app_secrets", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify([{ name: "vapid_public", value: nk.publicKey }, { name: "vapid_private", value: nk.privateKey }]) });
+  return await get();
+}
+const prefsOn = (prefs, ev) => !prefs || prefs[ev] !== false;
+// Sends one notification to every owner/office phone that wants this kind of event. Never throws.
+async function notify(env, ev, title, body, url, onlyEmail) {
+  try {
+    if (!env.SUPABASE_SECRET_KEY) return 0;
+    const keys = await vapidKeys(env);
+    if (!keys) return 0;
+    const dr = await sbRest(env, "push_devices?select=id,email,endpoint,p256dh,auth");
+    if (!dr.ok) return 0;
+    let devs = (await dr.json()) || [];
+    if (onlyEmail) devs = devs.filter((d) => d.email.toLowerCase() === onlyEmail.toLowerCase());
+    if (!devs.length) return 0;
+    const sr = await fetch(`${baseUrl(env)}/rest/v1/staff?select=email,role`, { headers: { apikey: env.SUPABASE_SECRET_KEY } });
+    const staff = sr.ok ? (await sr.json()) || [] : [];
+    const roleOf = (e) => ((staff.find((x) => String(x.email).toLowerCase() === e.toLowerCase()) || {}).role || "owner");
+    const pr = await sbRest(env, "push_prefs?select=email,prefs");
+    const prefs = pr.ok ? (await pr.json()) || [] : [];
+    const prefOf = (e) => (prefs.find((x) => x.email.toLowerCase() === e.toLowerCase()) || {}).prefs;
+    devs = devs.filter((d) => staff.some((x) => String(x.email).toLowerCase() === d.email.toLowerCase()) &&
+      (roleOf(d.email) === "owner" || roleOf(d.email) === "office") && (ev === "test" || prefsOn(prefOf(d.email), ev)));
+    const msg = { title: String(title).slice(0, 120), body: String(body || "").slice(0, 240), url: url || "/crm/", tag: ev + "-" + Date.now() };
+    let ok = 0;
+    await Promise.all(devs.map(async (d) => {
+      const st = await sendPush(d, msg, keys, PUSH_SUBJECT);
+      if (st >= 200 && st < 300) {
+        ok++;
+        await sbRest(env, `push_devices?id=eq.${d.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ last_ok_at: new Date().toISOString() }) });
+      } else if (st === 404 || st === 410) {
+        await sbRest(env, `push_devices?id=eq.${d.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+      } else console.log("push failed", st);
+    }));
+    return ok;
+  } catch (e) { console.log("notify error", String(e).slice(0, 200)); return 0; }
+}
+async function callerUser(request, env) {
+  const token = bearer(request);
+  if (!token) return null;
+  try {
+    const u = await fetch(`${baseUrl(env)}/auth/v1/user`, { headers: { apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${token}` } });
+    if (!u.ok) return null;
+    const j = await u.json();
+    return { id: j.id, email: String(j.email || "").toLowerCase() };
+  } catch { return null; }
+}
+async function formEmailSetting(env) {
+  try {
+    const r = await sbRest(env, "business?select=form_emails&limit=1");
+    if (!r.ok) return "all";
+    return ((await r.json()) || [])[0]?.form_emails || "all";
+  } catch { return "all"; }
+}
+export async function handlePush(request, env) {
+  if (!env.SUPABASE_SECRET_KEY) return json({ error: "Notifications are not set up on the server." }, 500);
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const action = String((d && d.action) || "");
+  const u = await callerUser(request, env);
+  if (!u) return json({ error: "Not allowed." }, 403);
+  if (action === "receipt") {
+    // a crew member just uploaded a receipt from their own login
+    const cr = await sbRest(env, `crew?user_id=eq.${u.id}&active=eq.true&kind=eq.login&select=name`);
+    const c = cr.ok ? ((await cr.json()) || [])[0] : null;
+    if (!c) return json({ error: "Not allowed." }, 403);
+    await notify(env, "receipt", "Receipt uploaded", `${c.name || "A crew member"} uploaded a receipt to enter.`, "/crm/?go=expenses");
+    return json({ ok: true });
+  }
+  const who = await staffRow(env, u.email);
+  if (!who || (who.role !== "owner" && who.role !== "office")) return json({ error: "Not allowed." }, 403);
+  const me = u.email;
+  if (action === "key") {
+    const k = await vapidKeys(env);
+    return k ? json({ ok: true, key: k.publicKey }) : json({ error: "Run the Stage 44 SQL in Supabase first." }, 502);
+  }
+  if (action === "subscribe") {
+    const sub = d.sub || {}, keys = sub.keys || {};
+    const endpoint = String(sub.endpoint || "");
+    if (!/^https:\/\/[^\s]{10,900}$/.test(endpoint) || !/^[A-Za-z0-9_-]{40,200}$/.test(String(keys.p256dh || "")) || !/^[A-Za-z0-9_-]{10,60}$/.test(String(keys.auth || "")))
+      return json({ error: "bad subscription" }, 400);
+    const row = { email: me, endpoint, p256dh: keys.p256dh, auth: keys.auth, label: String(d.label || "").slice(0, 80) };
+    const r = await sbRest(env, "push_devices?on_conflict=endpoint", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(row) });
+    if (!r.ok) return json({ error: "Could not save this phone. Run the Stage 44 SQL in Supabase first." }, 502);
+    return json({ ok: true });
+  }
+  if (action === "unsubscribe") {
+    const endpoint = String(d.endpoint || "");
+    const id = String(d.id || "");
+    const q = endpoint ? `endpoint=eq.${encodeURIComponent(endpoint)}` : UUID.test(id) ? `id=eq.${id}` : "";
+    if (!q) return json({ error: "bad request" }, 400);
+    await sbRest(env, `push_devices?${q}&email=eq.${encodeURIComponent(me)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    return json({ ok: true });
+  }
+  if (action === "get") {
+    const [pr, dr] = await Promise.all([
+      sbRest(env, `push_prefs?email=eq.${encodeURIComponent(me)}&select=prefs`),
+      sbRest(env, `push_devices?email=eq.${encodeURIComponent(me)}&select=id,label,created_at,last_ok_at,endpoint&order=created_at.asc`),
+    ]);
+    if (!pr.ok || !dr.ok) return json({ error: "Run the Stage 44 SQL in Supabase first." }, 502);
+    const prefs = ((await pr.json()) || [])[0]?.prefs || {};
+    const events = Object.keys(PUSH_EVENTS).map((k) => ({ key: k, label: PUSH_EVENTS[k], on: prefsOn(prefs, k) }));
+    return json({ ok: true, events, devices: (await dr.json()) || [], formEmails: who.role === "owner" ? await formEmailSetting(env) : null });
+  }
+  if (action === "set") {
+    const prefs = {};
+    for (const k of Object.keys(PUSH_EVENTS)) prefs[k] = !(d.prefs && d.prefs[k] === false);
+    const r = await sbRest(env, "push_prefs?on_conflict=email", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ email: me, prefs, updated_at: new Date().toISOString() }) });
+    if (!r.ok) return json({ error: "Could not save." }, 502);
+    if (who.role === "owner" && ["all", "photos", "off"].includes(d.formEmails)) {
+      await sbRest(env, "business?id=not.is.null", { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ form_emails: d.formEmails }) });
+    }
+    return json({ ok: true });
+  }
+  if (action === "test") {
+    const n = await notify(env, "test", "Foreman notifications are on ✓", "This is how new leads and requests will show up.", "/crm/", me);
+    return n ? json({ ok: true, sent: n }) : json({ error: "No phone got it. Turn notifications on for this phone first." }, 404);
+  }
+  return json({ error: "bad action" }, 400);
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -615,6 +770,10 @@ export default {
     if (url.pathname === "/api/team") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handleTeam(request, env);
+    }
+    if (url.pathname === "/api/push") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      return handlePush(request, env);
     }
     if (url.pathname === "/api/invoices/email") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);

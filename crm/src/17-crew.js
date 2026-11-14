@@ -600,6 +600,7 @@ function crewReceipts(files, note, st) {
       }, Promise.resolve())
       .then(function () {
         st.textContent = ok ? "\u2713 Receipt sent to the office." : "Could not upload. Try again.";
+        if (ok) callApi("/api/push", "receipt", {}); // pings the office phones
       });
   });
 }
