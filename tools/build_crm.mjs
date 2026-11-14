@@ -12,6 +12,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { buildAllDark } from "./build_dark.mjs";
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const srcDir = path.join(root, "crm", "src");
@@ -39,3 +40,6 @@ if (!process.argv.includes("--no-bump")) {
 } else {
   console.log("Built crm/app.js from " + files.length + " files (version unchanged)");
 }
+
+// dark mode colors follow whatever the light design is now
+buildAllDark();

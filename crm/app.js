@@ -12683,7 +12683,11 @@ var CREW_ES = {
   "Turn off": "Desactivar",
   "Turn on notifications": "Activar notificaciones",
   "Notifications weren't allowed.": "No se permitieron las notificaciones.",
-  "\u2713 Turned on.": "\u2713 Activadas."
+  "\u2713 Turned on.": "\u2713 Activadas.",
+  Appearance: "Apariencia",
+  Light: "Claro",
+  Dark: "Oscuro",
+  Auto: "Auto"
 };
 var crewLang = (function () {
   try {
@@ -12719,6 +12723,11 @@ function crewHeaderText() {
     mn = $("menuNotify");
   if (so && so.lastChild) so.lastChild.textContent = crewT("Log out");
   if (mn && mn.lastChild) mn.lastChild.textContent = crewT("Phone notifications");
+  var tl = $("amthemelbl");
+  if (tl) tl.textContent = crewT("Appearance");
+  [].forEach.call(document.querySelectorAll("[data-theme-set]"), function (b) {
+    b.textContent = crewT({ light: "Light", dark: "Dark", auto: "Auto" }[b.getAttribute("data-theme-set")]);
+  });
 }
 var crewTab = "route";
 function renderCrewApp() {
@@ -22210,6 +22219,35 @@ function openNotifySettings() {
   }
   load();
 }
+/* ---- appearance: light, dark, or match the phone/computer (each device remembers its own) ---- */
+function themePref() {
+  try {
+    return localStorage.getItem("theme") || "light";
+  } catch (e) {
+    return "light";
+  }
+}
+function applyTheme() {
+  var t = themePref();
+  if (t === "auto") t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", t);
+  [].forEach.call(document.querySelectorAll("[data-theme-set]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-theme-set") === themePref());
+    b.setAttribute("aria-pressed", b.getAttribute("data-theme-set") === themePref() ? "true" : "false");
+  });
+}
+[].forEach.call(document.querySelectorAll("[data-theme-set]"), function (b) {
+  b.addEventListener("click", function () {
+    try {
+      localStorage.setItem("theme", b.getAttribute("data-theme-set"));
+    } catch (e) {}
+    applyTheme();
+  });
+});
+try {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+} catch (e) {}
+applyTheme();
 /* ---- account menu in the header: who's signed in, notifications, log out ---- */
 function acctMenu(open) {
   var m = $("acctmenu"),

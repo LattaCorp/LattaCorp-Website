@@ -30,6 +30,11 @@
     "News from Latta Corp": "Noticias de Latta Corp",
     "Learn more": "Más información",
     "Phone notifications": "Notificaciones en el teléfono",
+    "Appearance": "Apariencia",
+    "Light": "Claro",
+    "Dark": "Oscuro",
+    "Auto": "Auto",
+    "Auto matches your phone's light or dark setting.": "Auto usa el modo claro u oscuro de su teléfono.",
     "Get a notification on your phone when something happens on your account.": "Reciba una notificación en su teléfono cuando pase algo en su cuenta.",
     "On iPhone: tap the Share button, then Add to Home Screen. Open the portal from your home screen and come back here.": "En iPhone: toque Compartir y luego Agregar a pantalla de inicio. Abra el portal desde su pantalla de inicio y vuelva aquí.",
     "This browser can't get notifications. On Android, use Chrome.": "Este navegador no puede recibir notificaciones. En Android, use Chrome.",
@@ -416,6 +421,26 @@
     return Promise.race([navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }),
       new Promise(function (res) { setTimeout(function () { res(null); }, 2500); })]);
   }
+  // light, dark, or match the phone; each phone remembers its own choice
+  function themePanel(tp) {
+    var cur = store("theme") || "light", row = el("div", "seg");
+    [["light", t("Light")], ["dark", t("Dark")], ["auto", t("Auto")]].forEach(function (x) {
+      var b = el("button", x[0] === cur ? "on" : "", x[1]);
+      b.type = "button";
+      b.setAttribute("aria-pressed", x[0] === cur ? "true" : "false");
+      b.addEventListener("click", function () {
+        try { localStorage.setItem("theme", x[0]); } catch (e) {}
+        var v = x[0] === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : x[0];
+        document.documentElement.setAttribute("data-theme", v);
+        tp.textContent = "";
+        tp.appendChild(el("h2", null, t("Appearance")));
+        themePanel(tp);
+      });
+      row.appendChild(b);
+    });
+    tp.appendChild(row);
+    tp.appendChild(el("p", "muted small", t("Auto matches your phone's light or dark setting.")));
+  }
   function notifyPanel(np) {
     var box = el("div"), list = el("div"), msg = el("p", "muted small");
     np.appendChild(el("p", "muted", t("Get a notification on your phone when something happens on your account.")));
@@ -772,6 +797,7 @@
     if (!(data.properties || []).length) pp.appendChild(el("p", "muted", "–")); else pp.appendChild(pl);
     var pe = panel(host, t("People on this account"));
     people(pe, ci, cl);
+    themePanel(panel(host, t("Appearance")));
     if (!isStaff) notifyPanel(panel(host, t("Phone notifications")));
     var ch = panel(host, t("Need to change something?"));
     ch.appendChild(el("p", "muted", t("Send us a note and we'll update your account.")));

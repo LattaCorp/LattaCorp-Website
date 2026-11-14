@@ -587,6 +587,35 @@ function openNotifySettings() {
   }
   load();
 }
+/* ---- appearance: light, dark, or match the phone/computer (each device remembers its own) ---- */
+function themePref() {
+  try {
+    return localStorage.getItem("theme") || "light";
+  } catch (e) {
+    return "light";
+  }
+}
+function applyTheme() {
+  var t = themePref();
+  if (t === "auto") t = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  document.documentElement.setAttribute("data-theme", t);
+  [].forEach.call(document.querySelectorAll("[data-theme-set]"), function (b) {
+    b.classList.toggle("on", b.getAttribute("data-theme-set") === themePref());
+    b.setAttribute("aria-pressed", b.getAttribute("data-theme-set") === themePref() ? "true" : "false");
+  });
+}
+[].forEach.call(document.querySelectorAll("[data-theme-set]"), function (b) {
+  b.addEventListener("click", function () {
+    try {
+      localStorage.setItem("theme", b.getAttribute("data-theme-set"));
+    } catch (e) {}
+    applyTheme();
+  });
+});
+try {
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+} catch (e) {}
+applyTheme();
 /* ---- account menu in the header: who's signed in, notifications, log out ---- */
 function acctMenu(open) {
   var m = $("acctmenu"),

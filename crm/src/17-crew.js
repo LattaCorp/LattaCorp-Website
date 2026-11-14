@@ -504,7 +504,11 @@ var CREW_ES = {
   "Turn off": "Desactivar",
   "Turn on notifications": "Activar notificaciones",
   "Notifications weren't allowed.": "No se permitieron las notificaciones.",
-  "\u2713 Turned on.": "\u2713 Activadas."
+  "\u2713 Turned on.": "\u2713 Activadas.",
+  Appearance: "Apariencia",
+  Light: "Claro",
+  Dark: "Oscuro",
+  Auto: "Auto"
 };
 var crewLang = (function () {
   try {
@@ -540,6 +544,11 @@ function crewHeaderText() {
     mn = $("menuNotify");
   if (so && so.lastChild) so.lastChild.textContent = crewT("Log out");
   if (mn && mn.lastChild) mn.lastChild.textContent = crewT("Phone notifications");
+  var tl = $("amthemelbl");
+  if (tl) tl.textContent = crewT("Appearance");
+  [].forEach.call(document.querySelectorAll("[data-theme-set]"), function (b) {
+    b.textContent = crewT({ light: "Light", dark: "Dark", auto: "Auto" }[b.getAttribute("data-theme-set")]);
+  });
 }
 var crewTab = "route";
 function renderCrewApp() {
