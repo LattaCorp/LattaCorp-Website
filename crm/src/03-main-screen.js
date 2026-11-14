@@ -386,14 +386,22 @@ document.addEventListener("click", function () {
 });
 window.addEventListener("resize", gearClose);
 document.addEventListener("scroll", gearClose, true);
-var GEAR_WORDS = /^(Edit|Delete|Remove|Rename|Make main)\b/;
+var GEAR_WORDS = /^(Edit|Delete|Remove|Rename|Make main|Make owner|Make office|Void|Pause|Resume|End job|Reactivate|Reset password|Reopen|Archive|Unarchive)\b/;
+/* buttons that sit beside Save/Add (the bottom of an edit form) stay as they are */
+var GEAR_KEEP = /^(Save|Add|Create|Send|Set|Cancel|Done|Update)\b/;
 function gearify() {
   var groups = [];
-  [].forEach.call(document.querySelectorAll("#app button.btn.sm,#panel button.btn.sm,#rightcol button.btn.sm"), function (b) {
-    if (b.closest(".gearmenu") || b.closest(".actions") || b.hidden) return;
+  [].forEach.call(document.querySelectorAll("#app button.btn,#panel button.btn,#rightcol button.btn"), function (b) {
+    if (b.closest(".gearmenu") || b.closest(".actions") || b.closest("#crewapp") || b.closest("#topbtns") || b.closest(".chatbox") || b.hidden) return;
     if (!GEAR_WORDS.test((b.textContent || "").trim())) return;
-    var par = b.parentNode,
-      g = null;
+    var par = b.parentNode;
+    if (
+      [].some.call(par.children, function (x) {
+        return x !== b && x.tagName === "BUTTON" && GEAR_KEEP.test((x.textContent || "").trim());
+      })
+    )
+      return;
+    var g = null;
     groups.forEach(function (x) {
       if (x.par === par) g = x;
     });
@@ -401,14 +409,24 @@ function gearify() {
     g.bs.push(b);
   });
   groups.forEach(function (g) {
-    var w = gearMenu(),
-      card = g.par.closest ? g.par.closest(".pcard,.rcard,.row,.card") : null;
-    if (card && !card.querySelector(":scope > .gearwrap.gcorner")) {
+    var card = g.par.closest ? g.par.closest(".pcard,.rcard,.row,.card") || g.par.closest("#panel:not(.pop)") : null,
+      old = card ? card.querySelector(":scope > .gearwrap.gcorner") : null,
+      w;
+    if (old && old._par === g.par) {
+      // the same buttons were drawn again: refill the gear that's already there
+      w = old;
+      w.menu.textContent = "";
+    } else if (card && !old) {
       // the gear sits in the top right corner of the card it belongs to
+      w = gearMenu();
       w.classList.add("gcorner");
       card.classList.add("hasgear");
       card.insertBefore(w, card.firstChild);
-    } else g.par.insertBefore(w, g.bs[0]);
+    } else {
+      w = gearMenu();
+      g.par.insertBefore(w, g.bs[0]);
+    }
+    w._par = g.par;
     g.bs.forEach(function (b) {
       w.menu.appendChild(b);
     });
