@@ -24,6 +24,28 @@
   var qs = new URLSearchParams(location.search);
   var lang = qs.get("lang") === "es" ? "es" : store("lc-portal-lang") || ((navigator.language || "").slice(0, 2) === "es" ? "es" : "en");
   var ES = {
+    "Something went wrong. Please try again.": "Algo salió mal. Inténtelo de nuevo.",
+    "Offers for you": "Ofertas para usted",
+    "View & approve": "Ver y aprobar",
+    "News from Latta Corp": "Noticias de Latta Corp",
+    "Learn more": "Más información",
+    "Phone notifications": "Notificaciones en el teléfono",
+    "Get a notification on your phone when something happens on your account.": "Reciba una notificación en su teléfono cuando pase algo en su cuenta.",
+    "On iPhone: tap the Share button, then Add to Home Screen. Open the portal from your home screen and come back here.": "En iPhone: toque Compartir y luego Agregar a pantalla de inicio. Abra el portal desde su pantalla de inicio y vuelva aquí.",
+    "This browser can't get notifications. On Android, use Chrome.": "Este navegador no puede recibir notificaciones. En Android, use Chrome.",
+    "Notifications are blocked for this site. Allow them in your phone's settings, then come back here.": "Las notificaciones están bloqueadas para este sitio. Permítalas en los ajustes de su teléfono y vuelva aquí.",
+    "Notifications are on for this phone.": "Las notificaciones están activadas en este teléfono.",
+    "Send a test": "Enviar una prueba",
+    "Sent. It should pop up in a few seconds.": "Enviada. Debería aparecer en unos segundos.",
+    "Turn off on this phone": "Desactivar en este teléfono",
+    "Turn on notifications": "Activar notificaciones",
+    "Notifications weren't allowed. Tap the button again and choose Allow.": "No se permitieron las notificaciones. Toque el botón otra vez y elija Permitir.",
+    "Turned on.": "Activadas.",
+    "Notify me about:": "Notificarme sobre:",
+    "Saved": "Guardado",
+    "New invoices": "Facturas nuevas",
+    "Lawn maintenance completed": "Mantenimiento de césped terminado",
+    "Offers and recommended services": "Ofertas y servicios recomendados",
     "People on this account": "Personas en esta cuenta",
     "Please enter a name.": "Escriba un nombre.",
     "An email is needed to sign in to the portal.": "Se necesita un correo para entrar al portal.",
@@ -121,7 +143,7 @@
   /* ---------- formatting ---------- */
   function money(n) { return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(Number(n) || 0); }
   function pd(s) { if (!s) return null; var p = String(s).slice(0, 10).split("-"); return new Date(+p[0], +p[1] - 1, +p[2]); }
-  function fdate(s, opt) { var d = pd(s); return d ? d.toLocaleDateString(LOC(), opt || { month: "short", day: "numeric", year: "numeric" }) : ""; }
+  function fdate(s, opt) { var d = pd(s); return d && !isNaN(d) ? d.toLocaleDateString(LOC(), opt || { month: "short", day: "numeric", year: "numeric" }) : ""; }
   function invNum(n) { var s = String(n || 0); while (s.length < 4) s = "0" + s; return "LC-" + s; }
   function dateBlock(s) {
     var d = pd(s), b = el("div", "date");
@@ -316,6 +338,7 @@
       if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
     var host = $("view"); host.textContent = ""; VIEWS[view](host);
+    if (view === "home") feed(host);
     window.scrollTo(0, 0);
   }
   function panel(host, title) { var p = el("section", "panel"); if (title) p.appendChild(el("h2", null, title)); host.appendChild(p); return p; }
@@ -353,6 +376,102 @@
   function toPick() { var e = document.querySelector(".sitepick"); if (e) e.scrollIntoView({ block: "start" }); }
   function invPill(s) { return s === "past_due" ? pill(t("Past due"), "past_due") : s === "due" ? pill(t("Due"), "due") : s === "void" ? pill(t("Void"), "gray") : pill(t("Paid")); }
   function docLink(tok, label) { var a = el("a", "btn alt", label || t("View")); a.href = "../d/?t=" + encodeURIComponent(tok); a.target = "_blank"; a.rel = "noopener"; a.style.minHeight = "38px"; a.style.padding = "0 14px"; return a; }
+
+  /* News from Latta Corp and offers (recommended services) for this account */
+  function feed(host) {
+    var cid = curId;
+    sb.rpc("portal_feed", { cid: cid }).then(function (r) {
+      if (r.error || !r.data || cid !== curId || view !== "home") return;
+      var offers = r.data.offers || [], news = r.data.news || [];
+      if (offers.length) {
+        var op = panel(host, t("Offers for you")), ol = el("ul", "list");
+        offers.forEach(function (o) { li(ol, { title: o.title, sub: money(o.total) + (o.date ? " · " + fdate(String(o.date).slice(0, 10)) : ""), right: docLink(o.token, t("View & approve")) }); });
+        op.appendChild(ol);
+      }
+      if (news.length) {
+        var np = panel(host, t("News from Latta Corp"));
+        news.forEach(function (n) {
+          var b = el("div", "newsitem");
+          b.appendChild(el("b", null, n.title));
+          if (n.date) b.appendChild(el("div", "muted small", fdate(String(n.date).slice(0, 10))));
+          if (n.body) { var bd = el("p", null, n.body); bd.style.whiteSpace = "pre-wrap"; b.appendChild(bd); }
+          if (n.link) { var a = el("a", "btn alt sm", t("Learn more")); a.href = n.link; a.target = "_blank"; a.rel = "noopener"; b.appendChild(a); }
+          np.appendChild(b);
+        });
+      }
+    });
+  }
+  /* Phone notifications for this account: each person turns on what they want */
+  function pushApi(action, extra) {
+    return sb.auth.getSession().then(function (r) {
+      var tok = r.data && r.data.session && r.data.session.access_token;
+      return fetch("/api/portal/push", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + tok },
+        body: JSON.stringify(Object.assign({ action: action, client_id: curId }, extra || {})) });
+    }).then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { j.ok = res.ok && j.ok !== false; return j; }); },
+      function () { return { ok: false, error: "offline" }; });
+  }
+  function keyBytes(b64) { var s2 = b64.replace(/-/g, "+").replace(/_/g, "/"); while (s2.length % 4) s2 += "="; var bin = atob(s2), out = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i); return out; }
+  function mySub() {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window)) return Promise.resolve(null);
+    return Promise.race([navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }),
+      new Promise(function (res) { setTimeout(function () { res(null); }, 2500); })]);
+  }
+  function notifyPanel(np) {
+    var box = el("div"), list = el("div"), msg = el("p", "muted small");
+    np.appendChild(el("p", "muted", t("Get a notification on your phone when something happens on your account.")));
+    np.appendChild(box); np.appendChild(list); np.appendChild(msg);
+    var ios = /iPhone|iPad|iPod/.test(navigator.userAgent), standalone = window.matchMedia && matchMedia("(display-mode: standalone)").matches || navigator.standalone;
+    function draw() {
+      box.textContent = "";
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        box.appendChild(el("p", "muted small", ios && !standalone
+          ? t("On iPhone: tap the Share button, then Add to Home Screen. Open the portal from your home screen and come back here.")
+          : t("This browser can't get notifications. On Android, use Chrome.")));
+        return;
+      }
+      if (Notification.permission === "denied") { box.appendChild(el("p", "muted small", t("Notifications are blocked for this site. Allow them in your phone's settings, then come back here."))); return; }
+      mySub().then(function (sub) {
+        if (sub) {
+          box.appendChild(el("p", null, "✓ " + t("Notifications are on for this phone.")));
+          var row = el("div", "prow");
+          var tb = el("button", "btn alt sm", t("Send a test")); tb.type = "button";
+          tb.onclick = function () { pushApi("test").then(function (r) { msg.textContent = r.ok ? t("Sent. It should pop up in a few seconds.") : t("Something went wrong. Please try again."); }); };
+          var ob = el("button", "btn alt sm", t("Turn off on this phone")); ob.type = "button";
+          ob.onclick = function () { var ep = sub.endpoint; sub.unsubscribe().then(function () { return pushApi("unsubscribe", { endpoint: ep }); }).then(draw); };
+          row.appendChild(tb); row.appendChild(ob); box.appendChild(row);
+        } else {
+          var on = el("button", "btn", t("Turn on notifications")); on.type = "button";
+          on.onclick = function () {
+            on.disabled = true; msg.textContent = "";
+            Notification.requestPermission().then(function (perm) {
+              if (perm !== "granted") { on.disabled = false; msg.textContent = t("Notifications weren't allowed. Tap the button again and choose Allow."); return; }
+              return pushApi("key").then(function (k) {
+                if (!k.ok) throw new Error("key");
+                return navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: keyBytes(k.key) }); });
+              }).then(function (s2) { return pushApi("subscribe", { sub: s2.toJSON(), label: ios ? "iPhone" : "Phone" }); })
+                .then(function (r) { if (!r.ok) throw new Error("save"); msg.textContent = "✓ " + t("Turned on."); draw(); });
+            }).catch(function () { on.disabled = false; msg.textContent = t("Something went wrong. Please try again."); });
+          };
+          box.appendChild(on);
+        }
+      });
+    }
+    function drawPrefs() {
+      pushApi("get").then(function (r) {
+        list.textContent = "";
+        if (!r.ok || !r.events) return;
+        list.appendChild(el("p", "muted small", t("Notify me about:")));
+        var prefs = {};
+        r.events.forEach(function (e) { prefs[e.key] = e.on; });
+        r.events.forEach(function (e) {
+          var l = el("label", "chk"), c = el("input"); c.type = "checkbox"; c.checked = e.on;
+          c.onchange = function () { prefs[e.key] = c.checked; pushApi("set", { prefs: prefs }).then(function (x) { msg.textContent = x.ok ? t("Saved") + " ✓" : t("Something went wrong. Please try again."); }); };
+          l.appendChild(c); l.appendChild(el("span", null, t(e.label))); list.appendChild(l);
+        });
+      });
+    }
+    draw(); drawPrefs();
+  }
 
   /* ---------- Home ---------- */
   function home(host) {
@@ -653,6 +772,7 @@
     if (!(data.properties || []).length) pp.appendChild(el("p", "muted", "–")); else pp.appendChild(pl);
     var pe = panel(host, t("People on this account"));
     people(pe, ci, cl);
+    if (!isStaff) notifyPanel(panel(host, t("Phone notifications")));
     var ch = panel(host, t("Need to change something?"));
     ch.appendChild(el("p", "muted", t("Send us a note and we'll update your account.")));
     var cb = el("button", "btn alt", t("Ask for a change")); cb.type = "button";

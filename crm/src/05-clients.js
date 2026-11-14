@@ -148,6 +148,8 @@ function renderClients() {
   );
   tb.appendChild(document.createTextNode(" "));
   tb.appendChild(btn("Import CSV", "btn alt", openImport));
+  tb.appendChild(document.createTextNode(" "));
+  tb.appendChild(btn("Send news", "btn alt", openNewsForm));
   var list = $("list");
   list.textContent = "";
   if (clientsErr) {

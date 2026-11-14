@@ -125,6 +125,7 @@ function visitCard(v, after, showJob, opts) {
           return;
         }
         Object.assign(v, p);
+        if (p.status === "done") callApi("/api/push", "client-visit", { id: v.id });
         if (
           j &&
           j.frequency === "once" &&

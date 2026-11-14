@@ -587,7 +587,38 @@ function openNotifySettings() {
   }
   load();
 }
-$("bell").addEventListener("click", openNotifySettings);
+/* ---- account menu in the header: who's signed in, notifications, log out ---- */
+function acctMenu(open) {
+  var m = $("acctmenu"),
+    b = $("acct");
+  if (open == null) open = m.hidden;
+  if (open) {
+    var w = $("amwho");
+    w.textContent = "";
+    w.appendChild(el("b", null, crewMe ? crewMe.name || "Crew" : (typeof team !== "undefined" && (team.filter(function (x) { return x.email === myEmail; })[0] || {}).name) || "Signed in"));
+    w.appendChild(document.createTextNode(myEmail || ""));
+    $("menuNotify").hidden = !!crewMe;
+  }
+  m.hidden = !open;
+  b.setAttribute("aria-expanded", open ? "true" : "false");
+}
+$("acct").addEventListener("click", function (e) {
+  e.stopPropagation();
+  acctMenu();
+});
+$("acctmenu").addEventListener("click", function (e) {
+  e.stopPropagation();
+});
+document.addEventListener("click", function () {
+  if (!$("acctmenu").hidden) acctMenu(false);
+});
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Escape" && !$("acctmenu").hidden) acctMenu(false);
+});
+$("menuNotify").addEventListener("click", function () {
+  acctMenu(false);
+  openNotifySettings();
+});
 if ("serviceWorker" in navigator)
   navigator.serviceWorker.addEventListener("message", function (e) {
     var g = e.data && e.data.go;
@@ -596,3 +627,66 @@ if ("serviceWorker" in navigator)
       load();
     }
   });
+
+/* ---- News: a short update that shows in every client's portal and pings phones that allow it ---- */
+function openNewsForm() {
+  var p = panel();
+  p.appendChild(el("h2", null, "Send news to clients"));
+  p.appendChild(
+    el(
+      "p",
+      "note",
+      "Shows under News in the client portal and sends a notification to clients who turned on News. Good for seasonal tips, holiday schedules, or a special."
+    )
+  );
+  var ti = fld("Title", "text", ""),
+    bd = fld("Message", "textarea", ""),
+    ln = fld("Link (optional, starts with https://)", "text", "");
+  ti.input.maxLength = 100;
+  ti.input.placeholder = "Mulch special: 10% off in December";
+  ln.input.dataset.ac = "no";
+  p.appendChild(ti);
+  p.appendChild(bd);
+  p.appendChild(ln);
+  var aud = "all",
+    bar = el("div", "bdbar");
+  bar.appendChild(el("span", "note", "Send to: "));
+  [
+    ["all", "Everyone"],
+    ["residential", "Residential"],
+    ["hoa", "HOA"],
+    ["commercial", "Commercial"]
+  ].forEach(function (x) {
+    var b = btn(x[1], "bdpill" + (aud === x[0] ? " on" : ""), function () {
+      aud = x[0];
+      [].forEach.call(bar.querySelectorAll(".bdpill"), function (c) {
+        c.classList.toggle("on", c === b);
+      });
+    });
+    bar.appendChild(b);
+  });
+  p.appendChild(bar);
+  var err = el("div", "note");
+  p.appendChild(err);
+  var a = el("div", "actions"),
+    sv = btn("Send", "btn", function () {
+      var t = ti.input.value.trim(),
+        l = ln.input.value.trim();
+      if (!t) return (err.textContent = "Give it a title.");
+      if (l && !/^https:\/\//.test(l)) return (err.textContent = "The link must start with https://");
+      if (!confirm("Send \"" + t + "\" to " + (aud === "all" ? "all clients" : aud + " clients") + "?")) return;
+      sv.disabled = true;
+      err.textContent = "Sending...";
+      callApi("/api/push", "news", { title: t, body: bd.input.value.trim(), link: l, audience: aud }).then(function (r) {
+        sv.disabled = false;
+        if (!r.ok) return (err.textContent = r.error);
+        err.textContent =
+          "✓ Posted to the portal" + (r.data.sent ? " and sent to " + r.data.sent + " phone" + (r.data.sent > 1 ? "s" : "") : ". No client phones have notifications on yet") + ".";
+        ti.input.value = bd.input.value = ln.input.value = "";
+      });
+    });
+  a.appendChild(sv);
+  a.appendChild(btn("Close", "btn alt", closeDetail));
+  p.appendChild(a);
+  ti.input.focus();
+}

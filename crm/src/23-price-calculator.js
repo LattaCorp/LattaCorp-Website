@@ -718,6 +718,24 @@ function openEstimate(id) {
         markEstSent(e);
       })
     );
+    var of = btn(e.offered_at ? "Offered ✓ · offer again" : "Send as offer to their phone", "btn alt", function () {
+      if (!confirm("Send this to " + cname(e.client_id) + "'s phone as a recommended service? They can open it and approve it online.")) return;
+      of.disabled = true;
+      callApi("/api/push", "client-offer", { id: e.id }).then(function (r) {
+        of.disabled = false;
+        if (!r.ok) return alert(r.error);
+        e.offered_at = new Date().toISOString();
+        if (e.status === "draft") e.status = "sent";
+        alert(
+          r.data.sent
+            ? "Sent to " + r.data.sent + " phone" + (r.data.sent > 1 ? "s" : "") + ". It also shows under Offers in their portal."
+            : "Saved as an offer. It shows under Offers in their portal, but nobody on this account has phone notifications on for offers yet, so also send it by Email or Text."
+        );
+        render();
+        openEstimate(e.id);
+      });
+    });
+    sendRow.appendChild(of);
     p.appendChild(sendRow);
     var pv = el("a", "btn alt", "Preview");
     pv.href = docUrl(e.share_token, true);

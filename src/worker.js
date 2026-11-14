@@ -602,6 +602,7 @@ export async function handleInvoiceEmail(request, env) {
         await sbRest(env, `invoices?id=eq.${m.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ emailed_at: at, emailed_to: m.to }) });
         await sbRest(env, `invoices?id=eq.${m.id}&sent_at=is.null`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ sent_at: at }) });
         sent.push({ id: m.id, to: m.to, at });
+        try { await clientInvoiceNotice(env, m.id); } catch {}
       }
     }
   }
@@ -641,7 +642,7 @@ async function notify(env, ev, title, body, url, onlyEmail) {
     if (!env.SUPABASE_SECRET_KEY) return 0;
     const keys = await vapidKeys(env);
     if (!keys) return 0;
-    const dr = await sbRest(env, "push_devices?select=id,email,endpoint,p256dh,auth");
+    const dr = await sbRest(env, "push_devices?kind=eq.staff&select=id,email,endpoint,p256dh,auth");
     if (!dr.ok) return 0;
     let devs = (await dr.json()) || [];
     if (onlyEmail) devs = devs.filter((d) => d.email.toLowerCase() === onlyEmail.toLowerCase());
@@ -685,12 +686,190 @@ async function formEmailSetting(env) {
     return ((await r.json()) || [])[0]?.form_emails || "all";
   } catch { return "all"; }
 }
+
+// ---- Client notifications (client portal phones) ----
+const CLIENT_EVENTS = {
+  invoice: "New invoices",
+  visit: "Lawn maintenance completed",
+  offer: "Offers and recommended services",
+  news: "News from Latta Corp",
+};
+// HOA and Commercial accounts start with only News on; each person can turn the rest on.
+const clientDefault = (type, ev) => ev === "news" || !(type === "hoa" || type === "commercial");
+const clientPrefOn = (prefs, type, ev) => (prefs && typeof prefs[ev] === "boolean" ? prefs[ev] : clientDefault(type, ev));
+async function clientPeople(env, cid) {
+  const cr = await sbRest(env, `clients?id=eq.${cid}&select=id,name,type,email`);
+  const c = cr.ok ? ((await cr.json()) || [])[0] : null;
+  if (!c) return null;
+  const kr = await sbRest(env, `client_contacts?client_id=eq.${cid}&portal_access=eq.true&select=email`);
+  const emails = new Set([String(c.email || "").trim().toLowerCase()]);
+  if (kr.ok) for (const k of (await kr.json()) || []) emails.add(String(k.email || "").trim().toLowerCase());
+  emails.delete("");
+  return { client: c, emails: [...emails] };
+}
+// one notification to everyone on this account who wants it (on their phones with the portal installed)
+async function notifyClient(env, cid, ev, title, body, url) {
+  try {
+    const who = await clientPeople(env, cid);
+    if (!who || !who.emails.length) return 0;
+    const keys = await vapidKeys(env);
+    if (!keys) return 0;
+    const list = who.emails.map((e) => encodeURIComponent(`"${e}"`)).join(",");
+    const [dr, pr] = await Promise.all([
+      sbRest(env, `push_devices?kind=eq.client&email=in.(${list})&select=id,email,endpoint,p256dh,auth`),
+      sbRest(env, `portal_push_prefs?client_id=eq.${cid}&select=email,prefs`),
+    ]);
+    if (!dr.ok) return 0;
+    const prefs = pr.ok ? (await pr.json()) || [] : [];
+    const prefOf = (e) => (prefs.find((x) => x.email.toLowerCase() === e.toLowerCase()) || {}).prefs;
+    const devs = ((await dr.json()) || []).filter((d) => ev === "test" || clientPrefOn(prefOf(d.email), who.client.type, ev));
+    const msg = { title: String(title).slice(0, 120), body: String(body || "").slice(0, 240), url: url || "/portal/", tag: ev + "-" + Date.now() };
+    let ok = 0;
+    await Promise.all(devs.map(async (d) => {
+      const st = await sendPush(d, msg, keys, PUSH_SUBJECT);
+      if (st >= 200 && st < 300) ok++;
+      else if (st === 404 || st === 410) await sbRest(env, `push_devices?id=eq.${d.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    }));
+    return ok;
+  } catch (e) { console.log("notifyClient error", String(e).slice(0, 200)); return 0; }
+}
+const claimOnce = async (env, table, id) => {
+  const r = await sbRest(env, `${table}?id=eq.${id}&client_notified_at=is.null&select=*`, { method: "PATCH",
+    headers: { Prefer: "return=representation" }, body: JSON.stringify({ client_notified_at: new Date().toISOString() }) });
+  try { return r.ok ? ((await r.json()) || [])[0] || null : null; } catch { return null; }
+};
+async function clientInvoiceNotice(env, id) {
+  const inv = await claimOnce(env, "invoices", id);
+  if (!inv || inv.status === "void") return 0;
+  const num = "LC-" + String(inv.number || 0).padStart(4, "0");
+  return notifyClient(env, inv.client_id, "invoice", `New invoice ${num} · ${money2(inv.total)}`,
+    (inv.due_date ? "Due " + fmtDay(inv.due_date) + ". " : "") + "Tap to view it.", inv.share_token ? `/d/?t=${inv.share_token}` : "/portal/");
+}
+async function clientVisitNotice(env, id) {
+  const vr = await sbRest(env, `visits?id=eq.${id}&select=id,status,kind,client_id,property_id,client_notified_at`);
+  const v = vr.ok ? ((await vr.json()) || [])[0] : null;
+  if (!v || v.status !== "done" || v.kind === "addon" || v.client_notified_at) return 0;
+  if (!(await claimOnce(env, "visits", id))) return 0;
+  let addr = "";
+  try { addr = ((await (await sbRest(env, `properties?id=eq.${v.property_id}&select=address`)).json()) || [])[0]?.address || ""; } catch {}
+  return notifyClient(env, v.client_id, "visit", "Lawn maintenance completed ✓", (addr ? addr.split(",")[0] + " is all done. " : "Your lawn is all done. ") + "Thank you!", "/portal/");
+}
+// Staff (and crew, for finished visits) tell clients' phones about something
+async function handleClientPush(env, action, d, u, role) {
+  const id = String(d.id || "");
+  if (action === "client-visit") {
+    if (!UUID.test(id)) return json({ error: "bad request" }, 400);
+    return json({ ok: true, sent: await clientVisitNotice(env, id) });
+  }
+  if (role !== "owner" && role !== "office") return json({ error: "Not allowed." }, 403);
+  if (action === "client-invoice") {
+    if (!UUID.test(id)) return json({ error: "bad request" }, 400);
+    return json({ ok: true, sent: await clientInvoiceNotice(env, id) });
+  }
+  if (action === "client-offer") {
+    if (!UUID.test(id)) return json({ error: "bad request" }, 400);
+    const now = new Date().toISOString();
+    const er = await sbRest(env, `estimates?id=eq.${id}&status=in.(draft,sent)&select=*`, { method: "PATCH", headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ offered_at: now, status: "sent" }) });
+    const e = er.ok ? ((await er.json()) || [])[0] : null;
+    if (!e) return json({ error: "That quote can't be offered (it may already be approved or declined)." }, 409);
+    const who = await clientPeople(env, e.client_id);
+    const n = await notifyClient(env, e.client_id, "offer", `Latta Corp recommends: ${e.title || "a service for your property"}`,
+      `${money2(e.total)} · Tap to see the details and approve it online.`, `/d/?t=${e.share_token}`);
+    return json({ ok: true, sent: n, people: who ? who.emails.length : 0 });
+  }
+  if (action === "news") {
+    const title = String(d.title || "").trim().slice(0, 100), body = String(d.body || "").trim().slice(0, 1000);
+    const link = /^https:\/\/[^\s]{3,300}$/.test(String(d.link || "")) ? String(d.link) : "";
+    const audience = ["all", "residential", "hoa", "commercial"].includes(d.audience) ? d.audience : "all";
+    if (!title) return json({ error: "Give it a title." }, 400);
+    const pr = await sbRest(env, "news_posts", { method: "POST", headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ title, body, link, audience, created_by: u.email }) });
+    if (!pr.ok) return json({ error: "Run the Stage 45 SQL in Supabase first." }, 502);
+    const post = ((await pr.json()) || [])[0];
+    // everyone with a client phone signed up, on accounts that match the audience
+    const cr = await sbRest(env, `clients?select=id,type${audience === "all" ? "" : "&type=eq." + audience}`);
+    const cls = cr.ok ? (await cr.json()) || [] : [];
+    const dr = await sbRest(env, "push_devices?kind=eq.client&select=email");
+    const devEmails = new Set(dr.ok ? ((await dr.json()) || []).map((x) => x.email.toLowerCase()) : []);
+    let sent = 0;
+    for (const c of cls) {
+      const who = await clientPeople(env, c.id);
+      if (!who || !who.emails.some((e) => devEmails.has(e))) continue;
+      sent += await notifyClient(env, c.id, "news", title, body.slice(0, 160) || "Tap to read more.", link || "/portal/");
+    }
+    if (post) await sbRest(env, `news_posts?id=eq.${post.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ sent_count: sent }) });
+    return json({ ok: true, sent });
+  }
+  return json({ error: "bad action" }, 400);
+}
+// The client portal's own notification settings (signed-in portal people)
+export async function handlePortalPush(request, env) {
+  if (!env.SUPABASE_SECRET_KEY) return json({ error: "not set up" }, 500);
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const action = String((d && d.action) || "");
+  const token = bearer(request);
+  const me = await callerEmail(request, env);
+  if (!me) return json({ error: "Not allowed." }, 403);
+  if (action === "key") {
+    const k = await vapidKeys(env);
+    return k ? json({ ok: true, key: k.publicKey }) : json({ error: "not set up" }, 502);
+  }
+  if (action === "subscribe") {
+    const sub = d.sub || {}, keys = sub.keys || {};
+    const endpoint = String(sub.endpoint || "");
+    if (!/^https:\/\/[^\s]{10,900}$/.test(endpoint) || !/^[A-Za-z0-9_-]{40,200}$/.test(String(keys.p256dh || "")) || !/^[A-Za-z0-9_-]{10,60}$/.test(String(keys.auth || "")))
+      return json({ error: "bad subscription" }, 400);
+    const r = await sbRest(env, "push_devices?on_conflict=endpoint", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ email: me, endpoint, p256dh: keys.p256dh, auth: keys.auth, label: String(d.label || "").slice(0, 80), kind: "client" }) });
+    return r.ok ? json({ ok: true }) : json({ error: "Could not save this phone." }, 502);
+  }
+  if (action === "unsubscribe") {
+    await sbRest(env, `push_devices?endpoint=eq.${encodeURIComponent(String(d.endpoint || ""))}&email=eq.${encodeURIComponent(me)}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    return json({ ok: true });
+  }
+  const acct = await portalAccountAs(env, token, d && d.client_id);
+  if (!acct || !acct.client) return json({ error: "Not allowed." }, 403);
+  const cid = d.client_id, type = acct.client.type || "residential";
+  if (action === "get") {
+    const r = await sbRest(env, `portal_push_prefs?client_id=eq.${cid}&email=eq.${encodeURIComponent(me)}&select=prefs`);
+    const prefs = r.ok ? ((await r.json()) || [])[0]?.prefs : null;
+    return json({ ok: true, events: Object.keys(CLIENT_EVENTS).map((k) => ({ key: k, label: CLIENT_EVENTS[k], on: clientPrefOn(prefs, type, k) })) });
+  }
+  if (action === "set") {
+    const prefs = {};
+    for (const k of Object.keys(CLIENT_EVENTS)) if (d.prefs && typeof d.prefs[k] === "boolean") prefs[k] = d.prefs[k];
+    const r = await sbRest(env, "portal_push_prefs?on_conflict=email,client_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" },
+      body: JSON.stringify({ email: me, client_id: cid, prefs, updated_at: new Date().toISOString() }) });
+    return r.ok ? json({ ok: true }) : json({ error: "Could not save." }, 502);
+  }
+  if (action === "test") {
+    const dr = await sbRest(env, `push_devices?kind=eq.client&email=eq.${encodeURIComponent(me)}&select=id,email,endpoint,p256dh,auth`);
+    const keys = await vapidKeys(env);
+    let n = 0;
+    for (const dv of (dr.ok ? (await dr.json()) || [] : [])) {
+      const st = await sendPush(dv, { title: "Notifications are on ✓", body: "This is how Latta Corp updates will show up.", url: "/portal/", tag: "test" }, keys, PUSH_SUBJECT);
+      if (st >= 200 && st < 300) n++;
+    }
+    return n ? json({ ok: true }) : json({ error: "This phone isn't signed up yet." }, 404);
+  }
+  return json({ error: "bad action" }, 400);
+}
+
 export async function handlePush(request, env) {
   if (!env.SUPABASE_SECRET_KEY) return json({ error: "Notifications are not set up on the server." }, 500);
   let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
   const action = String((d && d.action) || "");
   const u = await callerUser(request, env);
   if (!u) return json({ error: "Not allowed." }, 403);
+  if (action === "client-visit") {
+    // a finished visit: staff or a crew login may report it
+    const cr = await sbRest(env, `crew?user_id=eq.${u.id}&active=eq.true&kind=eq.login&select=id`);
+    const isCrew = cr.ok && ((await cr.json()) || []).length > 0;
+    const st = isCrew ? null : await staffRow(env, u.email);
+    if (!isCrew && !(st && (st.role === "owner" || st.role === "office"))) return json({ error: "Not allowed." }, 403);
+    return handleClientPush(env, action, d, u, isCrew ? "crew" : st.role);
+  }
   if (action === "receipt") {
     // a crew member just uploaded a receipt from their own login
     const cr = await sbRest(env, `crew?user_id=eq.${u.id}&active=eq.true&kind=eq.login&select=name`);
@@ -702,6 +881,7 @@ export async function handlePush(request, env) {
   const who = await staffRow(env, u.email);
   if (!who || (who.role !== "owner" && who.role !== "office")) return json({ error: "Not allowed." }, 403);
   const me = u.email;
+  if (/^client-|^news$/.test(action)) return handleClientPush(env, action, d, u, who.role);
   if (action === "key") {
     const k = await vapidKeys(env);
     return k ? json({ ok: true, key: k.publicKey }) : json({ error: "Run the Stage 44 SQL in Supabase first." }, 502);
@@ -711,7 +891,7 @@ export async function handlePush(request, env) {
     const endpoint = String(sub.endpoint || "");
     if (!/^https:\/\/[^\s]{10,900}$/.test(endpoint) || !/^[A-Za-z0-9_-]{40,200}$/.test(String(keys.p256dh || "")) || !/^[A-Za-z0-9_-]{10,60}$/.test(String(keys.auth || "")))
       return json({ error: "bad subscription" }, 400);
-    const row = { email: me, endpoint, p256dh: keys.p256dh, auth: keys.auth, label: String(d.label || "").slice(0, 80) };
+    const row = { email: me, endpoint, p256dh: keys.p256dh, auth: keys.auth, label: String(d.label || "").slice(0, 80), kind: "staff" };
     const r = await sbRest(env, "push_devices?on_conflict=endpoint", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(row) });
     if (!r.ok) return json({ error: "Could not save this phone. Run the Stage 44 SQL in Supabase first." }, 502);
     return json({ ok: true });
@@ -727,7 +907,7 @@ export async function handlePush(request, env) {
   if (action === "get") {
     const [pr, dr] = await Promise.all([
       sbRest(env, `push_prefs?email=eq.${encodeURIComponent(me)}&select=prefs`),
-      sbRest(env, `push_devices?email=eq.${encodeURIComponent(me)}&select=id,label,created_at,last_ok_at,endpoint&order=created_at.asc`),
+      sbRest(env, `push_devices?kind=eq.staff&email=eq.${encodeURIComponent(me)}&select=id,label,created_at,last_ok_at,endpoint&order=created_at.asc`),
     ]);
     if (!pr.ok || !dr.ok) return json({ error: "Run the Stage 44 SQL in Supabase first." }, 502);
     const prefs = ((await pr.json()) || [])[0]?.prefs || {};
@@ -770,6 +950,10 @@ export default {
     if (url.pathname === "/api/team") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handleTeam(request, env);
+    }
+    if (url.pathname === "/api/portal/push") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      return handlePortalPush(request, env);
     }
     if (url.pathname === "/api/push") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);

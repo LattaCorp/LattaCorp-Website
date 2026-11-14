@@ -444,6 +444,7 @@ function startCrewApp(me) {
   $("gsearch").hidden = true;
   $("crewapp").hidden = false;
   $("signout").hidden = false;
+  $("acct").hidden = false;
   $("refresh").hidden = false;
   renderCrewApp();
 }
@@ -549,6 +550,7 @@ function renderCrewApp() {
         btn(isDone ? "Undo" : "Done", isDone ? "btn alt" : "btn", function () {
           sb.rpc("crew_set_done", { p_visit: x.visit_id, p_done: !isDone }).then(function (r2) {
             if (r2.error) alert("Could not save that. Try again.");
+            else if (!isDone) callApi("/api/push", "client-visit", { id: x.visit_id });
             renderCrewApp();
           });
         })

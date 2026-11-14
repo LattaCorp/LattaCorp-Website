@@ -1,6 +1,6 @@
 // Minimal service worker: caches the app shell so the CRM opens instantly.
 // Never caches Supabase/API calls, so lead data is always live.
-const V = "lc-crm-v213";
+const V = "lc-crm-v215";
 const SHELL = ["./", "config.js", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 self.addEventListener("install", e => { e.waitUntil(caches.open(V).then(c => c.addAll(SHELL)).then(() => self.skipWaiting())); });
 self.addEventListener("activate", e => { e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== V).map(k => caches.delete(k)))).then(() => self.clients.claim())); });
@@ -14,7 +14,7 @@ self.addEventListener("push", e => {
   let d = {};
   try { d = e.data ? e.data.json() : {}; } catch { d = { title: "Foreman", body: e.data ? e.data.text() : "" }; }
   e.waitUntil(self.registration.showNotification(d.title || "Foreman", {
-    body: d.body || "", icon: "icon-192.png", tag: d.tag || undefined, data: { url: d.url || "./" }
+    body: d.body || "", icon: "icon-192.png", badge: "badge-96.png", tag: d.tag || undefined, vibrate: [80, 40, 80], data: { url: d.url || "./" }
   }));
 });
 self.addEventListener("notificationclick", e => {

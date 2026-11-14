@@ -197,6 +197,7 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 .prow{display:flex;gap:10px;flex-wrap:wrap}
 @media (max-width:620px){.list li:has(.pacts){flex-wrap:wrap}.list li .pacts{width:100%;justify-content:flex-start;margin-top:6px}}
 label.chk{display:flex;gap:10px;align-items:flex-start;margin:0 0 8px;font-weight:600;font-size:.95rem}label.chk input{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--forest)}
+.newsitem{padding:12px 0;border-top:1px solid var(--line)}.newsitem:first-of-type{border-top:0;padding-top:4px}.newsitem p{margin:6px 0}.newsitem .btn{margin-top:4px}
 </style>
 </head>
 <body>
@@ -259,6 +260,7 @@ label.chk{display:flex;gap:10px;align-items:flex-start;margin:0 0 8px;font-weigh
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../crm/config.js"></script>
 <script src="guides.js?v=2"></script>
-<script src="portal.js?v=14"></script>
+<script src="portal.js?v=15"></script>
+<script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

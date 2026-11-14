@@ -749,6 +749,7 @@ function markSent(inv) {
       if (!r.error) {
         inv.sent_at = now;
         render();
+        callApi("/api/push", "client-invoice", { id: inv.id }); // pings the client's phone if they turned that on
       }
     });
 }
