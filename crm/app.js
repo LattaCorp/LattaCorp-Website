@@ -2255,6 +2255,7 @@ function openClient(id) {
   // More: portal, archive, delete
   var more = panes.account;
   more.appendChild(clientContactsSection(c));
+  more.appendChild(agreementsSection(c));
   more.appendChild(contactArchiveSection(c));
   more.appendChild(clientPortalSection(c));
   var mr = el("div", "qacts");
@@ -3037,6 +3038,101 @@ function openImport() {
 }
 
 /* ---- Contact archive: every change to this client's contacts (by the client in the portal, or by staff) ---- */
+/* Signed agreements (Service Agreement, Automatic Payment Authorization): read-only, permanent records signed in the portal */
+function agreementsSection(c) {
+  var sec = el("div", "sec"),
+    holder = el("div");
+  sec.appendChild(el("h3", null, "Signed agreements"));
+  sec.appendChild(el("div", "note", "Signed by the client in the portal. These are permanent: nobody can edit or delete them."));
+  sec.appendChild(holder);
+  holder.appendChild(el("div", "note", "Loading..."));
+  sb.rpc("portal_agreements", { cid: c.id }).then(function (r) {
+    holder.textContent = "";
+    if (r.error) {
+      holder.appendChild(el("div", "note", "Agreements aren't set up yet. Run the Stage 48 SQL in Supabase."));
+      return;
+    }
+    var signed = (r.data && r.data.signed) || [];
+    var hasService = signed.some(function (s) {
+      return s.kind === "service";
+    });
+    var ap = signed.filter(function (s) {
+      return s.kind === "autopay" && !s.cancelled_at;
+    })[0];
+    var st = el("div", "agrstat");
+    st.appendChild(el("span", "chip " + (hasService ? "won" : "lost"), hasService ? "Service Agreement signed" : "Service Agreement not signed"));
+    st.appendChild(el("span", "chip " + (ap ? "won" : ""), ap ? "Autopay on (" + (ap.method === "ach" ? "bank" : "credit card") + ")" : "Autopay off"));
+    holder.appendChild(st);
+    if (!signed.length) {
+      holder.appendChild(el("div", "note", "Nothing signed yet. The client sees a reminder to sign on their portal home page."));
+      return;
+    }
+    signed.forEach(function (s) {
+      var row = el("button", "agrline");
+      row.type = "button";
+      row.appendChild(el("b", null, s.title));
+      row.appendChild(
+        el(
+          "span",
+          "note",
+          "Signed " + new Date(s.signed_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) + " by " + s.typed_name + (s.kind === "autopay" ? (s.cancelled_at ? " · turned off " + new Date(s.cancelled_at).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : " · active") : "")
+        )
+      );
+      row.addEventListener("click", function () {
+        showSignedAgreement(c, s);
+      });
+      holder.appendChild(row);
+    });
+  });
+  return sec;
+}
+function showSignedAgreement(c, s) {
+  var p = panel();
+  p.appendChild(el("h2", null, s.title));
+  p.appendChild(el("div", "note", c.name + " · permanent record, can't be edited or deleted"));
+  var d = s.details || {},
+    rows = [
+      ["Signed by", s.typed_name + (s.signer_title ? ", " + s.signer_title : "")],
+      ["Signer email", s.signer_email],
+      ["Signed on", new Date(s.signed_at).toLocaleString(undefined, { dateStyle: "long", timeStyle: "short" })],
+      ["From IP address", s.ip || "-"],
+      ["Version", s.version_id],
+      ["Fingerprint (SHA-256)", s.body_sha256],
+      ["Property", d.property || "-"]
+    ];
+  if (s.method) rows.push(["Payment method", s.method === "ach" ? "Bank account (ACH)" : "Credit card (3% surcharge)"]);
+  if (s.cancelled_at) rows.push(["Autopay turned off", new Date(s.cancelled_at).toLocaleString()]);
+  (d.services || []).forEach(function (x) {
+    rows.push(["Service at signing", [x.title, x.frequency, x.price != null ? money(x.price) : ""].filter(Boolean).join(" · ")]);
+  });
+  var t = el("div", "agrmeta");
+  rows.forEach(function (r) {
+    var row = el("div", "agrrow");
+    row.appendChild(el("span", "note", r[0]));
+    row.appendChild(el("b", null, r[1]));
+    t.appendChild(row);
+  });
+  p.appendChild(t);
+  var im = document.createElement("img");
+  im.src = s.signature_png;
+  im.alt = "Signature of " + s.typed_name;
+  im.className = "sigimg";
+  p.appendChild(im);
+  var body = el("div", "agrbody");
+  String(s.body || "")
+    .split("\n")
+    .forEach(function (line) {
+      if (!line.trim()) return;
+      var m = line.match(/^##\s+(.*)/);
+      if (m) return body.appendChild(el("h3", null, m[1]));
+      body.appendChild(el("p", /^(-|\d+\.)\s/.test(line) ? "agrli" : "", line.replace(/\*\*/g, "")));
+    });
+  p.appendChild(body);
+  var pr = btn("Print", "btn alt", function () {
+    window.print();
+  });
+  p.appendChild(pr);
+}
 function contactArchiveSection(c) {
   var sec = el("div", "sec"),
     holder = el("div");

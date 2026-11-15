@@ -805,6 +805,64 @@ async function handleClientPush(env, action, d, u, role) {
   return json({ error: "bad action" }, 400);
 }
 // The client portal's own notification settings (signed-in portal people)
+// ---- Signed agreements: email the signer (or whoever asks, to their own address) a full copy ----
+function agreementHtml(body) {
+  const inline = (s) => esc(s).replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  let out = "", list = "";
+  for (const line of String(body || "").split("\n")) {
+    let m;
+    const close = () => { if (list) { out += `</${list}>`; list = ""; } };
+    if (!line.trim()) { close(); continue; }
+    if ((m = line.match(/^##\s+(.*)/))) { close(); out += `<h3 style="margin:18px 0 6px;font-size:16px;color:#1b552b">${inline(m[1])}</h3>`; continue; }
+    if ((m = line.match(/^-\s+(.*)/)) || (m = line.match(/^\d+\.\s+(.*)/))) {
+      const tag = /^-/.test(line) ? "ul" : "ol";
+      if (list !== tag) { close(); out += `<${tag} style="margin:0 0 10px;padding-left:22px">`; list = tag; }
+      out += `<li style="margin:0 0 6px">${inline(m[1])}</li>`; continue;
+    }
+    close(); out += `<p style="margin:0 0 10px;font-size:14px;line-height:1.55;color:#1c2a20">${inline(line)}</p>`;
+  }
+  if (list) out += `</${list}>`;
+  return out;
+}
+async function agreementCopy(env, token, me, cid, acct, d) {
+  const r = await fetch(`${baseUrl(env)}/rest/v1/rpc/portal_agreements`, {
+    method: "POST", headers: { apikey: PUBLISHABLE_KEY, Authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({ cid }),
+  });
+  const a = r.ok ? await r.json() : null;
+  const s = a && (a.signed || []).find((x) => x.id === String(d.id || ""));
+  if (!s) return json({ error: "not found" }, 404);
+  const det = s.details || {};
+  const when = new Date(s.signed_at).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "long", timeStyle: "short" }) + " ET";
+  const rows = [["Client", det.client], ["Account number", det.account_no], ["Service property", det.property],
+    ...(det.services || []).map((x) => ["Service plan", [x.title, x.frequency, x.price != null ? "$" + Number(x.price).toFixed(2) : ""].filter(Boolean).join(" · ")]),
+    ...(s.method ? [["Payment method", s.method === "ach" ? "Bank account (ACH), no fee" : "Credit card, 3% surcharge"]] : []),
+    ["Signed by", s.typed_name + (s.signer_title ? ", " + s.signer_title : "")], ["Signer email", s.signer_email], ["Signed on", when],
+    ["From IP address", s.ip || "-"], ["Version", s.version_id], ["Document fingerprint (SHA-256)", s.body_sha256],
+    ...(s.cancelled_at ? [["Automatic payments turned off", new Date(s.cancelled_at).toLocaleString("en-US", { timeZone: "America/New_York", dateStyle: "long", timeStyle: "short" }) + " ET"]] : [])]
+    .filter((x) => x[1] != null && x[1] !== "");
+  const table = `<table style="border-collapse:collapse;margin:0 0 16px;font-family:Arial,sans-serif;font-size:13px">${rows.map((x) => `<tr><td style="padding:3px 12px 3px 0;color:#58675c;vertical-align:top">${esc(x[0])}</td><td style="padding:3px 0;color:#1c2a20"><b>${esc(String(x[1]))}</b></td></tr>`).join("")}</table>`;
+  const cancelled = !!d.cancelled && !!s.cancelled_at;
+  const heading = cancelled ? "Automatic payments turned off" : `Your signed ${s.title}`;
+  const intro = cancelled
+    ? "Automatic payments are now off for this account. Your service continues; please pay each invoice yourself. Your original signed authorization stays in your client portal."
+    : `Here is your copy of the ${s.title} you signed. It is also saved in your client portal under Account, where it can't be changed or deleted.`;
+  const html = `<!doctype html><html><body style="margin:0;padding:0;background:#f3f7f1"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f7f1;padding:24px 12px"><tr><td align="center">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:12px;border:1px solid #e4ece1;font-family:Georgia,'Times New Roman',serif">
+<tr><td style="background:#1b552b;padding:18px 24px;color:#fff;font-size:19px;font-weight:600">LattaCorp Of Central Florida</td></tr>
+<tr><td style="padding:24px 26px 10px"><h1 style="margin:0 0 12px;font-size:22px;color:#1b552b;font-weight:600">${esc(heading)}</h1>
+<p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#1c2a20">${esc(intro)}</p>${table}${cancelled ? "" : agreementHtml(s.body)}
+<p style="margin:16px 0 8px;font-size:13px;color:#58675c;font-family:Arial,sans-serif">Signed electronically under the federal E-SIGN Act and Florida Statutes section 668.50.</p></td></tr>
+<tr><td style="padding:14px 26px 20px;border-top:1px solid #e4ece1;font-family:Arial,sans-serif;font-size:13px;color:#58675c">Questions? Email <a href="mailto:${SUPPORT_EMAIL}" style="color:#1b552b">${SUPPORT_EMAIL}</a> or call or text 407-470-5309.</td></tr>
+</table></td></tr></table></body></html>`;
+  const text = `${heading}\n\n${intro}\n\n${rows.map((x) => x[0] + ": " + x[1]).join("\n")}\n\n${cancelled ? "" : String(s.body).replace(/\*\*/g, "")}\n\nQuestions? ${SUPPORT_EMAIL} or 407-470-5309.`;
+  const ok = await sendViaResend(env, { from: AUTO_FROM, to: [me], reply_to: SUPPORT_EMAIL, headers: AUTO_HEADERS,
+    subject: cancelled ? "Automatic payments turned off" : `Your signed ${s.title} - LattaCorp`, html, text });
+  if (!d.resend) await notify(env, "portal", cancelled ? `Autopay turned off: ${acct.client.name || "a client"}` : `${s.title} signed: ${acct.client.name || "a client"}`,
+    `${s.typed_name}${s.method ? " · " + (s.method === "ach" ? "bank" : "credit card") : ""}`, "/crm/?go=clients");
+  return ok ? json({ ok: true }) : json({ error: "Could not send the email." }, 502);
+}
+
 export async function handlePortalPush(request, env) {
   if (!env.SUPABASE_SECRET_KEY) return json({ error: "not set up" }, 500);
   let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
@@ -832,6 +890,7 @@ export async function handlePortalPush(request, env) {
   const acct = await portalAccountAs(env, token, d && d.client_id);
   if (!acct || !acct.client) return json({ error: "Not allowed." }, 403);
   const cid = d.client_id, type = acct.client.type || "residential";
+  if (action === "agreement-copy") return agreementCopy(env, token, me, cid, acct, d);
   if (action === "get") {
     const r = await sbRest(env, `portal_push_prefs?client_id=eq.${cid}&email=eq.${encodeURIComponent(me)}&select=prefs`);
     const prefs = r.ok ? ((await r.json()) || [])[0]?.prefs : null;

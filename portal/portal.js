@@ -108,7 +108,7 @@
     "Upcoming visits": "Próximas visitas", "Past visits": "Visitas realizadas", "Moved from": "Movida del", "because of weather": "por el clima",
     "No upcoming visits are scheduled.": "No hay próximas visitas programadas.", "No past visits yet.": "Aún no hay visitas realizadas.",
     "Show more": "Ver más", "Balance due": "Saldo pendiente", "Credit on account": "Crédito en la cuenta",
-    "Pay with Zelle": "Pague con Zelle", "Cash is welcome too.": "También aceptamos efectivo.", "Checks are accepted for HOA and commercial accounts.": "Aceptamos cheques de cuentas de HOA y comerciales.", "Cash is also accepted.": "También aceptamos efectivo.",
+    "Pay with Zelle": "Pague con Zelle", "Agreements": "Acuerdos", "Signed agreements are kept permanently and can't be changed or deleted.": "Los acuerdos firmados se guardan permanentemente y no se pueden cambiar ni borrar.", "Loading...": "Cargando...", "Agreements aren't available right now.": "Los acuerdos no están disponibles en este momento.", "Service Agreement": "Acuerdo de Servicio", "Automatic Payment Authorization": "Autorización de Pago Automático", "Signed": "Firmado", "Turned off": "Desactivado", "Active": "Activo", "Nothing signed yet.": "Aún no hay nada firmado.", "Read and sign the Service Agreement": "Leer y firmar el Acuerdo de Servicio", "Set up automatic payments": "Configurar pagos automáticos", "Please sign your Service Agreement": "Por favor firme su Acuerdo de Servicio", "It covers your service, billing and our responsibilities. It takes about two minutes, and a copy stays in your account.": "Cubre su servicio, la facturación y nuestras responsabilidades. Toma unos dos minutos y una copia queda en su cuenta.", "Read and sign": "Leer y firmar", "Back": "Atrás", "This agreement is written in English. Call or text 407-470-5309 if you'd like us to go over it in Spanish.": "Este acuerdo está escrito en inglés. Llame o envíe un texto al 407-470-5309 si desea que lo revisemos en español.", "Client": "Cliente", "Account type": "Tipo de cuenta", "HOA": "HOA", "Commercial": "Comercial", "Residential": "Residencial", "Service property": "Propiedad de servicio", "Service plan": "Plan de servicio", "Payment method": "Método de pago", "Bank account (ACH), no fee": "Cuenta bancaria (ACH), sin cargo", "Credit card, 3% surcharge": "Tarjeta de crédito, recargo del 3%", "Version": "Versión", "How should we charge your invoices?": "¿Cómo debemos cobrar sus facturas?", "Credit card, 3% surcharge (debit cards not accepted)": "Tarjeta de crédito, recargo del 3% (no se aceptan tarjetas de débito)", "You'll connect your bank or card on our secure payment page once online payments open. Nothing is charged until then.": "Conectará su banco o tarjeta en nuestra página de pago segura cuando abran los pagos en línea. No se cobra nada hasta entonces.", "Your full name": "Su nombre completo", "Your title (for example Board President or Property Manager)": "Su cargo (por ejemplo, Presidente de la Junta o Administrador de Propiedades)", "Sign below with your finger or mouse": "Firme abajo con el dedo o el ratón", "Signature": "Firma", "Clear": "Borrar", "I authorize LattaCorp Of Central Florida to charge my invoices automatically as described above, and I agree to sign electronically.": "Autorizo a LattaCorp Of Central Florida a cobrar mis facturas automáticamente como se describe arriba, y acepto firmar electrónicamente.", "I have read and agree to this Service Agreement and the Terms of Service, I am authorized to sign for this account, and I agree to sign electronically.": "He leído y acepto este Acuerdo de Servicio y los Términos de Servicio, estoy autorizado para firmar por esta cuenta y acepto firmar electrónicamente.", "Sign": "Firmar", "Pick bank account or credit card.": "Elija cuenta bancaria o tarjeta de crédito.", "Type your full name.": "Escriba su nombre completo.", "Please sign in the box.": "Por favor firme en el recuadro.", "Please check the box to agree.": "Por favor marque la casilla para aceptar.", "Signing...": "Firmando...", "Signed. A copy was emailed to you and is saved in your account.": "Firmado. Le enviamos una copia por correo y está guardada en su cuenta.", "Signature of": "Firma de", "Signed by": "Firmado por", "Signed on": "Firmado el", "From IP address": "Desde la dirección IP", "Document fingerprint (SHA-256)": "Huella del documento (SHA-256)", "Status": "Estado", "This signed copy is permanent. It can't be changed or deleted by you or by us.": "Esta copia firmada es permanente. Ni usted ni nosotros podemos cambiarla o borrarla.", "Print or save as PDF": "Imprimir o guardar como PDF", "Email me a copy": "Enviarme una copia", "Sent": "Enviada", "Couldn't send": "No se pudo enviar", "Turn off automatic payments": "Desactivar pagos automáticos", "Turn off automatic payments? Your service continues, and you'll pay each invoice yourself.": "¿Desactivar los pagos automáticos? Su servicio continúa y usted pagará cada factura.", "Cash is welcome too.": "También aceptamos efectivo.", "Checks are accepted for HOA and commercial accounts.": "Aceptamos cheques de cuentas de HOA y comerciales.", "Cash is also accepted.": "También aceptamos efectivo.",
     "Online card and bank payments are coming soon.": "Muy pronto podrá pagar en línea con tarjeta o cuenta bancaria.",
     "Please include your invoice number in the Zelle note.": "Por favor incluya su número de factura en la nota de Zelle.",
     "Open invoices": "Facturas pendientes", "All invoices": "Todas las facturas", "Payments": "Pagos", "No payments yet.": "Aún no hay pagos.",
@@ -343,7 +343,7 @@
       if (on) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
     });
     var host = $("view"); host.textContent = ""; VIEWS[view](host);
-    if (view === "home") feed(host);
+    if (view === "home") { feed(host); signBanner(host); }
     window.scrollTo(0, 0);
   }
   function panel(host, title) { var p = el("section", "panel"); if (title) p.appendChild(el("h2", null, title)); host.appendChild(p); return p; }
@@ -786,6 +786,197 @@
   $("lb").addEventListener("click", function (e) { if (e.target === $("lb")) $("lb").close(); });
 
   /* ---------- Account ---------- */
+
+  /* ---------- Agreements: the Service Agreement and the Automatic Payment Authorization ----------
+     Signed copies are permanent (the database refuses any change or deletion) and always viewable here. */
+  var agr = null, agrFor = null;
+  function loadAgr(force) {
+    if (agr && agrFor === curId && !force) return Promise.resolve(agr);
+    var cid = curId;
+    return sb.rpc("portal_agreements", { cid: cid }).then(function (r) {
+      if (r.error) return null;
+      agr = r.data; agrFor = cid; return agr;
+    }, function () { return null; });
+  }
+  function ldate(iso) { var d = new Date(iso); return isNaN(d) ? "" : d.toLocaleDateString(LOC(), { month: "short", day: "numeric", year: "numeric" }); }
+  function curVer(kind) { return ((agr && agr.current) || []).filter(function (v) { return v.kind === kind; })[0]; }
+  function signedOf(kind) { return ((agr && agr.signed) || []).filter(function (s) { return s.kind === kind; }); }
+  function serviceSigned() { var v = curVer("service"); return signedOf("service").some(function (s) { return !v || s.version_id === v.id; }); }
+  function activeAutopay() { return signedOf("autopay").filter(function (s) { return !s.cancelled_at; })[0]; }
+  function mdBlock(host, text) {
+    var list = null, listTag = "";
+    function inline(s) {
+      var out = document.createDocumentFragment(), parts = String(s).split(/(\*\*[^*]+\*\*)/);
+      parts.forEach(function (p) { if (/^\*\*[^*]+\*\*$/.test(p)) out.appendChild(el("b", null, p.slice(2, -2))); else if (p) out.appendChild(document.createTextNode(p)); });
+      return out;
+    }
+    String(text || "").split("\n").forEach(function (line) {
+      var m;
+      if (!line.trim()) { list = null; return; }
+      if ((m = line.match(/^##\s+(.*)/))) { list = null; host.appendChild(el("h3", "agrh", m[1])); return; }
+      if ((m = line.match(/^-\s+(.*)/)) || (m = line.match(/^\d+\.\s+(.*)/))) {
+        var tag = /^-/.test(line) ? "ul" : "ol";
+        if (!list || listTag !== tag) { list = el(tag, "agrlist"); listTag = tag; host.appendChild(list); }
+        var li2 = el("li"); li2.appendChild(inline(m[1])); list.appendChild(li2); return;
+      }
+      list = null; var p = el("p"); p.appendChild(inline(line)); host.appendChild(p);
+    });
+  }
+  function detailsBox(host, d, method) {
+    var box = el("div", "agrdet"), rows = [[t("Client"), d.client + (d.company && d.company !== d.client ? " (" + d.company + ")" : "")], [t("Account type"), t(({ hoa: "HOA", commercial: "Commercial" })[d.type] || "Residential")]];
+    if (d.account_no) rows.push([t("Account number"), String(d.account_no)]);
+    if (d.property) rows.push([t("Service property"), d.property]);
+    (d.services || []).forEach(function (s) { rows.push([t("Service plan"), s.title + (s.frequency ? " · " + s.frequency : "") + (s.price != null ? " · " + money(s.price) : "")]); });
+    if (method) rows.push([t("Payment method"), method === "ach" ? t("Bank account (ACH), no fee") : t("Credit card, 3% surcharge")]);
+    rows.forEach(function (r) { var row = el("div", "agrrow"); row.appendChild(el("span", "muted", r[0])); row.appendChild(el("b", null, r[1])); box.appendChild(row); });
+    host.appendChild(box);
+  }
+  function liveDetails() {
+    var c = data.client, prop = (data.properties || []).filter(function (p) { return p.address; })[0];
+    return { client: c.name, company: c.company, type: c.type, account_no: c.account_no, property: prop ? prop.address : "",
+      services: (data.jobs || []).filter(function (j) { return j.status === "active"; }).map(function (j) { return { title: j.title, frequency: j.frequency, price: j.price }; }) };
+  }
+  function agreementsPanel(host) {
+    var p = panel(host, t("Agreements"));
+    p.appendChild(el("p", "muted small", t("Signed agreements are kept permanently and can't be changed or deleted.")));
+    var box = el("div"); box.appendChild(el("p", "muted", t("Loading...")));
+    p.appendChild(box);
+    loadAgr().then(function (a) {
+      box.textContent = "";
+      if (!a) { box.appendChild(el("p", "muted", t("Agreements aren't available right now."))); return; }
+      var ul = el("ul", "list");
+      a.signed.forEach(function (s) {
+        var item = li(ul, { title: t(s.title), sub: t("Signed") + " " + ldate(s.signed_at) + " · " + s.typed_name + (s.kind === "autopay" ? " · " + (s.cancelled_at ? t("Turned off") + " " + ldate(s.cancelled_at) : t("Active")) : "") });
+        item.classList.add("tap"); item.tabIndex = 0; item.setAttribute("role", "button");
+        item.onclick = function () { viewSigned(s); };
+        item.onkeydown = function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); viewSigned(s); } };
+      });
+      if (a.signed.length) box.appendChild(ul); else box.appendChild(el("p", "muted", t("Nothing signed yet.")));
+      if (isStaff) return;
+      var acts = el("div", "acts");
+      if (!serviceSigned() && curVer("service")) { var b1 = el("button", "btn", t("Read and sign the Service Agreement")); b1.type = "button"; b1.onclick = function () { signView("service"); }; acts.appendChild(b1); }
+      if (!activeAutopay() && curVer("autopay")) { var b2 = el("button", "btn alt", t("Set up automatic payments")); b2.type = "button"; b2.onclick = function () { signView("autopay"); }; acts.appendChild(b2); }
+      if (acts.children.length) box.appendChild(acts);
+    });
+  }
+  function signBanner(host) {
+    if (isStaff) return;
+    loadAgr().then(function (a) {
+      if (!a || serviceSigned() || !curVer("service") || view !== "home") return;
+      var p = el("section", "panel signnote");
+      p.appendChild(el("h2", null, t("Please sign your Service Agreement")));
+      p.appendChild(el("p", null, t("It covers your service, billing and our responsibilities. It takes about two minutes, and a copy stays in your account.")));
+      var b = el("button", "btn", t("Read and sign")); b.type = "button"; b.onclick = function () { signView("service"); };
+      p.appendChild(b);
+      var band = host.querySelector(".band");
+      if (band && band.nextSibling) host.insertBefore(p, band.nextSibling); else host.appendChild(p);
+    });
+  }
+  function agrPage(title) {
+    var host = $("view"); host.textContent = ""; window.scrollTo(0, 0);
+    var back = el("button", "btn alt sm", "‹ " + t("Back")); back.type = "button"; back.onclick = function () { show("account"); };
+    host.appendChild(back);
+    var p = panel(host, title); p.classList.add("agrdoc");
+    if (lang === "es") p.appendChild(el("p", "muted small", t("This agreement is written in English. Call or text 407-470-5309 if you'd like us to go over it in Spanish.")));
+    return p;
+  }
+  function signView(kind) {
+    var v = curVer(kind); if (!v) return;
+    var p = agrPage(t(v.title));
+    detailsBox(p, liveDetails(), null);
+    var bodyBox = el("div", "agrbody"); mdBlock(bodyBox, v.body); p.appendChild(bodyBox);
+    p.appendChild(el("p", "muted small", t("Version") + " " + v.id));
+    var f = el("form", "agrsign"); f.noValidate = true;
+    var method = null;
+    if (kind === "autopay") {
+      f.appendChild(el("h3", "agrh", t("How should we charge your invoices?")));
+      [["ach", t("Bank account (ACH), no fee")], ["card", t("Credit card, 3% surcharge (debit cards not accepted)")]].forEach(function (o) {
+        var lb = el("label", "chk"), r = el("input"); r.type = "radio"; r.name = "apm"; r.value = o[0];
+        r.onchange = function () { method = o[0]; }; lb.appendChild(r); lb.appendChild(document.createTextNode(" " + o[1])); f.appendChild(lb);
+      });
+      f.appendChild(el("p", "muted small", t("You'll connect your bank or card on our secure payment page once online payments open. Nothing is charged until then.")));
+    }
+    var nl = el("label", "f"); nl.appendChild(el("span", null, t("Your full name"))); var nm = el("input"); nm.autocomplete = "name"; nm.maxLength = 120;
+    nm.value = (data.me && data.me.name) || ""; nl.appendChild(nm); f.appendChild(nl);
+    var tl = null;
+    if (data.client.type === "hoa" || data.client.type === "commercial") {
+      var tlab = el("label", "f"); tlab.appendChild(el("span", null, t("Your title (for example Board President or Property Manager)"))); tl = el("input"); tl.maxLength = 80; tlab.appendChild(tl); f.appendChild(tlab);
+    }
+    f.appendChild(el("p", "small", t("Sign below with your finger or mouse")));
+    var cvw = el("div", "sigwrap"), cv = document.createElement("canvas"); cv.width = 900; cv.height = 260; cv.className = "sigpad"; cv.setAttribute("aria-label", t("Signature")); cvw.appendChild(cv);
+    var clr = el("button", "btn alt sm", t("Clear")); clr.type = "button"; cvw.appendChild(clr); f.appendChild(cvw);
+    var ink = false, cx = cv.getContext("2d"), drawing = false, last = null;
+    cx.lineWidth = 3.2; cx.lineCap = "round"; cx.lineJoin = "round"; cx.strokeStyle = "#12301b";
+    function pt(e) { var r = cv.getBoundingClientRect(); return { x: (e.clientX - r.left) * cv.width / r.width, y: (e.clientY - r.top) * cv.height / r.height }; }
+    cv.addEventListener("pointerdown", function (e) { drawing = true; last = pt(e); cv.setPointerCapture(e.pointerId); cx.beginPath(); cx.arc(last.x, last.y, 1.4, 0, 6.3); cx.fillStyle = cx.strokeStyle; cx.fill(); ink = true; e.preventDefault(); });
+    cv.addEventListener("pointermove", function (e) { if (!drawing) return; var q = pt(e); cx.beginPath(); cx.moveTo(last.x, last.y); cx.lineTo(q.x, q.y); cx.stroke(); last = q; e.preventDefault(); });
+    ["pointerup", "pointercancel", "pointerleave"].forEach(function (ev) { cv.addEventListener(ev, function () { drawing = false; }); });
+    clr.onclick = function () { cx.clearRect(0, 0, cv.width, cv.height); ink = false; };
+    var ag = el("label", "chk"), ck = el("input"); ck.type = "checkbox"; ag.appendChild(ck);
+    ag.appendChild(document.createTextNode(" " + (kind === "autopay"
+      ? t("I authorize LattaCorp Of Central Florida to charge my invoices automatically as described above, and I agree to sign electronically.")
+      : t("I have read and agree to this Service Agreement and the Terms of Service, I am authorized to sign for this account, and I agree to sign electronically."))));
+    f.appendChild(ag);
+    var err = el("p", "err hide"); f.appendChild(err);
+    var go = el("button", "btn", t("Sign")); go.type = "submit"; f.appendChild(go);
+    p.appendChild(f);
+    f.onsubmit = function (e) {
+      e.preventDefault();
+      function bad(m) { err.textContent = m; err.classList.remove("hide"); }
+      if (kind === "autopay" && !method) return bad(t("Pick bank account or credit card."));
+      if (nm.value.trim().length < 2) return bad(t("Type your full name."));
+      if (!ink) return bad(t("Please sign in the box."));
+      if (!ck.checked) return bad(t("Please check the box to agree."));
+      err.classList.add("hide"); go.disabled = true; go.textContent = t("Signing...");
+      sb.rpc("portal_sign", { cid: curId, ver: v.id, p_name: nm.value.trim(), p_title: tl ? tl.value.trim() : null, p_sig: cv.toDataURL("image/png"), p_method: method }).then(function (r) {
+        if (r.error) { go.disabled = false; go.textContent = t("Sign"); return bad(r.error.message || t("Something went wrong. Please try again, or call or text 407-470-5309.")); }
+        var id = r.data && r.data.id;
+        pushApi("agreement-copy", { id: id });
+        loadAgr(true).then(function () {
+          var s = ((agr && agr.signed) || []).filter(function (x) { return x.id === id; })[0];
+          flash = t("Signed. A copy was emailed to you and is saved in your account.");
+          if (s) viewSigned(s, true); else show("account");
+        });
+      }, function () { go.disabled = false; go.textContent = t("Sign"); bad(t("Something went wrong. Please try again, or call or text 407-470-5309.")); });
+    };
+  }
+  function viewSigned(s, justSigned) {
+    var p = agrPage(t(s.title));
+    if (justSigned) { var ok = el("p", "ok"); ok.textContent = t("Signed. A copy was emailed to you and is saved in your account."); p.insertBefore(ok, p.children[1] || null); flash = ""; }
+    detailsBox(p, s.details || {}, s.method);
+    var bodyBox = el("div", "agrbody"); mdBlock(bodyBox, s.body); p.appendChild(bodyBox);
+    var sg = el("div", "agrsig");
+    sg.appendChild(el("h3", "agrh", t("Signature")));
+    var im = el("img", "sigimg"); im.src = s.signature_png; im.alt = t("Signature of") + " " + s.typed_name; sg.appendChild(im);
+    var meta = el("div", "agrmeta");
+    [[t("Signed by"), s.typed_name + (s.signer_title ? ", " + s.signer_title : "")], [t("Email"), s.signer_email],
+     [t("Signed on"), new Date(s.signed_at).toLocaleString(LOC(), { dateStyle: "long", timeStyle: "short" })], [t("From IP address"), s.ip || "–"],
+     [t("Version"), s.version_id], [t("Document fingerprint (SHA-256)"), s.body_sha256]].forEach(function (r) {
+      var row = el("div", "agrrow"); row.appendChild(el("span", "muted", r[0])); row.appendChild(el("b", null, r[1])); meta.appendChild(row);
+    });
+    if (s.kind === "autopay") { var st = el("div", "agrrow"); st.appendChild(el("span", "muted", t("Status"))); st.appendChild(el("b", null, s.cancelled_at ? t("Turned off") + " " + ldate(s.cancelled_at) : t("Active"))); meta.appendChild(st); }
+    sg.appendChild(meta); p.appendChild(sg);
+    p.appendChild(el("p", "muted small", t("This signed copy is permanent. It can't be changed or deleted by you or by us.")));
+    var acts = el("div", "acts");
+    var pr = el("button", "btn alt", t("Print or save as PDF")); pr.type = "button"; pr.onclick = function () { window.print(); }; acts.appendChild(pr);
+    var em = el("button", "btn alt", t("Email me a copy")); em.type = "button";
+    em.onclick = function () { em.disabled = true; pushApi("agreement-copy", { id: s.id, resend: true }).then(function (r) { em.textContent = r.ok ? t("Sent") : t("Couldn't send"); }); };
+    acts.appendChild(em);
+    if (s.kind === "autopay" && !s.cancelled_at && !isStaff) {
+      var off = el("button", "btn alt", t("Turn off automatic payments")); off.type = "button";
+      off.onclick = function () {
+        if (!confirm(t("Turn off automatic payments? Your service continues, and you'll pay each invoice yourself."))) return;
+        off.disabled = true;
+        sb.rpc("portal_autopay_cancel", { cid: curId, agreement: s.id }).then(function (r) {
+          if (r.error) { off.disabled = false; alert(t("Something went wrong. Please try again, or call or text 407-470-5309.")); return; }
+          pushApi("agreement-copy", { id: s.id, cancelled: true });
+          loadAgr(true).then(function () { var n = ((agr && agr.signed) || []).filter(function (x) { return x.id === s.id; })[0]; if (n) viewSigned(n); });
+        });
+      };
+      acts.appendChild(off);
+    }
+    p.appendChild(acts);
+  }
   function account(host) {
     var c = data.client;
     var a = panel(host, t("Your account"));
@@ -799,6 +990,7 @@
     if (!(data.properties || []).length) pp.appendChild(el("p", "muted", "–")); else pp.appendChild(pl);
     var pe = panel(host, t("People on this account"));
     people(pe, ci, cl);
+    agreementsPanel(host);
     themePanel(panel(host, t("Appearance")));
     if (!isStaff) notifyPanel(panel(host, t("Phone notifications")));
     var ch = panel(host, t("Need to change something?"));
