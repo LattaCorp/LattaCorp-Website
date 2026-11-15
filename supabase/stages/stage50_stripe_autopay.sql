@@ -38,3 +38,6 @@ create policy "account and staff read methods" on public.autopay_methods for sel
 drop policy if exists "account and staff read charges" on public.autopay_charges;
 create policy "account and staff read charges" on public.autopay_charges for select to authenticated using (client_id in (select public.portal_client_ids()));
 revoke insert, update, delete, truncate on public.autopay_methods, public.autopay_charges from anon, authenticated;
+
+-- Stage 50b: one-time "Pay now by bank" payments share the charges table.
+alter table public.autopay_charges add column if not exists source text not null default 'autopay' check (source in ('autopay', 'paynow'));

@@ -1194,27 +1194,35 @@ async function saveSetup(env, setupIntentId, meta) {
 }
 
 async function recordAutopayPaid(env, pi) {
-  const ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status`))[0];
+  let ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status,source`))[0];
+  const md = pi.metadata || {};
+  if (!ch && md.source === "paynow" && UUID.test(md.invoice_id || "") && UUID.test(md.client_id || "")) {
+    await sbRest(env, "autopay_charges?on_conflict=payment_intent", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+      body: JSON.stringify({ invoice_id: md.invoice_id, client_id: md.client_id, payment_intent: pi.id, amount: Number(pi.amount || 0) / 100, status: "processing", source: "paynow" }) });
+    ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status,source`))[0];
+  }
   if (!ch) return;
+  const online = ch.source === "paynow", how = online ? "Bank (online)" : "Bank autopay";
   await sbRest(env, `autopay_charges?id=eq.${ch.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "succeeded", updated_at: new Date().toISOString() }) });
   const dup = await rows(env, `invoice_payments?reference=eq.${pi.id}&select=id`);
   const today = etDay();
   if (!dup.length) {
     await sbRest(env, "invoice_payments", { method: "POST", headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ invoice_id: ch.invoice_id, client_id: ch.client_id, paid_on: today, amount: ch.amount, method: "Bank autopay", reference: pi.id, note: "Automatic payment (Stripe)" }) });
+      body: JSON.stringify({ invoice_id: ch.invoice_id, client_id: ch.client_id, paid_on: today, amount: ch.amount, method: how, reference: pi.id, note: online ? "Paid online by bank (Stripe)" : "Automatic payment (Stripe)" }) });
   }
   const inv = (await rows(env, `invoices?id=eq.${ch.invoice_id}&select=id,number,total,status`))[0];
   const paid = (await rows(env, `invoice_payments?invoice_id=eq.${ch.invoice_id}&select=amount`)).reduce((a, p) => a + Number(p.amount || 0), 0);
   if (inv && inv.status === "open" && paid + 0.005 >= Number(inv.total || 0)) {
-    await sbRest(env, `invoices?id=eq.${inv.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "paid", paid_at: new Date().toISOString(), paid_method: "Bank autopay" }) });
+    await sbRest(env, `invoices?id=eq.${inv.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "paid", paid_at: new Date().toISOString(), paid_method: how }) });
   }
   const c = (await rows(env, `clients?id=eq.${ch.client_id}&select=name`))[0] || {};
-  await notify(env, "portal", `Autopay received: ${c.name || "a client"}`, `$${Number(ch.amount).toFixed(2)}${inv ? " · invoice " + inv.number : ""}`, "/crm/?go=billing");
-  await notifyClient(env, ch.client_id, "invoice", "Payment received ✓", `Your automatic payment of $${Number(ch.amount).toFixed(2)} went through. Thank you!`, `${PORTAL_URL}?go=billing`);
+  await notify(env, "portal", `${online ? "Online bank payment" : "Autopay"} received: ${c.name || "a client"}`, `$${Number(ch.amount).toFixed(2)}${inv ? " · invoice " + inv.number : ""}`, "/crm/?go=billing");
+  await notifyClient(env, ch.client_id, "invoice", "Payment received ✓", `Your ${online ? "bank" : "automatic"} payment of $${Number(ch.amount).toFixed(2)} went through. Thank you!`, `${PORTAL_URL}?go=billing`);
 }
 async function recordAutopayFailed(env, pi) {
-  const ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status`))[0];
+  const ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status,source`))[0];
   if (!ch || ch.status === "failed") return;
+  const online = ch.source === "paynow";
   const why = String((pi.last_payment_error && (pi.last_payment_error.message || pi.last_payment_error.code)) || "The bank didn't approve the payment.").slice(0, 300);
   await sbRest(env, `autopay_charges?id=eq.${ch.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "failed", failure: why, updated_at: new Date().toISOString() }) });
   // If it had been recorded as paid (a late bank return), take the payment back off.
@@ -1224,8 +1232,9 @@ async function recordAutopayFailed(env, pi) {
     await sbRest(env, `invoices?id=eq.${ch.invoice_id}&status=eq.paid`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "open", paid_at: null, paid_method: null }) });
   }
   const c = (await rows(env, `clients?id=eq.${ch.client_id}&select=name,email`))[0] || {};
-  await notify(env, "portal", `Autopay FAILED: ${c.name || "a client"}`, `$${Number(ch.amount).toFixed(2)} · ${why}`, "/crm/?go=billing");
-  await notifyClient(env, ch.client_id, "invoice", "Automatic payment didn't go through", "Please check your bank account or pay another way. We'll try once more in a few days.", `${PORTAL_URL}?go=billing`);
+  await notify(env, "portal", `${online ? "Online bank payment" : "Autopay"} FAILED: ${c.name || "a client"}`, `$${Number(ch.amount).toFixed(2)} · ${why}`, "/crm/?go=billing");
+  await notifyClient(env, ch.client_id, "invoice", online ? "Your bank payment didn't go through" : "Automatic payment didn't go through",
+    online ? "Please check your bank account and try again, or pay another way." : "Please check your bank account or pay another way. We'll try once more in a few days.", `${PORTAL_URL}?go=billing`);
 }
 
 export async function handleStripeWebhook(request, env) {
@@ -1235,6 +1244,13 @@ export async function handleStripeWebhook(request, env) {
   const o = (ev.data && ev.data.object) || {};
   try {
     if (ev.type === "checkout.session.completed" && o.mode === "setup" && o.setup_intent) await saveSetup(env, o.setup_intent, o.metadata || {});
+    else if (ev.type === "checkout.session.completed" && o.mode === "payment" && o.payment_intent && (o.metadata || {}).source === "paynow") {
+      const md = o.metadata;
+      if (UUID.test(md.invoice_id || "") && UUID.test(md.client_id || ""))
+        await sbRest(env, "autopay_charges?on_conflict=payment_intent", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+          body: JSON.stringify({ invoice_id: md.invoice_id, client_id: md.client_id, payment_intent: o.payment_intent, amount: Number(o.amount_total || 0) / 100, status: "processing", source: "paynow" }) });
+      if (o.payment_status === "paid") await recordAutopayPaid(env, { id: o.payment_intent, metadata: md });
+    }
     else if (ev.type === "setup_intent.succeeded" && o.id) await saveSetup(env, o.id, o.metadata || {});
     else if (ev.type === "payment_intent.succeeded") await recordAutopayPaid(env, o);
     else if (ev.type === "payment_intent.payment_failed") await recordAutopayFailed(env, o);
@@ -1243,6 +1259,42 @@ export async function handleStripeWebhook(request, env) {
     }
   } catch (e) { console.log("stripe webhook error", ev.type, String(e)); return json({ error: "handler failed" }, 500); }
   return json({ received: true });
+}
+
+// "Pay now by bank" from an invoice link (anyone holding the invoice link can pay that one invoice).
+export async function handlePayInvoice(request, env) {
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const tok = String(d.t || "").replace(/[^a-zA-Z0-9]/g, "");
+  if (tok.length < 32) return json({ error: "bad link" }, 400);
+  if (!env.STRIPE_SECRET_KEY) return json({ error: "Online payments aren't open yet. Please pay by Zelle or cash." }, 503);
+  const inv = (await rows(env, `invoices?share_token=eq.${tok}&select=id,number,total,status,client_id`))[0];
+  if (!inv || inv.status !== "open") return json({ error: "This invoice is already paid or no longer open." }, 400);
+  const paid = (await rows(env, `invoice_payments?invoice_id=eq.${inv.id}&select=amount`)).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const due = Math.round((Number(inv.total || 0) - paid) * 100) / 100;
+  if (due < 0.5) return json({ error: "Nothing is due on this invoice." }, 400);
+  const busy = await rows(env, `autopay_charges?invoice_id=eq.${inv.id}&status=eq.processing&select=id`);
+  if (busy.length) return json({ error: "A bank payment for this invoice is already processing. It usually takes about 4 business days." }, 409);
+  const c = (await rows(env, `clients?id=eq.${inv.client_id}&select=id,name,email,stripe_customer_id`))[0] || {};
+  let cust = c.stripe_customer_id;
+  if (!cust) {
+    const r = await stripe(env, "POST", "customers", { name: c.name, email: EMAIL_RE.test(c.email || "") ? c.email : undefined, metadata: { client_id: inv.client_id } }, `cust-${inv.client_id}`);
+    if (r.error) return json({ error: r.error.message }, 502);
+    cust = r.id;
+    await sbRest(env, `clients?id=eq.${inv.client_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ stripe_customer_id: cust }) });
+  }
+  const md = { invoice_id: inv.id, client_id: inv.client_id, invoice_number: String(inv.number), source: "paynow" };
+  const back = `${SITE}/d/?t=${tok}`;
+  const base = {
+    mode: "payment", customer: cust,
+    line_items: [{ quantity: 1, price_data: { currency: "usd", unit_amount: cents(due), product_data: { name: `Invoice ${inv.number}`, description: "Latta Corp Of Central Florida" } } }],
+    payment_method_options: { us_bank_account: { verification_method: "automatic", financial_connections: { permissions: ["payment_method"] } } },
+    payment_intent_data: { description: `Latta Corp invoice ${inv.number}`, metadata: md },
+    metadata: md, success_url: `${back}&paid=1`, cancel_url: back,
+  };
+  let s = await stripe(env, "POST", "checkout/sessions", { ...base, excluded_payment_method_types: ["card", "link", "cashapp", "amazon_pay", "klarna", "affirm", "afterpay_clearpay", "paypal"] });
+  if (s.error) s = await stripe(env, "POST", "checkout/sessions", { ...base, excluded_payment_method_types: ["card", "link"] });
+  if (s.error) return json({ error: s.error.message }, 502);
+  return json({ ok: true, url: s.url });
 }
 
 // The daily job (and the owner's "Run now" button). Returns what it did.
@@ -1258,8 +1310,9 @@ export async function runAutopay(env, opts = {}) {
     for (const inv of invs) {
       const sentAt = inv.emailed_at || inv.sent_at;
       if (!sentAt || sentAt > tenDaysAgo) { out.skipped.push(`#${inv.number}: emailed less than 10 days ago`); continue; }
-      const tries = await rows(env, `autopay_charges?invoice_id=eq.${inv.id}&select=status,updated_at&order=created_at.desc`);
-      if (tries.some((x) => x.status !== "failed")) continue;
+      const all = await rows(env, `autopay_charges?invoice_id=eq.${inv.id}&select=status,updated_at,source&order=created_at.desc`);
+      if (all.some((x) => x.status !== "failed")) continue;
+      const tries = all.filter((x) => x.source !== "paynow"); // a client's own failed "pay now" doesn't use up autopay tries
       if (tries.length >= 2) { out.skipped.push(`#${inv.number}: already tried twice`); continue; }
       if (tries.length && Date.now() - new Date(tries[0].updated_at).getTime() < 3 * 86400000) continue;
       const paid = (await rows(env, `invoice_payments?invoice_id=eq.${inv.id}&select=amount`)).reduce((a, p) => a + Number(p.amount || 0), 0);
@@ -1322,6 +1375,10 @@ export default {
     if (url.pathname === "/api/pay") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handlePay(request, env);
+    }
+    if (url.pathname === "/api/pay-invoice") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      return handlePayInvoice(request, env);
     }
     if (url.pathname === "/api/stripe/webhook") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);

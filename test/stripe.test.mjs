@@ -1,6 +1,6 @@
 // Checks for bank autopay: node test/stripe.test.mjs
 import { formEncode, verifyStripeSignature } from "../src/stripe.js";
-import { runAutopay, handleStripeWebhook } from "../src/worker.js";
+import { runAutopay, handleStripeWebhook, handlePayInvoice } from "../src/worker.js";
 import assert from "node:assert";
 
 // form encoding the way Stripe wants it
@@ -53,6 +53,8 @@ globalThis.fetch = async (url, opts = {}) => {
   url = String(url);
   if (url.startsWith("https://api.stripe.com/")) {
     stripeCalls.push({ url, body: opts.body, idem: opts.headers && opts.headers["Idempotency-Key"] });
+    if (url.includes("checkout/sessions")) return new Response(JSON.stringify({ id: "cs_" + stripeCalls.length, url: "https://checkout.stripe.com/x" }), { status: 200 });
+    if (url.endsWith("/customers")) return new Response(JSON.stringify({ id: "cus_new" }), { status: 200 });
     return new Response(JSON.stringify({ id: "pi_" + stripeCalls.length, status: "processing" }), { status: 200 });
   }
   const m = url.match(/\/rest\/v1\/([a-z_]+)(\?.*)?$/);
@@ -108,4 +110,29 @@ assert.equal(db.autopay_charges[0].status, "failed");
 // bad signature is refused
 r = await handleStripeWebhook(new Request("https://x/api/stripe/webhook", { method: "POST", headers: { "stripe-signature": "t=1,v1=00" }, body }), env);
 assert.equal(r.status, 400);
+
+// "Pay now by bank" from the invoice link
+const C1 = "11111111-1111-1111-1111-111111111111", I1 = "22222222-2222-2222-2222-222222222222", TOK = "a".repeat(40);
+const payReq = (tok) => new Request("https://x/api/pay-invoice", { method: "POST", body: JSON.stringify({ t: tok }) });
+db = fresh(false); stripeCalls = [];
+db.clients.push({ id: C1, name: "Pay Client", email: "p@x.com" });
+db.invoices.push({ id: I1, client_id: C1, number: 200, total: 90, status: "open", share_token: TOK });
+db.invoice_payments.push({ invoice_id: I1, amount: 15 });
+r = await handlePayInvoice(payReq("short"), env); assert.equal(r.status, 400);
+r = await handlePayInvoice(payReq(TOK), env); let j = await r.json();
+assert.equal(j.url, "https://checkout.stripe.com/x", JSON.stringify(j));
+const cs = stripeCalls.find((c) => c.url.includes("checkout/sessions"));
+assert(cs.body.includes("unit_amount%5D=7500") && cs.body.includes("mode=payment") && cs.body.includes("excluded_payment_method_types"), "charges only what's left, bank only");
+assert.equal(db.clients.find((c) => c.id === C1).stripe_customer_id, "cus_new");
+// Stripe finishes checkout -> processing, then success marks it paid as an online bank payment
+const md = { invoice_id: I1, client_id: C1, invoice_number: "200", source: "paynow" };
+const done = JSON.stringify({ type: "checkout.session.completed", data: { object: { mode: "payment", payment_intent: "pi_pay", amount_total: 7500, payment_status: "unpaid", metadata: md } } });
+await handleStripeWebhook(new Request("https://x", { method: "POST", headers: { "stripe-signature": await sign(done) }, body: done }), env);
+assert.equal(db.autopay_charges.filter((c) => c.source === "paynow" && c.status === "processing").length, 1);
+r = await handlePayInvoice(payReq(TOK), env); assert.equal(r.status, 409, "can't start a second payment while one is processing");
+const ok = JSON.stringify({ type: "payment_intent.succeeded", data: { object: { id: "pi_pay", amount: 7500, metadata: md } } });
+await handleStripeWebhook(new Request("https://x", { method: "POST", headers: { "stripe-signature": await sign(ok) }, body: ok }), env);
+assert.equal(db.invoices.find((i) => i.id === I1).status, "paid");
+assert.equal(db.invoice_payments.filter((p) => p.invoice_id === I1 && p.method === "Bank (online)").length, 1);
+r = await handlePayInvoice(payReq(TOK), env); assert.equal(r.status, 400, "paid invoice can't be paid again");
 console.log("stripe autopay checks passed");
