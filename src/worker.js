@@ -1117,7 +1117,19 @@ export async function handlePay(request, env) {
   const cid = String(d.client_id || "");
   const acct = await portalAccountAs(env, token, cid);
   if (!acct || !acct.client) return json({ error: "Not allowed." }, 403);
-  const method = (await rows(env, `autopay_methods?client_id=eq.${cid}&select=kind,bank_name,last4,status,created_at`))[0] || null;
+  let method = (await rows(env, `autopay_methods?client_id=eq.${cid}&select=kind,bank_name,last4,status,created_at`))[0] || null;
+  if (action === "status" && !method && env.STRIPE_SECRET_KEY) {
+    // In case Stripe's webhook message hasn't arrived (or failed): look the bank up straight from Stripe.
+    const c = (await rows(env, `clients?id=eq.${cid}&select=stripe_customer_id`))[0];
+    if (c && c.stripe_customer_id) {
+      const list = await stripe(env, "GET", "setup_intents", { customer: c.stripe_customer_id, limit: 5 });
+      const ok = ((list && list.data) || []).find((x) => x.status === "succeeded" && x.payment_method);
+      if (ok) {
+        await saveSetup(env, ok.id, { client_id: cid, agreement_id: (ok.metadata || {}).agreement_id });
+        method = (await rows(env, `autopay_methods?client_id=eq.${cid}&select=kind,bank_name,last4,status,created_at`))[0] || null;
+      }
+    }
+  }
   if (action === "status") {
     return json({ ok: true, enabled: Boolean(env.STRIPE_SECRET_KEY), mode: stripeMode(env), method, agreement: Boolean(await activeAutopayAgreement(env, cid)) });
   }
