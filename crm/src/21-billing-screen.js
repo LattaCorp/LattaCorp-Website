@@ -1339,6 +1339,72 @@ function openBizSettings() {
   });
   s.style.marginTop = "14px";
   p.appendChild(s);
+  autopaySettings(p);
+}
+/* Automatic (bank) payments through Stripe: the owner's on/off switch, status and a "run now" button */
+function autopaySettings(p) {
+  var sec = el("div", "sec");
+  sec.style.marginTop = "22px";
+  sec.appendChild(el("h3", null, "Automatic payments (Stripe)"));
+  var st = el("div", "note", "Checking Stripe...");
+  sec.appendChild(st);
+  p.appendChild(sec);
+  callApi("/api/pay", "settings", {}).then(function (r) {
+    st.textContent = "";
+    var d = r.data || {};
+    if (!r.ok) {
+      st.textContent = r.error || "Couldn't check Stripe.";
+      return;
+    }
+    var chips = el("div", "agrstat");
+    chips.appendChild(el("span", "chip " + (d.connected ? "won" : "lost"), d.connected ? "Stripe connected (" + (d.mode === "live" ? "LIVE" : "test mode") + ")" : "Stripe key missing"));
+    chips.appendChild(el("span", "chip " + (d.webhook ? "won" : "lost"), d.webhook ? "Webhook set" : "Webhook secret missing"));
+    st.appendChild(chips);
+    st.appendChild(
+      el(
+        "div",
+        "note",
+        "When on, every morning Foreman charges each client who signed the autopay authorization and connected a bank, for open invoices that are due and were emailed at least 10 days earlier. Each invoice is tried at most twice."
+      )
+    );
+    if (!isOwner()) return;
+    var lb = el("label", "chk"),
+      cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !!d.on;
+    lb.appendChild(cb);
+    lb.appendChild(document.createTextNode(" Automatic payments are on"));
+    cb.addEventListener("change", function () {
+      if (cb.checked && !confirm("Turn on automatic payments? Clients who connected a bank will be charged for due invoices starting tomorrow morning.")) {
+        cb.checked = false;
+        return;
+      }
+      sb.from("business")
+        .update({ autopay_on: cb.checked })
+        .eq("id", 1)
+        .then(function (r2) {
+          if (r2.error) {
+            alert("Could not save. Run the Stage 50 SQL in Supabase.");
+            cb.checked = !cb.checked;
+          }
+        });
+    });
+    st.appendChild(lb);
+    var out = el("div", "note");
+    st.appendChild(
+      btn("Run now", "btn alt sm", function () {
+        if (!confirm("Charge all due autopay invoices now?")) return;
+        out.textContent = "Running...";
+        callApi("/api/pay", "run", {}).then(function (r3) {
+          var x = r3.data || {};
+          out.textContent = r3.ok
+            ? x.charged + " charged." + (x.skipped && x.skipped.length ? " Skipped: " + x.skipped.join("; ") : "") + (x.errors && x.errors.length ? " Errors: " + x.errors.join("; ") : "")
+            : r3.error || "Could not run.";
+        });
+      })
+    );
+    st.appendChild(out);
+  });
 }
 
 /* ---- Quote responses: when a client accepts or declines a quote online it's "new" until you open it.

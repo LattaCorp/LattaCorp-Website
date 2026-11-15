@@ -1,4 +1,5 @@
 import { makeVapidKeys, sendPush } from "./push.js";
+import { stripe, stripeMode, verifyStripeSignature, cents } from "./stripe.js";
 // Latta Corp website server code (Cloudflare Worker).
 // The static website is served automatically. This file only handles form submissions sent to /api/submit:
 // it emails them to the business through Resend. Settings: TO_EMAIL (wrangler.jsonc) and RESEND_API_KEY (a secret
@@ -1081,12 +1082,197 @@ export async function handlePush(request, env) {
   return json({ error: "bad action" }, 400);
 }
 
+
+// ============================ Bank (ACH) automatic payments through Stripe ============================
+// Rules: a client must have signed the Automatic Payment Authorization (bank) and connected a bank on Stripe's page;
+// the owner's "Automatic payments" switch in Foreman must be on; we only charge open invoices that are due and were
+// emailed at least 10 days earlier; each invoice is charged at most twice (one retry, 3+ days later).
+const etDay = (d = new Date()) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+async function rows(env, path) { const r = await sbRest(env, path); return r.ok ? (await r.json()) || [] : []; }
+async function activeAutopayAgreement(env, cid) {
+  const ag = await rows(env, `signed_agreements?client_id=eq.${cid}&kind=eq.autopay&select=id,method,signed_at&order=signed_at.desc`);
+  for (const a of ag) {
+    const ev = await rows(env, `agreement_events?agreement_id=eq.${a.id}&kind=eq.autopay_cancelled&select=id`);
+    if (!ev.length) return a;
+  }
+  return null;
+}
+async function autopayOn(env) { return (((await rows(env, "business?select=autopay_on&id=eq.1"))[0]) || {}).autopay_on === true; }
+
+export async function handlePay(request, env) {
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const action = String(d.action || "");
+  const token = bearer(request);
+  const me = await callerEmail(request, env);
+  if (!me) return json({ error: "Please sign in again." }, 403);
+  const staff = await staffRow(env, me);
+  if (action === "run") {
+    if (!staff || staff.role !== "owner") return json({ error: "Only an owner can run automatic payments." }, 403);
+    return json({ ok: true, ...(await runAutopay(env, { manual: true })) });
+  }
+  if (action === "settings") {
+    if (!staff) return json({ error: "Not allowed." }, 403);
+    return json({ ok: true, connected: Boolean(env.STRIPE_SECRET_KEY), webhook: Boolean(env.STRIPE_WEBHOOK_SECRET), mode: stripeMode(env), on: await autopayOn(env) });
+  }
+  const cid = String(d.client_id || "");
+  const acct = await portalAccountAs(env, token, cid);
+  if (!acct || !acct.client) return json({ error: "Not allowed." }, 403);
+  const method = (await rows(env, `autopay_methods?client_id=eq.${cid}&select=kind,bank_name,last4,status,created_at`))[0] || null;
+  if (action === "status") {
+    return json({ ok: true, enabled: Boolean(env.STRIPE_SECRET_KEY), mode: stripeMode(env), method, agreement: Boolean(await activeAutopayAgreement(env, cid)) });
+  }
+  if (staff) return json({ error: "Only the client can connect or remove their bank." }, 403);
+  if (action === "connect") {
+    if (!env.STRIPE_SECRET_KEY) return json({ error: "Online payments aren't open yet." }, 503);
+    const ag = await activeAutopayAgreement(env, cid);
+    if (!ag) return json({ error: "Please sign the Automatic Payment Authorization first." }, 400);
+    if (ag.method !== "ach") return json({ error: "Card automatic payments aren't open yet. Please choose bank." }, 400);
+    const c = (await rows(env, `clients?id=eq.${cid}&select=id,name,email,stripe_customer_id`))[0];
+    let cust = c && c.stripe_customer_id;
+    if (!cust) {
+      const r = await stripe(env, "POST", "customers", { name: c.name, email: EMAIL_RE.test(c.email || "") ? c.email : me, metadata: { client_id: cid } }, `cust-${cid}`);
+      if (r.error) return json({ error: r.error.message }, 502);
+      cust = r.id;
+      await sbRest(env, `clients?id=eq.${cid}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ stripe_customer_id: cust }) });
+    }
+    const back = `${PORTAL_URL}?pay=`;
+    const s = await stripe(env, "POST", "checkout/sessions", {
+      mode: "setup", customer: cust, currency: "usd", payment_method_types: ["us_bank_account"],
+      payment_method_options: { us_bank_account: { verification_method: "automatic", financial_connections: { permissions: ["payment_method"] } } },
+      success_url: back + "connected", cancel_url: back + "cancelled",
+      metadata: { client_id: cid, agreement_id: ag.id, email: me },
+      setup_intent_data: { metadata: { client_id: cid, agreement_id: ag.id } },
+    });
+    if (s.error) return json({ error: s.error.message }, 502);
+    return json({ ok: true, url: s.url });
+  }
+  if (action === "remove") {
+    if (!method) return json({ ok: true });
+    const m = (await rows(env, `autopay_methods?client_id=eq.${cid}&select=stripe_pm`))[0];
+    if (m && m.stripe_pm) await stripe(env, "POST", `payment_methods/${m.stripe_pm}/detach`, {});
+    await sbRest(env, `autopay_methods?client_id=eq.${cid}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "removed", updated_at: new Date().toISOString() }) });
+    await notify(env, "portal", `Bank removed from autopay: ${acct.client.name || "a client"}`, me, "/crm/?go=clients");
+    return json({ ok: true });
+  }
+  return json({ error: "bad action" }, 400);
+}
+
+async function saveSetup(env, setupIntentId, meta) {
+  const si = await stripe(env, "GET", `setup_intents/${setupIntentId}`, { expand: ["payment_method"] });
+  if (si.error || si.status !== "succeeded" || !si.payment_method) return;
+  const pm = si.payment_method, cid = (meta && meta.client_id) || (si.metadata || {}).client_id;
+  if (!UUID.test(String(cid || ""))) return;
+  let status = "active", note = null, kind = pm.type === "card" ? "card" : "ach", bank = null, last4 = null;
+  if (pm.type === "us_bank_account") { bank = pm.us_bank_account && pm.us_bank_account.bank_name; last4 = pm.us_bank_account && pm.us_bank_account.last4; }
+  if (pm.type === "card") {
+    bank = pm.card && pm.card.brand; last4 = pm.card && pm.card.last4;
+    if (pm.card && pm.card.funding !== "credit") { status = "rejected"; note = "Debit and prepaid cards are not accepted."; await stripe(env, "POST", `payment_methods/${pm.id}/detach`, {}); }
+  }
+  const row = { client_id: cid, agreement_id: (meta && meta.agreement_id) || (si.metadata || {}).agreement_id || null, stripe_customer: si.customer, stripe_pm: pm.id,
+    stripe_mandate: si.mandate || null, kind, bank_name: bank, last4, status, note, updated_at: new Date().toISOString() };
+  await sbRest(env, "autopay_methods?on_conflict=client_id", { method: "POST", headers: { Prefer: "resolution=merge-duplicates,return=minimal" }, body: JSON.stringify(row) });
+  const c = (await rows(env, `clients?id=eq.${cid}&select=name`))[0] || {};
+  await notify(env, "portal", `Autopay bank connected: ${c.name || "a client"}`, `${bank || "Bank"} ending ${last4 || "----"}`, "/crm/?go=clients");
+}
+
+async function recordAutopayPaid(env, pi) {
+  const ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status`))[0];
+  if (!ch) return;
+  await sbRest(env, `autopay_charges?id=eq.${ch.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "succeeded", updated_at: new Date().toISOString() }) });
+  const dup = await rows(env, `invoice_payments?reference=eq.${pi.id}&select=id`);
+  const today = etDay();
+  if (!dup.length) {
+    await sbRest(env, "invoice_payments", { method: "POST", headers: { Prefer: "return=minimal" },
+      body: JSON.stringify({ invoice_id: ch.invoice_id, client_id: ch.client_id, paid_on: today, amount: ch.amount, method: "Bank autopay", reference: pi.id, note: "Automatic payment (Stripe)" }) });
+  }
+  const inv = (await rows(env, `invoices?id=eq.${ch.invoice_id}&select=id,number,total,status`))[0];
+  const paid = (await rows(env, `invoice_payments?invoice_id=eq.${ch.invoice_id}&select=amount`)).reduce((a, p) => a + Number(p.amount || 0), 0);
+  if (inv && inv.status === "open" && paid + 0.005 >= Number(inv.total || 0)) {
+    await sbRest(env, `invoices?id=eq.${inv.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "paid", paid_at: new Date().toISOString(), paid_method: "Bank autopay" }) });
+  }
+  const c = (await rows(env, `clients?id=eq.${ch.client_id}&select=name`))[0] || {};
+  await notify(env, "portal", `Autopay received: ${c.name || "a client"}`, `$${Number(ch.amount).toFixed(2)}${inv ? " · invoice " + inv.number : ""}`, "/crm/?go=billing");
+  await notifyClient(env, ch.client_id, "invoice", "Payment received ✓", `Your automatic payment of $${Number(ch.amount).toFixed(2)} went through. Thank you!`, `${PORTAL_URL}?go=billing`);
+}
+async function recordAutopayFailed(env, pi) {
+  const ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status`))[0];
+  if (!ch || ch.status === "failed") return;
+  const why = String((pi.last_payment_error && (pi.last_payment_error.message || pi.last_payment_error.code)) || "The bank didn't approve the payment.").slice(0, 300);
+  await sbRest(env, `autopay_charges?id=eq.${ch.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "failed", failure: why, updated_at: new Date().toISOString() }) });
+  // If it had been recorded as paid (a late bank return), take the payment back off.
+  const pay = await rows(env, `invoice_payments?reference=eq.${pi.id}&select=id`);
+  if (pay.length) {
+    await sbRest(env, `invoice_payments?reference=eq.${pi.id}`, { method: "DELETE", headers: { Prefer: "return=minimal" } });
+    await sbRest(env, `invoices?id=eq.${ch.invoice_id}&status=eq.paid`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "open", paid_at: null, paid_method: null }) });
+  }
+  const c = (await rows(env, `clients?id=eq.${ch.client_id}&select=name,email`))[0] || {};
+  await notify(env, "portal", `Autopay FAILED: ${c.name || "a client"}`, `$${Number(ch.amount).toFixed(2)} · ${why}`, "/crm/?go=billing");
+  await notifyClient(env, ch.client_id, "invoice", "Automatic payment didn't go through", "Please check your bank account or pay another way. We'll try once more in a few days.", `${PORTAL_URL}?go=billing`);
+}
+
+export async function handleStripeWebhook(request, env) {
+  const raw = await request.text();
+  if (!(await verifyStripeSignature(raw, request.headers.get("stripe-signature"), env.STRIPE_WEBHOOK_SECRET))) return json({ error: "bad signature" }, 400);
+  let ev; try { ev = JSON.parse(raw); } catch { return json({ error: "bad json" }, 400); }
+  const o = (ev.data && ev.data.object) || {};
+  try {
+    if (ev.type === "checkout.session.completed" && o.mode === "setup" && o.setup_intent) await saveSetup(env, o.setup_intent, o.metadata || {});
+    else if (ev.type === "setup_intent.succeeded" && o.id) await saveSetup(env, o.id, o.metadata || {});
+    else if (ev.type === "payment_intent.succeeded") await recordAutopayPaid(env, o);
+    else if (ev.type === "payment_intent.payment_failed") await recordAutopayFailed(env, o);
+    else if (ev.type === "mandate.updated" && o.status === "inactive" && o.payment_method) {
+      await sbRest(env, `autopay_methods?stripe_pm=eq.${o.payment_method}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "removed", note: "The bank authorization was revoked.", updated_at: new Date().toISOString() }) });
+    }
+  } catch (e) { console.log("stripe webhook error", ev.type, String(e)); return json({ error: "handler failed" }, 500); }
+  return json({ received: true });
+}
+
+// The daily job (and the owner's "Run now" button). Returns what it did.
+export async function runAutopay(env, opts = {}) {
+  const out = { charged: 0, skipped: [], errors: [] };
+  if (!env.STRIPE_SECRET_KEY || !env.SUPABASE_SECRET_KEY) { out.skipped.push("Stripe is not connected."); return out; }
+  if (!(await autopayOn(env))) { out.skipped.push("Automatic payments are switched off in Foreman."); return out; }
+  const today = etDay(), tenDaysAgo = new Date(Date.now() - 10 * 86400000).toISOString();
+  const methods = await rows(env, "autopay_methods?status=eq.active&kind=eq.ach&select=client_id,stripe_customer,stripe_pm,stripe_mandate");
+  for (const m of methods) {
+    if (!(await activeAutopayAgreement(env, m.client_id))) { out.skipped.push(`${m.client_id}: authorization turned off`); continue; }
+    const invs = await rows(env, `invoices?client_id=eq.${m.client_id}&status=eq.open&due_date=lte.${today}&select=id,number,total,sent_at,emailed_at&order=due_date.asc`);
+    for (const inv of invs) {
+      const sentAt = inv.emailed_at || inv.sent_at;
+      if (!sentAt || sentAt > tenDaysAgo) { out.skipped.push(`#${inv.number}: emailed less than 10 days ago`); continue; }
+      const tries = await rows(env, `autopay_charges?invoice_id=eq.${inv.id}&select=status,updated_at&order=created_at.desc`);
+      if (tries.some((x) => x.status !== "failed")) continue;
+      if (tries.length >= 2) { out.skipped.push(`#${inv.number}: already tried twice`); continue; }
+      if (tries.length && Date.now() - new Date(tries[0].updated_at).getTime() < 3 * 86400000) continue;
+      const paid = (await rows(env, `invoice_payments?invoice_id=eq.${inv.id}&select=amount`)).reduce((a, p) => a + Number(p.amount || 0), 0);
+      const due = Math.round((Number(inv.total || 0) - paid) * 100) / 100;
+      if (due < 0.5) continue;
+      const pi = await stripe(env, "POST", "payment_intents", {
+        amount: cents(due), currency: "usd", customer: m.stripe_customer, payment_method: m.stripe_pm, payment_method_types: ["us_bank_account"],
+        confirm: true, off_session: true, mandate: m.stripe_mandate || undefined, description: `Latta Corp invoice ${inv.number}`,
+        metadata: { invoice_id: inv.id, client_id: m.client_id, invoice_number: String(inv.number) },
+      }, `inv-${inv.id}-try-${tries.length + 1}`);
+      if (pi.error) { out.errors.push(`#${inv.number}: ${pi.error.message}`); continue; }
+      await sbRest(env, "autopay_charges", { method: "POST", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ invoice_id: inv.id, client_id: m.client_id, payment_intent: pi.id, amount: due, status: "processing" }) });
+      if (pi.status === "succeeded") await recordAutopayPaid(env, pi);
+      else if (pi.status === "requires_payment_method" || pi.status === "canceled") await recordAutopayFailed(env, pi);
+      out.charged++;
+    }
+  }
+  if (opts.manual || out.charged || out.errors.length) await notify(env, "portal", "Automatic payments run", `${out.charged} charged${out.errors.length ? " · " + out.errors.length + " errors" : ""}`, "/crm/?go=billing");
+  return out;
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(runAutopay(env).catch((e) => console.log("autopay run failed", String(e))));
+  },
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/api/health") {
       // Safe status check (shows whether the settings exist, never their values).
-      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), crmKeySet: Boolean(env.SUPABASE_SECRET_KEY), turnstileSet: Boolean(env.TURNSTILE_SECRET_KEY), sendsTo: (env.TO_EMAIL || DEFAULT_TO) ? (env.TO_EMAIL || DEFAULT_TO).replace(/^(.).*(@.*)$/, "$1***$2") : null });
+      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), crmKeySet: Boolean(env.SUPABASE_SECRET_KEY), turnstileSet: Boolean(env.TURNSTILE_SECRET_KEY), stripeSet: Boolean(env.STRIPE_SECRET_KEY), stripeWebhookSet: Boolean(env.STRIPE_WEBHOOK_SECRET), sendsTo: (env.TO_EMAIL || DEFAULT_TO) ? (env.TO_EMAIL || DEFAULT_TO).replace(/^(.).*(@.*)$/, "$1***$2") : null });
     }
     if (url.pathname === "/api/submit") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
@@ -1111,6 +1297,14 @@ export default {
     if (url.pathname === "/api/invoices/email") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handleInvoiceEmail(request, env);
+    }
+    if (url.pathname === "/api/pay") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      return handlePay(request, env);
+    }
+    if (url.pathname === "/api/stripe/webhook") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      return handleStripeWebhook(request, env);
     }
     if (url.pathname === "/api/quote-approved") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);

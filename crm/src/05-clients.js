@@ -1242,8 +1242,22 @@ function agreementsSection(c) {
     })[0];
     var st = el("div", "agrstat");
     st.appendChild(el("span", "chip " + (hasService ? "won" : "lost"), hasService ? "Service Agreement signed" : "Service Agreement not signed"));
-    st.appendChild(el("span", "chip " + (ap ? "won" : ""), ap ? "Autopay on (" + (ap.method === "ach" ? "bank" : "credit card") + ")" : "Autopay off"));
+    st.appendChild(el("span", "chip " + (ap ? "won" : ""), ap ? "Autopay authorized (" + (ap.method === "ach" ? "bank" : "credit card") + ")" : "Autopay off"));
     holder.appendChild(st);
+    if (ap)
+      sb.from("autopay_methods")
+        .select("bank_name,last4,status")
+        .eq("client_id", c.id)
+        .then(function (m) {
+          var x = m.data && m.data[0];
+          st.appendChild(
+            el(
+              "span",
+              "chip " + (x && x.status === "active" ? "won" : "lost"),
+              x && x.status === "active" ? "Bank: " + (x.bank_name || "account") + " ••••" + (x.last4 || "") : "No bank connected yet"
+            )
+          );
+        });
     if (!signed.length) {
       holder.appendChild(el("div", "note", "Nothing signed yet. The client sees a reminder to sign on their portal home page."));
       return;

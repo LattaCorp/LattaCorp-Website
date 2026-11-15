@@ -108,7 +108,7 @@
     "Upcoming visits": "Próximas visitas", "Past visits": "Visitas realizadas", "Moved from": "Movida del", "because of weather": "por el clima",
     "No upcoming visits are scheduled.": "No hay próximas visitas programadas.", "No past visits yet.": "Aún no hay visitas realizadas.",
     "Show more": "Ver más", "Balance due": "Saldo pendiente", "Credit on account": "Crédito en la cuenta",
-    "Pay with Zelle": "Pague con Zelle", "Agreements": "Acuerdos", "Signed agreements are kept permanently and can't be changed or deleted.": "Los acuerdos firmados se guardan permanentemente y no se pueden cambiar ni borrar.", "Loading...": "Cargando...", "Agreements aren't available right now.": "Los acuerdos no están disponibles en este momento.", "Service Agreement": "Acuerdo de Servicio", "Automatic Payment Authorization": "Autorización de Pago Automático", "Signed": "Firmado", "Turned off": "Desactivado", "Active": "Activo", "Nothing signed yet.": "Aún no hay nada firmado.", "Read and sign the Service Agreement": "Leer y firmar el Acuerdo de Servicio", "Set up automatic payments": "Configurar pagos automáticos", "Please sign your Service Agreement": "Por favor firme su Acuerdo de Servicio", "It covers your service, billing and our responsibilities. It takes about two minutes, and a copy stays in your account.": "Cubre su servicio, la facturación y nuestras responsabilidades. Toma unos dos minutos y una copia queda en su cuenta.", "Read and sign": "Leer y firmar", "Back": "Atrás", "This agreement is written in English. Call or text 407-470-5309 if you'd like us to go over it in Spanish.": "Este acuerdo está escrito en inglés. Llame o envíe un texto al 407-470-5309 si desea que lo revisemos en español.", "Client": "Cliente", "Account type": "Tipo de cuenta", "HOA": "HOA", "Commercial": "Comercial", "Residential": "Residencial", "Service property": "Propiedad de servicio", "Service plan": "Plan de servicio", "Payment method": "Método de pago", "Bank account (ACH), no fee": "Cuenta bancaria (ACH), sin cargo", "Credit card, 3% surcharge": "Tarjeta de crédito, recargo del 3%", "Version": "Versión", "How should we charge your invoices?": "¿Cómo debemos cobrar sus facturas?", "Credit card, 3% surcharge (debit cards not accepted)": "Tarjeta de crédito, recargo del 3% (no se aceptan tarjetas de débito)", "You'll connect your bank or card on our secure payment page once online payments open. Nothing is charged until then.": "Conectará su banco o tarjeta en nuestra página de pago segura cuando abran los pagos en línea. No se cobra nada hasta entonces.", "Your full name": "Su nombre completo", "Your title (for example Board President or Property Manager)": "Su cargo (por ejemplo, Presidente de la Junta o Administrador de Propiedades)", "Sign below with your finger or mouse": "Firme abajo con el dedo o el ratón", "Signature": "Firma", "Clear": "Borrar", "I authorize Latta Corp Of Central Florida to charge my invoices automatically as described above, and I agree to sign electronically.": "Autorizo a Latta Corp Of Central Florida a cobrar mis facturas automáticamente como se describe arriba, y acepto firmar electrónicamente.", "I have read and agree to this Service Agreement and the Terms of Service, I am authorized to sign for this account, and I agree to sign electronically.": "He leído y acepto este Acuerdo de Servicio y los Términos de Servicio, estoy autorizado para firmar por esta cuenta y acepto firmar electrónicamente.", "Sign": "Firmar", "Pick bank account or credit card.": "Elija cuenta bancaria o tarjeta de crédito.", "Type your full name.": "Escriba su nombre completo.", "Please sign in the box.": "Por favor firme en el recuadro.", "Please check the box to agree.": "Por favor marque la casilla para aceptar.", "Signing...": "Firmando...", "Signed. A copy was emailed to you and is saved in your account.": "Firmado. Le enviamos una copia por correo y está guardada en su cuenta.", "Signature of": "Firma de", "Signed by": "Firmado por", "Signed on": "Firmado el", "From IP address": "Desde la dirección IP", "Document fingerprint (SHA-256)": "Huella del documento (SHA-256)", "Status": "Estado", "This signed copy is permanent. It can't be changed or deleted by you or by us.": "Esta copia firmada es permanente. Ni usted ni nosotros podemos cambiarla o borrarla.", "Print or save as PDF": "Imprimir o guardar como PDF", "Email me a copy": "Enviarme una copia", "Sent": "Enviada", "Couldn't send": "No se pudo enviar", "Turn off automatic payments": "Desactivar pagos automáticos", "Turn off automatic payments? Your service continues, and you'll pay each invoice yourself.": "¿Desactivar los pagos automáticos? Su servicio continúa y usted pagará cada factura.", "Cash is welcome too.": "También aceptamos efectivo.", "Checks are accepted for HOA and commercial accounts.": "Aceptamos cheques de cuentas de HOA y comerciales.", "Cash is also accepted.": "También aceptamos efectivo.",
+    "Pay with Zelle": "Pague con Zelle", "Agreements": "Acuerdos", "Signed agreements are kept permanently and can't be changed or deleted.": "Los acuerdos firmados se guardan permanentemente y no se pueden cambiar ni borrar.", "Loading...": "Cargando...", "Agreements aren't available right now.": "Los acuerdos no están disponibles en este momento.", "Service Agreement": "Acuerdo de Servicio", "Automatic Payment Authorization": "Autorización de Pago Automático", "Signed": "Firmado", "Turned off": "Desactivado", "Active": "Activo", "Nothing signed yet.": "Aún no hay nada firmado.", "Read and sign the Service Agreement": "Leer y firmar el Acuerdo de Servicio", "Set up automatic payments": "Configurar pagos automáticos", "Please sign your Service Agreement": "Por favor firme su Acuerdo de Servicio", "It covers your service, billing and our responsibilities. It takes about two minutes, and a copy stays in your account.": "Cubre su servicio, la facturación y nuestras responsabilidades. Toma unos dos minutos y una copia queda en su cuenta.", "Read and sign": "Leer y firmar", "Back": "Atrás", "This agreement is written in English. Call or text 407-470-5309 if you'd like us to go over it in Spanish.": "Este acuerdo está escrito en inglés. Llame o envíe un texto al 407-470-5309 si desea que lo revisemos en español.", "Client": "Cliente", "Account type": "Tipo de cuenta", "HOA": "HOA", "Commercial": "Comercial", "Residential": "Residencial", "Service property": "Propiedad de servicio", "Service plan": "Plan de servicio", "Payment method": "Método de pago", "Bank account (ACH), no fee": "Cuenta bancaria (ACH), sin cargo", "Credit card, 3% surcharge": "Tarjeta de crédito, recargo del 3%", "Version": "Versión", "How should we charge your invoices?": "¿Cómo debemos cobrar sus facturas?", "Credit card, 3% surcharge (debit cards not accepted)": "Tarjeta de crédito, recargo del 3% (no se aceptan tarjetas de débito)", "You'll connect your bank or card on our secure payment page once online payments open. Nothing is charged until then.": "Conectará su banco o tarjeta en nuestra página de pago segura cuando abran los pagos en línea. No se cobra nada hasta entonces.", "Your full name": "Su nombre completo", "Your title (for example Board President or Property Manager)": "Su cargo (por ejemplo, Presidente de la Junta o Administrador de Propiedades)", "Sign below with your finger or mouse": "Firme abajo con el dedo o el ratón", "Signature": "Firma", "Clear": "Borrar", "I authorize Latta Corp Of Central Florida to charge my invoices automatically as described above, and I agree to sign electronically.": "Autorizo a Latta Corp Of Central Florida a cobrar mis facturas automáticamente como se describe arriba, y acepto firmar electrónicamente.", "I have read and agree to this Service Agreement and the Terms of Service, I am authorized to sign for this account, and I agree to sign electronically.": "He leído y acepto este Acuerdo de Servicio y los Términos de Servicio, estoy autorizado para firmar por esta cuenta y acepto firmar electrónicamente.", "Sign": "Firmar", "Pick bank account or credit card.": "Elija cuenta bancaria o tarjeta de crédito.", "Type your full name.": "Escriba su nombre completo.", "Please sign in the box.": "Por favor firme en el recuadro.", "Please check the box to agree.": "Por favor marque la casilla para aceptar.", "Signing...": "Firmando...", "Signed. A copy was emailed to you and is saved in your account.": "Firmado. Le enviamos una copia por correo y está guardada en su cuenta.", "Signature of": "Firma de", "Signed by": "Firmado por", "Signed on": "Firmado el", "From IP address": "Desde la dirección IP", "Document fingerprint (SHA-256)": "Huella del documento (SHA-256)", "Status": "Estado", "This signed copy is permanent. It can't be changed or deleted by you or by us.": "Esta copia firmada es permanente. Ni usted ni nosotros podemos cambiarla o borrarla.", "Print or save as PDF": "Imprimir o guardar como PDF", "Email me a copy": "Enviarme una copia", "Sent": "Enviada", "Couldn't send": "No se pudo enviar", "Turn off automatic payments": "Desactivar pagos automáticos", "Turn off automatic payments? Your service continues, and you'll pay each invoice yourself.": "¿Desactivar los pagos automáticos? Su servicio continúa y usted pagará cada factura.", "Credit card, 3% surcharge (coming soon)": "Tarjeta de crédito, recargo del 3% (próximamente)", "Next, you'll connect your bank on Stripe's secure page. We never see your bank login or full account number.": "Después conectará su banco en la página segura de Stripe. Nunca vemos su usuario bancario ni su número de cuenta completo.", "Paying from": "Pagando desde", "Bank account": "Cuenta bancaria", "Each invoice is charged on its due date, at least 10 days after we email it.": "Cada factura se cobra en su fecha de vencimiento, al menos 10 días después de enviarla por correo.", "Remove this bank": "Quitar este banco", "Remove this bank? Automatic payments stop until you connect another one.": "¿Quitar este banco? Los pagos automáticos se detienen hasta que conecte otro.", "That card can't be used. We only accept credit cards and bank accounts.": "Esa tarjeta no se puede usar. Solo aceptamos tarjetas de crédito y cuentas bancarias.", "Online payments are opening soon. We'll let you know when you can connect your bank.": "Los pagos en línea abrirán pronto. Le avisaremos cuando pueda conectar su banco.", "No bank connected yet. Nothing will be charged until you connect one.": "Aún no hay banco conectado. No se cobrará nada hasta que conecte uno.", "Connect your bank account": "Conectar su cuenta bancaria", "Opening...": "Abriendo...", "Bank connected. It can take a minute to show here.": "Banco conectado. Puede tardar un minuto en aparecer aquí.", "Bank connection was cancelled. You can try again any time.": "Se canceló la conexión del banco. Puede intentarlo de nuevo cuando quiera.", "Cash is welcome too.": "También aceptamos efectivo.", "Checks are accepted for HOA and commercial accounts.": "Aceptamos cheques de cuentas de HOA y comerciales.", "Cash is also accepted.": "También aceptamos efectivo.",
     "Online card and bank payments are coming soon.": "Muy pronto podrá pagar en línea con tarjeta o cuenta bancaria.",
     "Please include your invoice number in the Zelle note.": "Por favor incluya su número de factura en la nota de Zelle.",
     "Open invoices": "Facturas pendientes", "All invoices": "Todas las facturas", "Payments": "Pagos", "No payments yet.": "Aún no hay pagos.",
@@ -237,6 +237,8 @@
   }
 
   /* ---------- account data ---------- */
+  var payReturn = qs.get("pay"), payMsg = null;
+  if (payReturn) history.replaceState(null, "", location.pathname + (qs.get("lang") === "es" ? "?lang=es" : ""));
   var accounts = [], curId = null, data = null, view = "home", photoUrls = {}, flash = "", isStaff = false, siteKey = "";
   function boot() {
     var th = qs.get("th");
@@ -329,7 +331,9 @@
     return sb.rpc("portal_account", { cid: curId }).then(function (r) {
       if (r.error || !r.data) throw r.error || new Error("no data");
       if (!data || data.client.id !== r.data.client.id) siteKey = "";
-      data = r.data; store("lc-portal-acct", curId); show(view);
+      data = r.data; store("lc-portal-acct", curId);
+      if (payReturn) { view = "account"; payMsg = payReturn === "connected" ? { ok: true, text: t("Bank connected. It can take a minute to show here.") } : { ok: false, text: t("Bank connection was cancelled. You can try again any time.") }; payReturn = null; }
+      show(view);
     });
   }
 
@@ -838,6 +842,7 @@
   }
   function agreementsPanel(host) {
     var p = panel(host, t("Agreements"));
+    if (payMsg) { var pm = el("p", payMsg.ok ? "ok" : "muted", payMsg.text); pm.setAttribute("role", "status"); p.appendChild(pm); payMsg = null; }
     p.appendChild(el("p", "muted small", t("Signed agreements are kept permanently and can't be changed or deleted.")));
     var box = el("div"); box.appendChild(el("p", "muted", t("Loading...")));
     p.appendChild(box);
@@ -890,11 +895,12 @@
     var method = null;
     if (kind === "autopay") {
       f.appendChild(el("h3", "agrh", t("How should we charge your invoices?")));
-      [["ach", t("Bank account (ACH), no fee")], ["card", t("Credit card, 3% surcharge (debit cards not accepted)")]].forEach(function (o) {
+      [["ach", t("Bank account (ACH), no fee")], ["card", t("Credit card, 3% surcharge (coming soon)")]].forEach(function (o) {
         var lb = el("label", "chk"), r = el("input"); r.type = "radio"; r.name = "apm"; r.value = o[0];
+        if (o[0] === "card") { r.disabled = true; lb.style.opacity = ".55"; } else { r.checked = true; method = "ach"; }
         r.onchange = function () { method = o[0]; }; lb.appendChild(r); lb.appendChild(document.createTextNode(" " + o[1])); f.appendChild(lb);
       });
-      f.appendChild(el("p", "muted small", t("You'll connect your bank or card on our secure payment page once online payments open. Nothing is charged until then.")));
+      f.appendChild(el("p", "muted small", t("Next, you'll connect your bank on Stripe's secure page. We never see your bank login or full account number.")));
     }
     var nl = el("label", "f"); nl.appendChild(el("span", null, t("Your full name"))); var nm = el("input"); nm.autocomplete = "name"; nm.maxLength = 120;
     nm.value = (data.me && data.me.name) || ""; nl.appendChild(nm); f.appendChild(nl);
@@ -932,6 +938,7 @@
         if (r.error) { go.disabled = false; go.textContent = t("Sign"); return bad(r.error.message || t("Something went wrong. Please try again, or call or text 407-470-5309.")); }
         var id = r.data && r.data.id;
         pushApi("agreement-copy", { id: id });
+        if (kind === "autopay") { flash = ""; payApi("connect").then(function (j) { if (j.ok && j.url) location.href = j.url; else loadAgr(true).then(function () { show("account"); }); }); return; }
         loadAgr(true).then(function () {
           var s = ((agr && agr.signed) || []).filter(function (x) { return x.id === id; })[0];
           flash = t("Signed. A copy was emailed to you and is saved in your account.");
@@ -939,6 +946,38 @@
         });
       }, function () { go.disabled = false; go.textContent = t("Sign"); bad(t("Something went wrong. Please try again, or call or text 407-470-5309.")); });
     };
+  }
+  function payApi(action) {
+    return sb.auth.getSession().then(function (r) {
+      var tok = r.data && r.data.session && r.data.session.access_token;
+      return fetch("/api/pay", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + tok }, body: JSON.stringify({ action: action, client_id: curId }) });
+    }).then(function (res) { return res.json().catch(function () { return {}; }).then(function (j) { j.ok = res.ok && j.ok !== false; return j; }); }, function () { return { ok: false, error: "offline" }; });
+  }
+  // the bank account automatic payments come from (connected on Stripe's page)
+  function bankBox(host) {
+    var b = el("div", "agrmeta"); b.appendChild(el("p", "muted", t("Loading..."))); host.appendChild(b);
+    payApi("status").then(function (j) {
+      b.textContent = "";
+      var m = j.method;
+      if (m && m.status === "active") {
+        var row = el("div", "agrrow"); row.appendChild(el("span", "muted", t("Paying from"))); row.appendChild(el("b", null, (m.bank_name || t("Bank account")) + " ••••" + (m.last4 || ""))); b.appendChild(row);
+        b.appendChild(el("p", "small muted", t("Each invoice is charged on its due date, at least 10 days after we email it.")));
+        if (!isStaff) {
+          var rm = el("button", "btn alt sm", t("Remove this bank")); rm.type = "button";
+          rm.onclick = function () { if (!confirm(t("Remove this bank? Automatic payments stop until you connect another one."))) return; rm.disabled = true; payApi("remove").then(function () { b.remove(); bankBox(host); }); };
+          b.appendChild(rm);
+        }
+        return;
+      }
+      if (m && m.status === "rejected") b.appendChild(el("p", "err", t("That card can't be used. We only accept credit cards and bank accounts.")));
+      if (!j.enabled) { b.appendChild(el("p", "muted", t("Online payments are opening soon. We'll let you know when you can connect your bank."))); return; }
+      b.appendChild(el("p", null, t("No bank connected yet. Nothing will be charged until you connect one.")));
+      if (!isStaff) {
+        var c = el("button", "btn", t("Connect your bank account")); c.type = "button";
+        c.onclick = function () { c.disabled = true; c.textContent = t("Opening..."); payApi("connect").then(function (r) { if (r.ok && r.url) location.href = r.url; else { c.disabled = false; c.textContent = t("Connect your bank account"); alert(r.error || t("Something went wrong. Please try again, or call or text 407-470-5309.")); } }); };
+        b.appendChild(c);
+      }
+    });
   }
   function viewSigned(s, justSigned) {
     var p = agrPage(t(s.title));
@@ -956,6 +995,7 @@
     });
     if (s.kind === "autopay") { var st = el("div", "agrrow"); st.appendChild(el("span", "muted", t("Status"))); st.appendChild(el("b", null, s.cancelled_at ? t("Turned off") + " " + ldate(s.cancelled_at) : t("Active"))); meta.appendChild(st); }
     sg.appendChild(meta); p.appendChild(sg);
+    if (s.kind === "autopay" && !s.cancelled_at) { p.appendChild(el("h3", "agrh", t("Bank account"))); bankBox(p); }
     p.appendChild(el("p", "muted small", t("This signed copy is permanent. It can't be changed or deleted by you or by us.")));
     var acts = el("div", "acts");
     var pr = el("button", "btn alt", t("Print or save as PDF")); pr.type = "button"; pr.onclick = function () { window.print(); }; acts.appendChild(pr);

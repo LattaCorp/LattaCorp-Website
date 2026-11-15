@@ -7,6 +7,9 @@
     "binding": "ASSETS",
     "run_worker_first": ["/api/*"]
   },
+  "triggers": {
+    "crons": ["15 13 * * *"]
+  },
   "vars": {
     "TO_EMAIL": "lattacorpofcentralfl@gmail.com",
     "FROM_EMAIL": "Latta Corp Website <website@lattacorpfl.com>"
