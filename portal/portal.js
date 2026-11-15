@@ -108,7 +108,7 @@
     "Upcoming visits": "Próximas visitas", "Past visits": "Visitas realizadas", "Moved from": "Movida del", "because of weather": "por el clima",
     "No upcoming visits are scheduled.": "No hay próximas visitas programadas.", "No past visits yet.": "Aún no hay visitas realizadas.",
     "Show more": "Ver más", "Balance due": "Saldo pendiente", "Credit on account": "Crédito en la cuenta",
-    "Pay with Zelle": "Pague con Zelle", "Cash or check is welcome too.": "También aceptamos efectivo o cheque.",
+    "Pay with Zelle": "Pague con Zelle", "Cash is welcome too.": "También aceptamos efectivo.", "Checks are accepted for HOA and commercial accounts.": "Aceptamos cheques de cuentas de HOA y comerciales.", "Cash is also accepted.": "También aceptamos efectivo.",
     "Online card and bank payments are coming soon.": "Muy pronto podrá pagar en línea con tarjeta o cuenta bancaria.",
     "Please include your invoice number in the Zelle note.": "Por favor incluya su número de factura en la nota de Zelle.",
     "Open invoices": "Facturas pendientes", "All invoices": "Todas las facturas", "Payments": "Pagos", "No payments yet.": "Aún no hay pagos.",
@@ -607,7 +607,9 @@
 
     var pay = el("div", "paybox"); pay.appendChild(el("h3", null, t("How to pay")));
     if (b.zelle) { var z = el("p"); z.appendChild(el("b", null, t("Pay with Zelle") + ": ")); z.appendChild(document.createTextNode(b.zelle)); pay.appendChild(z); pay.appendChild(el("p", "small muted", t("Please include your invoice number in the Zelle note."))); }
-    if (b.payment_note) pay.appendChild(el("p", "small", b.payment_note)); else pay.appendChild(el("p", "small", t("Cash or check is welcome too.")));
+    pay.appendChild(el("p", "small", t(b.payment_note || "Cash is welcome too.")));
+    var ct = data.client && data.client.type;
+    if ((ct === "hoa" || ct === "commercial") && !/check|cheque/i.test(b.payment_note || "")) pay.appendChild(el("p", "small", t("Checks are accepted for HOA and commercial accounts.")));
     pay.appendChild(el("p", "small muted", t("Online card and bank payments are coming soon.")));
     host.appendChild(pay);
 

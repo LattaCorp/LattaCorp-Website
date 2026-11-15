@@ -16773,6 +16773,14 @@ function invMessage(inv, c) {
 /* ---- printable invoice (works as a PDF too) ----
    Invoices with a private link show the exact page the client sees (d/index.html), with the account summary, so
    staff and clients always see the same invoice. Older invoices without a link use the simple layout below. */
+/* checks are only taken from HOA and commercial accounts */
+function takesChecks(cid) {
+  var c = byId(clients, cid);
+  return !!c && (c.type === "hoa" || c.type === "commercial");
+}
+function checkLine(cid) {
+  return takesChecks(cid) && !/check/i.test(bizv("payment_note", "")) ? "<br>Checks are accepted for HOA and commercial accounts." : "";
+}
 function showInvoice(inv, items) {
   if (inv.share_token) return showDocFrame(docUrl(inv.share_token, true) + "&embed=1&lang=en");
   var c = byId(clients, inv.client_id) || {},
@@ -16846,6 +16854,7 @@ function showInvoice(inv, items) {
     '<div class="pay"><b>How to pay</b><div>' +
     (bizv("zelle", "") ? "Zelle: " + esc(biz.zelle) + "<br>" : "") +
     esc(bizv("payment_note", "")) +
+    checkLine(inv.client_id) +
     "</div></div>" +
     '<div class="foot">' +
     esc(bizv("footer", "Thank you!")) +
@@ -17733,6 +17742,7 @@ function showStatement(c, from, to, pid) {
       ? '<div class="pay"><b>How to pay</b><div>' +
         (bizv("zelle", "") ? "Zelle: " + esc(biz.zelle) + "<br>" : "") +
         esc(bizv("payment_note", "")) +
+        checkLine(c.id) +
         "</div></div>"
       : "") +
     '<div class="foot">' +
@@ -21224,7 +21234,7 @@ function lpBusiness() {
 }
 function lpClient(c) {
   return c
-    ? { name: c.name, company: c.company || "", account_no: c.account_no || null, phone: c.phone || "", email: c.email || "" }
+    ? { name: c.name, company: c.company || "", account_no: c.account_no || null, phone: c.phone || "", email: c.email || "", type: c.type || "" }
     : { name: "" };
 }
 function lpMainAddress(cid) {

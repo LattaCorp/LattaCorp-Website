@@ -78,7 +78,7 @@ function lpBusiness() {
 }
 function lpClient(c) {
   return c
-    ? { name: c.name, company: c.company || "", account_no: c.account_no || null, phone: c.phone || "", email: c.email || "" }
+    ? { name: c.name, company: c.company || "", account_no: c.account_no || null, phone: c.phone || "", email: c.email || "", type: c.type || "" }
     : { name: "" };
 }
 function lpMainAddress(cid) {

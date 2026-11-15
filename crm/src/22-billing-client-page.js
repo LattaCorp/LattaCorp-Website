@@ -311,6 +311,7 @@ function showStatement(c, from, to, pid) {
       ? '<div class="pay"><b>How to pay</b><div>' +
         (bizv("zelle", "") ? "Zelle: " + esc(biz.zelle) + "<br>" : "") +
         esc(bizv("payment_note", "")) +
+        checkLine(c.id) +
         "</div></div>"
       : "") +
     '<div class="foot">' +
