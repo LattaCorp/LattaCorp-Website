@@ -782,11 +782,12 @@ footer .flab{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transfor
 
 .psstaff{margin-top:18px;padding-top:14px;border-top:1px solid #e4ece1}.psstaff a{font-weight:700}
 .staffbtn{display:inline-flex;align-items:center;gap:4px;flex:none;border-radius:999px;font-size:.7rem;font-weight:700;line-height:1;text-decoration:none;white-space:nowrap}
-/* the Staff (Foreman) button sits under the EN/ES switch, right-aligned, so it takes no room from the menu */
-header .lang{flex-wrap:wrap;justify-content:flex-end;row-gap:5px}
-header .lang::after{content:"";order:8;flex-basis:100%;height:0}
-header .lang .staffbtn{order:9;margin-left:auto;padding:3px 8px;color:#fff;border:1px solid rgba(255,255,255,.7);background:transparent}
+/* the Staff login (Foreman) button sits just left of the EN/ES switch */
+header .lang .staffbtn{margin-right:8px;padding:4px 9px;color:#fff;border:1px solid rgba(255,255,255,.7);background:transparent}
 header .lang .staffbtn:hover{background:#fff;color:var(--forest);text-decoration:none}
-@media (max-width:1100px){header .wrap.hgrid header .hgrid .lang,header .hgrid .lang{top:8px}}
 header .hnav .lang a::before{display:none}
-@media (max-width:1100px){header .lang .staffbtn{padding:3px 5px}header .lang .staffbtn span{display:none}}
+/* EN/ES switch + Staff login live in a slim row across the top of the header, so they never cover the menu */
+header .wrap.hgrid{position:relative;padding-top:34px}
+header .hgrid .lang{position:absolute!important;top:6px!important;right:clamp(10px,2vw,28px)!important;transform:none!important;margin:0!important}
+@media (max-width:1100px){header .wrap.hgrid{padding-top:32px}header .hgrid .lang{right:14px!important}}
+header .hnav .lang a.staffbtn{margin:0 8px 0 0!important;padding:4px 9px!important;font-size:.7rem!important}
