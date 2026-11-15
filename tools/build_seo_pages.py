@@ -134,7 +134,10 @@ def main():
                     # language switch: two real links instead of the JS toggle
                     en_a = f'<a href="/{path}/" data-l="en" class="{"on" if lang == "en" else ""}" hreflang="en">EN</a>'
                     es_a = f'<a href="/es/{path}/" data-l="es" class="{"on" if lang == "es" else ""}" hreflang="es">ES</a>'
-                    body = re.sub(r'<div class="lang">.*?</div>', f'<div class="lang">{en_a}<span aria-hidden="true">/</span>{es_a}</div>', body, count=1, flags=re.S)
+                    staff = (re.search(r'<a class="staffbtn".*?</a>', body, re.S) or [""])[0]  # keep the Staff (Foreman) button
+                    body = re.sub(r'<div class="lang">.*?</div>', lambda m: f'<div class="lang">{staff}{en_a}<span aria-hidden="true">/</span>{es_a}</div>', body, count=1, flags=re.S)
+                    if lang == "es":
+                        body = body.replace('title="Staff login" aria-label="Staff login"', 'title="Acceso del personal" aria-label="Acceso del personal"')
                     body = fix_links(body, lang)
                     # breadcrumbs + page schema
                     crumbs = [("Home" if lang == "en" else "Inicio", f"{SITE}/")]
