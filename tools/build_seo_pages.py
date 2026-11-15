@@ -138,6 +138,7 @@ def main():
                     body = re.sub(r'<div class="lang">.*?</div>', lambda m: f'<div class="lang">{staff}{en_a}<span aria-hidden="true">/</span>{es_a}</div>', body, count=1, flags=re.S)
                     if lang == "es":
                         body = body.replace('title="Staff login" aria-label="Staff login"', 'title="Acceso del personal" aria-label="Acceso del personal"')
+                        body = body.replace('<span>Acceso del personal</span></a>', '<span class="sl">Acceso del personal</span><span class="ss">Personal</span></a>')
                     body = fix_links(body, lang)
                     # breadcrumbs + page schema
                     crumbs = [("Home" if lang == "en" else "Inicio", f"{SITE}/")]

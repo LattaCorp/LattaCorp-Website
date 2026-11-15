@@ -782,12 +782,16 @@ footer .flab{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transfor
 
 .psstaff{margin-top:18px;padding-top:14px;border-top:1px solid #e4ece1}.psstaff a{font-weight:700}
 .staffbtn{display:inline-flex;align-items:center;gap:4px;flex:none;border-radius:999px;font-size:.7rem;font-weight:700;line-height:1;text-decoration:none;white-space:nowrap}
-/* the Staff login (Foreman) button sits just left of the EN/ES switch */
-header .lang .staffbtn{margin-right:8px;padding:4px 9px;color:#fff;border:1px solid rgba(255,255,255,.7);background:transparent}
-header .lang .staffbtn:hover{background:#fff;color:var(--forest);text-decoration:none}
+/* Staff login (Foreman): white button. Computer: left of the EN/ES switch in the slim top row. Phone: tucked under the switch, no extra height. */
+header .hnav .lang a.staffbtn{margin:0 10px 0 0!important;padding:5px 11px!important;font-size:.72rem!important;background:#fff;color:var(--forest);border:0;border-radius:6px;text-decoration:none}
+header .hnav .lang a.staffbtn:hover{background:var(--mint);color:var(--forest);text-decoration:none}
 header .hnav .lang a::before{display:none}
-/* EN/ES switch + Staff login live in a slim row across the top of the header, so they never cover the menu */
-header .wrap.hgrid{position:relative;padding-top:34px}
-header .hgrid .lang{position:absolute!important;top:6px!important;right:clamp(10px,2vw,28px)!important;transform:none!important;margin:0!important}
-@media (max-width:1100px){header .wrap.hgrid{padding-top:32px}header .hgrid .lang{right:14px!important}}
-header .hnav .lang a.staffbtn{margin:0 8px 0 0!important;padding:4px 9px!important;font-size:.7rem!important}
+header .wrap.hgrid{position:relative;padding-top:38px}
+header .hgrid .lang{position:absolute!important;top:7px!important;right:clamp(10px,2vw,28px)!important;transform:none!important;margin:0!important}
+@media (max-width:1100px){
+  header .wrap.hgrid{padding-top:8px}
+  header .hgrid .lang{top:8px!important;right:14px!important}
+  header .hnav .lang a.staffbtn{position:absolute!important;top:31px!important;right:0!important;left:auto!important;margin:0!important;padding:4px 9px!important;font-size:.68rem!important}
+}
+.staffbtn .ss{display:none}
+@media (max-width:1100px){.staffbtn .sl+.ss{display:inline}.staffbtn .sl:has(+.ss){display:none}}
