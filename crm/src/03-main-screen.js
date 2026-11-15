@@ -134,7 +134,7 @@ function render() {
       return v.status === "scheduled" && v.scheduled_date === tdy;
     }).length,
     newL = leads.filter(function (l) {
-      return l.status === "new";
+      return l.status === "new" && !l.archived_at;
     }).length;
   var items = {
     leads: ["leads", "Leads", newL, newResponses().length],

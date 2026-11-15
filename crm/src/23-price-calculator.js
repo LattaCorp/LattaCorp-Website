@@ -660,6 +660,7 @@ function openEstimate(id) {
   var hd = el("div", "qhead");
   hd.appendChild(el("span", "qnum", word + " " + estNum(e.number, e.doc_type)));
   hd.appendChild(el("span", "qst " + st[1], st[0]));
+  if (e.archived_at || (lead && lead.archived_at)) hd.appendChild(el("span", "qst no", "Archived"));
   p.appendChild(hd);
   // approved / declined: who answered and when, big and clear
   if (e.status === "accepted" || e.status === "declined") {
@@ -819,6 +820,9 @@ function openEstimate(id) {
       })
     );
   }
+  mr.appendChild(archiveBtn(it0, function () {
+    openEstimate(e.id);
+  }));
   mr.appendChild(
     btn("Delete", "btn danger", function () {
       if (!confirm("Delete this " + estWord(e) + " for good? Its link stops working.")) return;

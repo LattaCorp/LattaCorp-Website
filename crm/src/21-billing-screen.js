@@ -1412,7 +1412,7 @@ function autopaySettings(p) {
    minute and pops up a note when a new answer comes in. (Approvals are also emailed to the business email.) ---- */
 function newResponses() {
   return estimates.filter(function (e) {
-    return e.response_seen === false && (e.status === "accepted" || e.status === "declined");
+    return e.response_seen === false && !e.archived_at && (e.status === "accepted" || e.status === "declined");
   });
 }
 function respBadge() {

@@ -687,7 +687,7 @@ function render() {
       return v.status === "scheduled" && v.scheduled_date === tdy;
     }).length,
     newL = leads.filter(function (l) {
-      return l.status === "new";
+      return l.status === "new" && !l.archived_at;
     }).length;
   var items = {
     leads: ["leads", "Leads", newL, newResponses().length],
@@ -1189,8 +1189,40 @@ var PIPE_COLS = [
   ["new", "New Requests", "New"],
   ["quoted", "Pending Quotes", "Pending"],
   ["approved", "Approved by Client", "Approved"],
-  ["lost", "Declined", "Declined"]
+  ["lost", "Declined", "Declined"],
+  ["archived", "Archived", "Archived"]
 ];
+/* Archive: tidies a request, quote, estimate or approval off the board without deleting it.
+   A card is archived when its request or its quote is; archiving a card archives both. */
+function pipeArchived(it) {
+  return !!((it.lead && it.lead.archived_at) || (it.est && it.est.archived_at));
+}
+function archiveItem(it, on, cb) {
+  var at = on ? new Date().toISOString() : null,
+    steps = [];
+  if (it.lead) steps.push(sb.from("leads").update({ archived_at: at }).eq("id", it.lead.id));
+  if (it.est) steps.push(sb.from("estimates").update({ archived_at: at }).eq("id", it.est.id));
+  Promise.all(steps).then(function (rs) {
+    var bad = rs.filter(function (r) {
+      return r.error;
+    })[0];
+    if (bad) {
+      alert(/archived_at/.test(bad.error.message || "") ? "Run the Stage 51 SQL in Supabase first." : "Could not save that.");
+      return;
+    }
+    if (it.lead) it.lead.archived_at = at;
+    if (it.est) it.est.archived_at = at;
+    if (on && it.est && it.est.response_seen === false) markRespSeen(it.est);
+    render();
+    if (cb) cb();
+  });
+}
+function archiveBtn(it, after) {
+  var on = pipeArchived(it);
+  return btn(on ? "Unarchive" : "Archive", "btn alt", function () {
+    archiveItem(it, !on, after);
+  });
+}
 var LF = [];
 function pipeItems() {
   var byLead = {},
@@ -1261,6 +1293,7 @@ function pipeAddr(it) {
   return ps[0] ? ps[0].address : "";
 }
 function pipeCol(it) {
+  if (it.archived) return "archived";
   return it.stage === "won" ? "approved" : it.stage;
 }
 function recentJob(it) {
@@ -1273,8 +1306,9 @@ function renderLeads() {
   var items = pipeItems();
   items.forEach(function (it) {
     it.stage = pipeStage(it);
+    it.archived = pipeArchived(it);
   });
-  var counts = { new: 0, quoted: 0, approved: 0, lost: 0 };
+  var counts = { new: 0, quoted: 0, approved: 0, lost: 0, archived: 0 };
   items.forEach(function (it) {
     counts[pipeCol(it)]++;
   });
@@ -1282,7 +1316,8 @@ function renderLeads() {
     grp = el("div", "fgrp");
   PIPE_COLS.slice()
     .sort(function (x, y) {
-      return ["approved", "lost", "new", "quoted"].indexOf(x[0]) - ["approved", "lost", "new", "quoted"].indexOf(y[0]);
+      var o = ["approved", "lost", "new", "quoted", "archived"];
+      return o.indexOf(x[0]) - o.indexOf(y[0]);
     })
     .forEach(function (c) {
       var on = LF.indexOf(c[0]) > -1,
@@ -1319,7 +1354,7 @@ function renderLeads() {
   var list = $("list");
   list.textContent = "";
   var cols = PIPE_COLS.filter(function (c) {
-    return LF.length ? LF.indexOf(c[0]) > -1 : c[0] !== "lost";
+    return LF.length ? LF.indexOf(c[0]) > -1 : c[0] !== "lost" && c[0] !== "archived";
   });
   var shown = items
     .filter(function (it) {
@@ -1358,7 +1393,7 @@ function renderLeads() {
           "pempty",
           query
             ? "Nothing matches."
-            : { new: "No new requests.", quoted: "No quotes waiting.", approved: "Nothing approved right now.", lost: "Nothing declined." }[c[0]]
+            : { new: "No new requests.", quoted: "No quotes waiting.", approved: "Nothing approved right now.", lost: "Nothing declined.", archived: "Nothing archived." }[c[0]]
         )
       );
     set.forEach(function (it) {
@@ -1391,7 +1426,11 @@ function pipeCard(it) {
   if (e) right.appendChild(el("b", null, money(e.total)));
   var chip = STAGE_CHIP[st];
   right.appendChild(el("div")).appendChild(el("span", "chip " + chip[1], chip[0]));
-  if (fresh) right.lastChild.appendChild(el("span", "chip newresp", "New"));
+  if (fresh && !it.archived) right.lastChild.appendChild(el("span", "chip newresp", "New"));
+  if (it.archived) {
+    right.lastChild.appendChild(el("span", "chip arch", "Archived"));
+    b.classList.add("isarch");
+  }
   // a quote that hasn't been sent to the client yet
   if (e && e.status === "draft" && st === "quoted") {
     right.lastChild.appendChild(el("span", "chip draft", "DRAFT"));
@@ -1401,13 +1440,22 @@ function pipeCard(it) {
   if (w) right.appendChild(el("div", "sub", ago(w)));
   b.appendChild(left);
   b.appendChild(right);
-  if (st !== "lost") b.appendChild(makeJobBar(it, true));
+  if (st !== "lost" && !it.archived) b.appendChild(makeJobBar(it, true));
+  // quick archive / unarchive right on the card
+  var qa = el("button", "parch", it.archived ? "Unarchive" : "Archive");
+  qa.type = "button";
+  qa.title = it.archived ? "Put this back on the board" : "Move this off the board (it isn't deleted)";
+  qa.addEventListener("click", function (ev) {
+    ev.stopPropagation();
+    archiveItem(it, !it.archived);
+  });
+  b.appendChild(qa);
   function open() {
     if (e) openEstimate(e.id);
     else openLead(l.id);
   }
   b.addEventListener("click", function (ev) {
-    if (ev.target.closest(".mkjob")) return;
+    if (ev.target.closest(".mkjob") || ev.target.closest(".parch")) return;
     open();
   });
   b.addEventListener("keydown", function (ev) {
@@ -1713,6 +1761,13 @@ function openLead(id) {
       });
   });
   a.appendChild(save);
+  var lit = { lead: l, est: null };
+  estimates.forEach(function (x) {
+    if (x.lead_id === l.id && (!lit.est || x.number > lit.est.number)) lit.est = x;
+  });
+  a.appendChild(archiveBtn(lit, function () {
+    openLead(l.id);
+  }));
   a.appendChild(del);
   p.appendChild(a);
 }
@@ -17518,7 +17573,7 @@ function autopaySettings(p) {
    minute and pops up a note when a new answer comes in. (Approvals are also emailed to the business email.) ---- */
 function newResponses() {
   return estimates.filter(function (e) {
-    return e.response_seen === false && (e.status === "accepted" || e.status === "declined");
+    return e.response_seen === false && !e.archived_at && (e.status === "accepted" || e.status === "declined");
   });
 }
 function respBadge() {
@@ -19303,6 +19358,7 @@ function openEstimate(id) {
   var hd = el("div", "qhead");
   hd.appendChild(el("span", "qnum", word + " " + estNum(e.number, e.doc_type)));
   hd.appendChild(el("span", "qst " + st[1], st[0]));
+  if (e.archived_at || (lead && lead.archived_at)) hd.appendChild(el("span", "qst no", "Archived"));
   p.appendChild(hd);
   // approved / declined: who answered and when, big and clear
   if (e.status === "accepted" || e.status === "declined") {
@@ -19462,6 +19518,9 @@ function openEstimate(id) {
       })
     );
   }
+  mr.appendChild(archiveBtn(it0, function () {
+    openEstimate(e.id);
+  }));
   mr.appendChild(
     btn("Delete", "btn danger", function () {
       if (!confirm("Delete this " + estWord(e) + " for good? Its link stops working.")) return;
