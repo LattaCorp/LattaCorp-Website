@@ -1148,13 +1148,17 @@ export async function handlePay(request, env) {
       await sbRest(env, `clients?id=eq.${cid}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ stripe_customer_id: cust }) });
     }
     const back = `${PORTAL_URL}?pay=`;
-    const s = await stripe(env, "POST", "checkout/sessions", {
-      mode: "setup", customer: cust, currency: "usd", payment_method_types: ["us_bank_account"],
+    // Stripe now picks the payment methods from the Dashboard settings; we hide everything except bank.
+    const base = {
+      mode: "setup", customer: cust, currency: "usd",
       payment_method_options: { us_bank_account: { verification_method: "automatic", financial_connections: { permissions: ["payment_method"] } } },
       success_url: back + "connected", cancel_url: back + "cancelled",
       metadata: { client_id: cid, agreement_id: ag.id, email: me },
       setup_intent_data: { metadata: { client_id: cid, agreement_id: ag.id } },
-    });
+    };
+    let s = await stripe(env, "POST", "checkout/sessions", { ...base, excluded_payment_method_types: ["card", "link", "cashapp", "amazon_pay", "klarna", "affirm", "afterpay_clearpay", "paypal"] });
+    if (s.error) s = await stripe(env, "POST", "checkout/sessions", { ...base, excluded_payment_method_types: ["card", "link"] });
+    if (s.error) s = await stripe(env, "POST", "checkout/sessions", base);
     if (s.error) return json({ error: s.error.message }, 502);
     return json({ ok: true, url: s.url });
   }
@@ -1175,10 +1179,12 @@ async function saveSetup(env, setupIntentId, meta) {
   const pm = si.payment_method, cid = (meta && meta.client_id) || (si.metadata || {}).client_id;
   if (!UUID.test(String(cid || ""))) return;
   let status = "active", note = null, kind = pm.type === "card" ? "card" : "ach", bank = null, last4 = null;
+  if (pm.type !== "us_bank_account" && pm.type !== "card") { status = "rejected"; note = "Please connect a bank account."; await stripe(env, "POST", `payment_methods/${pm.id}/detach`, {}); }
   if (pm.type === "us_bank_account") { bank = pm.us_bank_account && pm.us_bank_account.bank_name; last4 = pm.us_bank_account && pm.us_bank_account.last4; }
   if (pm.type === "card") {
     bank = pm.card && pm.card.brand; last4 = pm.card && pm.card.last4;
     if (pm.card && pm.card.funding !== "credit") { status = "rejected"; note = "Debit and prepaid cards are not accepted."; await stripe(env, "POST", `payment_methods/${pm.id}/detach`, {}); }
+    else { status = "rejected"; note = "Card automatic payments aren't open yet. Please connect a bank account."; await stripe(env, "POST", `payment_methods/${pm.id}/detach`, {}); }
   }
   const row = { client_id: cid, agreement_id: (meta && meta.agreement_id) || (si.metadata || {}).agreement_id || null, stripe_customer: si.customer, stripe_pm: pm.id,
     stripe_mandate: si.mandate || null, kind, bank_name: bank, last4, status, note, updated_at: new Date().toISOString() };
@@ -1259,11 +1265,14 @@ export async function runAutopay(env, opts = {}) {
       const paid = (await rows(env, `invoice_payments?invoice_id=eq.${inv.id}&select=amount`)).reduce((a, p) => a + Number(p.amount || 0), 0);
       const due = Math.round((Number(inv.total || 0) - paid) * 100) / 100;
       if (due < 0.5) continue;
-      const pi = await stripe(env, "POST", "payment_intents", {
-        amount: cents(due), currency: "usd", customer: m.stripe_customer, payment_method: m.stripe_pm, payment_method_types: ["us_bank_account"],
+      const piBase = {
+        amount: cents(due), currency: "usd", customer: m.stripe_customer, payment_method: m.stripe_pm,
         confirm: true, off_session: true, mandate: m.stripe_mandate || undefined, description: `Latta Corp invoice ${inv.number}`,
         metadata: { invoice_id: inv.id, client_id: m.client_id, invoice_number: String(inv.number) },
-      }, `inv-${inv.id}-try-${tries.length + 1}`);
+      };
+      let pi = await stripe(env, "POST", "payment_intents", { ...piBase, payment_method_types: ["us_bank_account"] }, `inv-${inv.id}-try-${tries.length + 1}`);
+      if (pi.error && /payment_method_types/.test(pi.error.message || ""))
+        pi = await stripe(env, "POST", "payment_intents", { ...piBase, automatic_payment_methods: { enabled: true, allow_redirects: "never" } }, `inv-${inv.id}-try-${tries.length + 1}-apm`);
       if (pi.error) { out.errors.push(`#${inv.number}: ${pi.error.message}`); continue; }
       await sbRest(env, "autopay_charges", { method: "POST", headers: { Prefer: "return=minimal" },
         body: JSON.stringify({ invoice_id: inv.id, client_id: m.client_id, payment_intent: pi.id, amount: due, status: "processing" }) });
