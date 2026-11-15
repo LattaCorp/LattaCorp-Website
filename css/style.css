@@ -779,3 +779,6 @@ footer .flab{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transfor
 .introsec{padding:0 0 46px}
 .introsec .intro{background:var(--mint);border-radius:14px;padding:26px 30px}
 .introsec .intro{max-width:952px;box-sizing:border-box;margin:0 auto}@media (max-width:1000px){.introsec .intro{margin:0 24px}}
+
+.psstaff{margin-top:18px;padding-top:14px;border-top:1px solid #e4ece1}.psstaff a{font-weight:700}
+.fstaff a[href="/crm/"]{display:inline-block;border:1px solid rgba(255,255,255,.55);border-radius:6px;padding:1px 8px;text-decoration:none;margin-left:2px}

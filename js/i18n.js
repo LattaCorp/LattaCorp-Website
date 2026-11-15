@@ -201,6 +201,7 @@ var ES={
 "Can't find it? Check your Spam or Junk folder. It comes from website@lattacorpfl.com.": "¿No lo encuentra? Revise su carpeta de Spam o Correo no deseado. Llega de website@lattacorpfl.com.",
 "Send a new code": "Enviar otro código",
 "Use a different email": "Usar otro correo",
+"Latta Corp team?": "¿Equipo de Latta Corp?", "Sign in to Foreman": "Entrar a Foreman",
 "No code, or not on file yet? Call or text": "¿No le llegó el código o aún no está registrado? Llame o envíe un texto al",
 "Enter a valid email.": "Escriba un correo válido.",
 "Checking...": "Verificando...",
