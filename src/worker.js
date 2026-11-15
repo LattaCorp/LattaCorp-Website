@@ -849,7 +849,7 @@ async function agreementCopy(env, token, me, cid, acct, d) {
     : `Here is your copy of the ${s.title} you signed. It is also saved in your client portal under Account, where it can't be changed or deleted.`;
   const html = `<!doctype html><html><body style="margin:0;padding:0;background:#f3f7f1"><table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f3f7f1;padding:24px 12px"><tr><td align="center">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border-radius:12px;border:1px solid #e4ece1;font-family:Georgia,'Times New Roman',serif">
-<tr><td style="background:#1b552b;padding:18px 24px;color:#fff;font-size:19px;font-weight:600">LattaCorp Of Central Florida</td></tr>
+<tr><td style="background:#1b552b;padding:18px 24px;color:#fff;font-size:19px;font-weight:600">Latta Corp Of Central Florida</td></tr>
 <tr><td style="padding:24px 26px 10px"><h1 style="margin:0 0 12px;font-size:22px;color:#1b552b;font-weight:600">${esc(heading)}</h1>
 <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#1c2a20">${esc(intro)}</p>${table}${cancelled ? "" : agreementHtml(s.body)}
 <p style="margin:16px 0 8px;font-size:13px;color:#58675c;font-family:Arial,sans-serif">Signed electronically under the federal E-SIGN Act and Florida Statutes section 668.50.</p></td></tr>
