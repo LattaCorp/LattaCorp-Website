@@ -10,6 +10,7 @@
 // It also bumps the version numbers in crm/index.html and crm/sw.js so phones load the new code.
 // Pass --no-bump to rebuild without changing the version.
 import fs from "fs";
+import { execFileSync } from "child_process";
 import path from "path";
 import { fileURLToPath } from "url";
 import { buildAllDark } from "./build_dark.mjs";
@@ -27,7 +28,20 @@ for (const f of files) {
   out += fs.readFileSync(path.join(srcDir, f), "utf8").trimEnd() + "\n\n";
 }
 out += "})();\n";
-fs.writeFileSync(path.join(root, "crm", "app.js"), out);
+// The readable bundle is kept in .build/ (not published) for testing and debugging. What phones download,
+// crm/app.js, is the same code minified by esbuild (about 25% smaller to download). No esbuild here? Then the
+// readable bundle is published as-is, which works exactly the same, just a little bigger.
+fs.mkdirSync(path.join(root, ".build"), { recursive: true });
+fs.writeFileSync(path.join(root, ".build", "app.debug.js"), out);
+let min = null;
+for (const bin of [path.join(root, "node_modules", ".bin", "esbuild"), "/opt/npm-tools/node_modules/.bin/esbuild", "esbuild"]) {
+  try {
+    min = execFileSync(bin, ["--minify", "--target=es2017", "--loader=js", "--log-level=error"], { input: out, maxBuffer: 64 << 20 }).toString();
+    break;
+  } catch (e) {}
+}
+fs.writeFileSync(path.join(root, "crm", "app.js"), min ? "/* Foreman CRM (minified). Source: crm/src/, built by tools/build_crm.mjs */\n" + min : out);
+if (!min) console.log("(esbuild not found: published the readable bundle)");
 
 if (!process.argv.includes("--no-bump")) {
   const html = path.join(root, "crm", "index.html");
