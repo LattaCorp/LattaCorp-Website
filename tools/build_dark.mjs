@@ -58,25 +58,65 @@ function fromHsl({ h, s, l }, a = 1) {
   const hx = (v) => Math.round(v * 255).toString(16).padStart(2, "0");
   return a < 1 ? `rgba(${Math.round(r * 255)},${Math.round(g * 255)},${Math.round(b * 255)},${a})` : "#" + hx(r) + hx(g) + hx(b);
 }
-// what each kind of color becomes in the dark
-function darkBg(c) {
+// ---------- the two dark styles ----------
+// Every color the light design uses gets one CSS variable (--dk0, --dk1, ...). Each dark style fills those
+// variables in its own way, so all styles share one set of rules. "Charcoal" is the default dark;
+// "Slate" and "Deep Forest" are picked with <html data-dark="slate"> / <html data-dark="forest">.
+export const PALETTES = {
+  charcoal: { h: 212 / 360, s: 0.09, bgL: 0.075, surfL: 0.125, accent: "#3c9a4d", link: "#74d184",
+    tok: { bg: "#121417", side: "#181b1f", hdr: "#181b1f", surf: "#1d2126", surf2: "#252a30", line: "#2e343b", text: "#e8ebee", muted: "#9aa3ad", accent: "#3c9a4d", link: "#74d184", input: "#22262b", deep: "#1e3a27" } },
+  forest: { h: 145 / 360, s: 0.18, bgL: 0.065, surfL: 0.105, accent: "#2f8a45", link: "#8fdc9a",
+    tok: { bg: "#0d1310", side: "#121a15", hdr: "#10261a", surf: "#151e19", surf2: "#1c2721", line: "#27362d", text: "#e6eee8", muted: "#93a69a", accent: "#2f8a45", link: "#8fdc9a", input: "#1a2a20", deep: "#173823" } },
+  slate: { h: 215 / 360, s: 0.32, bgL: 0.08, surfL: 0.13, accent: "#239a5b", link: "#6fe0a3",
+    tok: { bg: "#0f141b", side: "#141b24", hdr: "#141b24", surf: "#18202a", surf2: "#1f2935", line: "#2b3747", text: "#e6edf3", muted: "#93a1b1", accent: "#239a5b", link: "#6fe0a3", input: "#1e2733", deep: "#16382b" } },
+};
+const isGreen = (x) => x.h > 0.2 && x.h < 0.47 && x.s > 0.22;
+const isNeutral = (x) => x.s < 0.2 || (isGreen(x) && x.l > 0.93); // grays, plus the pale brand mint, become plain surfaces
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+function darkBg(c, P) {
   const x = toHsl(c);
   if (c.a < 1) return null; // see-through overlays still read fine
-  if (x.l < 0.6) return null; // already a strong/dark color (buttons, header): keep
-  const white = x.l > 0.995;
-  return fromHsl({ h: white ? 0.38 : x.h, s: white ? 0.14 : Math.min(x.s, 0.24), l: white ? 0.135 : 0.1 + (1 - x.l) * 0.85 }, c.a);
+  if (x.l < 0.6) return isGreen(x) && x.l < 0.45 ? P.accent : null; // brand green buttons/tabs -> the style's green; other strong colors stay
+  if (isNeutral(x)) return fromHsl({ h: P.h, s: P.s, l: x.l > 0.995 ? P.surfL : clamp(P.bgL + (1 - x.l) * 0.9, P.bgL, 0.32) });
+  return fromHsl({ h: x.h, s: Math.min(x.s, 0.45) * 0.15, l: P.surfL + 0.03 + (1 - x.l) * 0.3 }); // tinted cards and chips keep just a hint of their color
 }
-function darkText(c) {
+function darkText(c, P) {
+  const x = toHsl(c);
+  if (c.a < 1 || x.l >= 0.55) return null; // light text (white on buttons) stays
+  if (isGreen(x)) return P.link;
+  if (x.s < 0.25) return fromHsl({ h: P.h, s: P.s * 0.6, l: Math.min(0.93, 0.93 - x.l * 0.55) });
+  return fromHsl({ h: x.h, s: Math.min(x.s, 0.55), l: Math.min(0.9, 0.9 - x.l * 0.45) });
+}
+function darkBorder(c, P) {
   const x = toHsl(c);
   if (c.a < 1) return null;
-  if (x.l >= 0.55) return null; // light text (white on buttons) stays
-  return fromHsl({ h: x.h, s: Math.min(x.s, 0.55), l: Math.min(0.93, 0.93 - x.l * 0.55) }, c.a);
+  if (x.l < 0.6) return isGreen(x) && x.l < 0.45 ? P.accent : null;
+  if (isNeutral(x)) return fromHsl({ h: P.h, s: P.s, l: 0.17 + (1 - x.l) * 0.55 });
+  return fromHsl({ h: x.h, s: Math.min(x.s, 0.3), l: 0.2 + (1 - x.l) * 0.6 });
 }
-function darkBorder(c) {
-  const x = toHsl(c);
-  if (c.a < 1) return null;
-  if (x.l < 0.6) return null;
-  return fromHsl({ h: x.h, s: Math.min(x.s, 0.25), l: 0.2 + (1 - x.l) * 0.6 }, c.a);
+const CONVERT = { bg: darkBg, text: darkText, border: darkBorder };
+// one variable per (kind, color); returns "var(--dkN)" or null when this color stays as it is in every style
+let VARS;
+function dkVar(kind, c) {
+  const key = kind + ":" + c.r + "," + c.g + "," + c.b + "," + c.a;
+  if (VARS.has(key)) return VARS.get(key).name;
+  const vals = {};
+  let any = false;
+  for (const [n, P] of Object.entries(PALETTES)) { vals[n] = CONVERT[kind](c, P); if (vals[n]) any = true; }
+  if (!any) { VARS.set(key, { name: null }); return null; }
+  const name = `var(--dk${VARS.size})`;
+  VARS.set(key, { name, idx: VARS.size, vals, src: c });
+  return name;
+}
+function varBlocks() {
+  const out = [];
+  for (const [n, P] of Object.entries(PALETTES)) {
+    const sel = n === "charcoal" ? 'html[data-theme="dark"]' : `html[data-theme="dark"][data-dark="${n}"]`;
+    const decls = Object.entries(P.tok).map(([k, v]) => `--dk-${k}:${v}`);
+    for (const v of VARS.values()) if (v.name) decls.push(`--dk${v.idx}:${v.vals[n] || (v.src.a < 1 ? `rgba(${v.src.r},${v.src.g},${v.src.b},${v.src.a})` : fromHsl(toHsl(v.src)))}`);
+    out.push(`${sel}{${decls.join(";")}}`);
+  }
+  return out.join("\n");
 }
 
 // ---------- reading the stylesheet ----------
@@ -118,7 +158,7 @@ function convertValue(val, kind, vars) {
     }
     const c = parseColor(src);
     if (!c) return tok;
-    const d = kind === "bg" ? darkBg(c) : kind === "text" ? darkText(c) : darkBorder(c);
+    const d = dkVar(kind, c);
     if (!d) return tok;
     changed = true;
     return d;
@@ -148,6 +188,7 @@ function scopeSel(sel) {
 }
 
 export function buildDark(css, jsSources, extra) {
+  VARS = new Map();
   css = stripComments(css.split(START)[0] + (css.split(END)[1] || ""));
   const vars = {};
   const rootM = css.match(/:root\s*\{([^}]*)\}/);
@@ -189,7 +230,7 @@ export function buildDark(css, jsSources, extra) {
       if (!kind || !v) continue;
       const c = parseColor(v);
       if (!c) continue;
-      const nv = kind === "bg" ? darkBg(c) : kind === "text" ? darkText(c) : darkBorder(c);
+      const nv = dkVar(kind, c);
       if (!nv) continue;
       const browserForm = c.a < 1 ? `rgba(${c.r}, ${c.g}, ${c.b}, ${c.a})` : `rgb(${c.r}, ${c.g}, ${c.b})`;
       const prefix = p === "background" ? "background" : p;
@@ -201,8 +242,10 @@ export function buildDark(css, jsSources, extra) {
   }
   let out = START + "\n";
   out += `${D}{color-scheme:dark}\n`;
-  for (const [m, list] of byMedia) out += m ? `${m}{\n${list.join("\n")}\n}\n` : list.join("\n") + "\n";
-  out += inlineRules.join("\n") + "\n";
+  const body = [];
+  for (const [m, list] of byMedia) body.push(m ? `${m}{\n${list.join("\n")}\n}` : list.join("\n"));
+  body.push(inlineRules.join("\n"));
+  out += varBlocks() + "\n" + body.join("\n") + "\n";
   out += (extra || "") + "\n" + END;
   return out;
 }
@@ -219,18 +262,27 @@ function apply(file, jsFiles, extra) {
   fs.writeFileSync(file, next);
 }
 
-// hand-written touches the generator can't infer
-const COMMON = `${D} body{background:#0f1712;color:#e3ebe4}
-${D} input,${D} select,${D} textarea{background:#18221b;color:#e3ebe4;border-color:#34463a}
-${D} input::placeholder,${D} textarea::placeholder{color:#7d8f81}
+// hand-written touches the generator can't infer (they use each style's --dk-* tokens)
+const COMMON = `${D} body{background:var(--dk-bg);color:var(--dk-text)}
+${D} input,${D} select,${D} textarea{background:var(--dk-input);color:var(--dk-text);border-color:var(--dk-line)}
+${D} input::placeholder,${D} textarea::placeholder{color:var(--dk-muted)}
 ${D} img{opacity:.96}
 ${D} #invpaper{color-scheme:light}`;
 
 export function buildAllDark() {
   const crmJs = fs.readdirSync(path.join(root, "crm", "src")).filter((f) => f.endsWith(".js")).map((f) => path.join(root, "crm", "src", f));
   apply(path.join(root, "crm", "index.html"), crmJs, COMMON + `
-${D} .gsearch input{background:#18221b;color:#e3ebe4;border-color:#34463a}`);
+${D} header{background:var(--dk-hdr)!important;border-bottom:1px solid var(--dk-line)}
+${D} .gsearch input{background:var(--dk-input);color:var(--dk-text);border-color:var(--dk-line)}
+${D} header .hb{background:var(--dk-input)!important;color:var(--dk-text)!important}
+${D} #side{background:var(--dk-side)!important}
+${D} body.dock #detail.on:not(.full),${D} body.dock #detail:not(.full) .panel{background:var(--dk-surf)!important;color:var(--dk-text)!important}
+${D} body.dock #detail.on:not(.full){border-left:1px solid var(--dk-line)}
+${D} :is(.exgrid thead th,.taxbox th,.ptable th){background:var(--dk-surf2)!important;color:var(--dk-text)!important}`);
   apply(path.join(root, "portal", "index.html"), [path.join(root, "portal", "portal.js")], COMMON + `
+${D} .top{background:var(--dk-hdr)!important;border-bottom:1px solid var(--dk-line)}
+${D} .band{background-color:var(--dk-deep)!important}
+${D} .seg button:nth-child(-n+2){border-bottom:1px solid var(--dk-line)!important}
 ${D} .band .btn.ghost{background:transparent!important;color:#fff!important;border-color:rgba(255,255,255,.7)!important}`);
 }
 if (process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {

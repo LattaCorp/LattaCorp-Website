@@ -31,10 +31,11 @@
     "Learn more": "Más información",
     "Phone notifications": "Notificaciones en el teléfono",
     "Appearance": "Apariencia",
-    "Light": "Claro",
-    "Dark": "Oscuro",
-    "Auto": "Auto",
-    "Auto matches your phone's light or dark setting.": "Auto usa el modo claro u oscuro de su teléfono.",
+    "Original": "Original",
+    "Charcoal": "Carbón",
+    "Slate": "Pizarra",
+    "Deep Forest": "Bosque",
+    "Charcoal, Slate and Deep Forest are dark styles, easier on the eyes at night.": "Carbón, Pizarra y Bosque son estilos oscuros, más cómodos para la vista de noche.",
     "Get a notification on your phone when something happens on your account.": "Reciba una notificación en su teléfono cuando pase algo en su cuenta.",
     "On iPhone: tap the Share button, then Add to Home Screen. Open the portal from your home screen and come back here.": "En iPhone: toque Compartir y luego Agregar a pantalla de inicio. Abra el portal desde su pantalla de inicio y vuelva aquí.",
     "This browser can't get notifications. On Android, use Chrome.": "Este navegador no puede recibir notificaciones. En Android, use Chrome.",
@@ -437,17 +438,20 @@
     return Promise.race([navigator.serviceWorker.ready.then(function (reg) { return reg.pushManager.getSubscription(); }),
       new Promise(function (res) { setTimeout(function () { res(null); }, 2500); })]);
   }
-  // light, dark, or match the phone; each phone remembers its own choice
+  // Original (light, the default) or one of three dark styles; each phone remembers its own choice
   function themePanel(tp) {
     var cur = store("theme") || "light", row = el("div", "seg");
-    [["light", t("Light")], ["dark", t("Dark")], ["auto", t("Auto")]].forEach(function (x) {
+    if (cur === "dark") cur = "charcoal";
+    if (cur === "auto") cur = "light";
+    [["light", t("Original")], ["charcoal", t("Charcoal")], ["slate", t("Slate")], ["forest", t("Deep Forest")]].forEach(function (x) {
       var b = el("button", x[0] === cur ? "on" : "", x[1]);
       b.type = "button";
       b.setAttribute("aria-pressed", x[0] === cur ? "true" : "false");
       b.addEventListener("click", function () {
         try { localStorage.setItem("theme", x[0]); } catch (e) {}
-        var v = x[0] === "auto" ? (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light") : x[0];
-        document.documentElement.setAttribute("data-theme", v);
+        var h = document.documentElement;
+        h.setAttribute("data-theme", x[0] === "light" ? "light" : "dark");
+        if (x[0] === "slate" || x[0] === "forest") h.setAttribute("data-dark", x[0]); else h.removeAttribute("data-dark");
         tp.textContent = "";
         tp.appendChild(el("h2", null, t("Appearance")));
         themePanel(tp);
@@ -455,7 +459,7 @@
       row.appendChild(b);
     });
     tp.appendChild(row);
-    tp.appendChild(el("p", "muted small", t("Auto matches your phone's light or dark setting.")));
+    tp.appendChild(el("p", "muted small", t("Charcoal, Slate and Deep Forest are dark styles, easier on the eyes at night.")));
   }
   function notifyPanel(np) {
     var box = el("div"), list = el("div"), msg = el("p", "muted small");
