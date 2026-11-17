@@ -220,10 +220,12 @@ function load() {
         function () {}
       );
     } catch (e) {}
+    if (window.__goB === "zelle") bfilter = "zelle";
     render();
     topUp().then(function (n) {
       if (n) render();
     });
+    loadZelle().then(render);
     startRespWatch();
     // the rest, in the background
     var keys = Object.keys(LQ);

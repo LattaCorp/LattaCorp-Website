@@ -56,6 +56,7 @@ function isOwner() {
 var view = (function () {
     try {
       var g = new URLSearchParams(location.search).get("go");
+      window.__goB = new URLSearchParams(location.search).get("b") || "";
       if (g && /^(leads|clients|jobs|schedule|billing|expenses|reports|photos|inventory|todo|personnel|team|route|forms|messages)$/.test(g)) {
         history.replaceState(null, "", location.pathname);
         return g;

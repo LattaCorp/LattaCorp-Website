@@ -17,11 +17,14 @@ function renderBilling() {
     ["tobill", "To bill", bg.order.length],
     ["open", "Open", op.length],
     ["paid", "Paid", pd_.length],
-    ["payments", "Payments", invPays.length]
+    ["payments", "Payments", invPays.length],
+    ["zelle", "Zelle", zelleToMatch().length]
   ].forEach(function (s) {
     var b = el("button", "tab" + (bfilter === s[0] ? " on" : ""), s[1]);
     b.type = "button";
-    b.appendChild(el("span", null, "(" + s[2] + ")"));
+    if (s[0] === "zelle") {
+      if (s[2]) b.appendChild(el("span", "zbadge", s[2] + " to match"));
+    } else b.appendChild(el("span", null, "(" + s[2] + ")"));
     b.addEventListener("click", function () {
       bfilter = s[0];
       render();
@@ -54,12 +57,13 @@ function renderBilling() {
   $("topbtns").appendChild(btn("Billing settings", "btn alt", openBizSettings));
   var list = $("list");
   list.textContent = "";
-  if (bfilter !== "payments" && !billErr) {
+  if (bfilter !== "payments" && bfilter !== "zelle" && !billErr) {
     var bfx = el("div");
     list.appendChild(bfx);
     backfillCards(bfx);
   }
   if (bfilter === "payments") return renderPayments(list);
+  if (bfilter === "zelle") return renderZelle(list);
   if (billErr) {
     list.appendChild(
       el(

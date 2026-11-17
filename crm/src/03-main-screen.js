@@ -143,7 +143,7 @@ function render() {
     schedule: ["schedule", "Schedule", stops],
     route: ["route", "Route check-off", stops],
     photos: ["photos", "Photos", 0],
-    billing: ["billing", "Billing", invoices.filter(isOverdue).length],
+    billing: ["billing", "Billing", invoices.filter(isOverdue).length, typeof zelleToMatch === "function" ? zelleToMatch().length : 0],
     expenses: ["expenses", "Expenses", receiptsToEnter().length],
     reports: ["reports", "Reports", 0],
     messages: ["messages", "Messages", typeof msgUnread === "function" ? msgUnread() : 0],

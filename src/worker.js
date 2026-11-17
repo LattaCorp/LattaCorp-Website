@@ -1,5 +1,6 @@
 import { makeVapidKeys, sendPush } from "./push.js";
 import { stripe, stripeMode, verifyStripeSignature, cents } from "./stripe.js";
+import { readEmail, looksLikeZelle, readZelle, fromBank, invoiceNumbers, nameScore } from "./zelle.js";
 // Latta Corp website server code (Cloudflare Worker).
 // The static website is served automatically. This file only handles form submissions sent to /api/submit:
 // it emails them to the business through Resend. Settings: TO_EMAIL (wrangler.jsonc) and RESEND_API_KEY (a secret
@@ -620,6 +621,7 @@ const PUSH_EVENTS = {
   quote: "Quotes approved by clients",
   receipt: "Receipts uploaded by the crew",
   chat: "New messages",
+  pay: "Payments received (Zelle and bank)",
 };
 const PUSH_SUBJECT = "mailto:Support@LattaCorpFL.com";
 async function vapidKeys(env) {
@@ -1297,6 +1299,115 @@ export async function handlePayInvoice(request, env) {
   return json({ ok: true, url: s.url });
 }
 
+// ---------- Zelle ----------
+// Bank of America emails each Zelle payment. A Gmail filter forwards those alerts to the website's Zelle address
+// (a Cloudflare email route to this Worker). We read the amount, sender and memo and find the invoice:
+//  - "sure" matches are recorded as a Zelle payment on their own (only for emails that provably came from the bank,
+//    and only while the owner's "record sure matches" switch is on);
+//  - everything else waits in Billing > Zelle for a one-tap match.
+const r2z = (n) => Math.round(Number(n || 0) * 100) / 100;
+const lcNum = (n) => "LC-" + String(n || 0).padStart(4, "0");
+export async function zelleMatch(env, z) {
+  const open = await rows(env, "invoices?status=eq.open&select=id,number,total,client_id&limit=5000");
+  const pays = open.length ? await rows(env, `invoice_payments?invoice_id=in.(${open.map((i) => i.id).join(",")})&select=invoice_id,amount`) : [];
+  const paid = {};
+  for (const p of pays) paid[p.invoice_id] = (paid[p.invoice_id] || 0) + Number(p.amount || 0);
+  for (const i of open) i.bal = r2z(Number(i.total || 0) - (paid[i.id] || 0));
+  const amt = r2z(z.amount), same = (a, b) => Math.abs(a - b) < 0.005;
+  const clients = await rows(env, "clients?select=id,name&limit=5000");
+  const cname = (id) => (clients.find((c) => c.id === id) || {}).name || "a client";
+  // 1) an invoice number in the memo
+  const nums = invoiceNumbers(z.memo);
+  for (const [list, labeled] of [[nums.labeled, true], [nums.bare, false]]) {
+    for (const n of list) {
+      const inv = open.find((i) => Number(i.number) === n);
+      if (!inv) continue;
+      const base = { invoice_id: inv.id, client_id: inv.client_id };
+      if (same(amt, inv.bal)) return { ...base, sure: true, reason: `Memo names invoice ${lcNum(n)} (${cname(inv.client_id)}) and the amount matches its balance.` };
+      if (labeled && amt < inv.bal) return { ...base, sure: true, reason: `Memo names invoice ${lcNum(n)} (${cname(inv.client_id)}). Part payment: $${amt.toFixed(2)} of $${inv.bal.toFixed(2)}.` };
+      return { ...base, sure: false, reason: `Memo mentions ${lcNum(n)} (${cname(inv.client_id)}), but its balance is $${inv.bal.toFixed(2)}.` };
+    }
+  }
+  // 2) the sender's name (client names and their contacts, like an HOA manager)
+  const contacts = await rows(env, "client_contacts?select=client_id,name&limit=20000");
+  const score = {};
+  for (const c of clients) score[c.id] = nameScore(z.sender, c.name);
+  for (const c of contacts) score[c.client_id] = Math.max(score[c.client_id] || 0, nameScore(z.sender, c.name));
+  for (const level of [2, 1]) {
+    const who = Object.keys(score).filter((id) => score[id] === level);
+    if (!who.length) continue;
+    const invs = open.filter((i) => who.includes(i.client_id) && same(i.bal, amt));
+    if (invs.length === 1) return { invoice_id: invs[0].id, client_id: invs[0].client_id, sure: level === 2,
+      reason: `${z.sender} ${level === 2 ? "matches" : "may be family of"} ${cname(invs[0].client_id)}, and the amount matches invoice ${lcNum(invs[0].number)}.` };
+    if (who.length === 1) {
+      const all = open.filter((i) => i.client_id === who[0]);
+      const tot = r2z(all.reduce((s, i) => s + i.bal, 0));
+      return { invoice_id: null, client_id: who[0], sure: false,
+        reason: all.length > 1 && same(tot, amt) ? `${z.sender} matches ${cname(who[0])}; the amount covers all ${all.length} open invoices.`
+          : `${z.sender} ${level === 2 ? "matches" : "may be family of"} ${cname(who[0])}, but no open invoice has this amount.` };
+    }
+  }
+  // 3) only one open invoice has exactly this amount
+  const byAmt = open.filter((i) => same(i.bal, amt));
+  if (byAmt.length === 1) return { invoice_id: byAmt[0].id, client_id: byAmt[0].client_id, sure: false,
+    reason: `Only open invoice for $${amt.toFixed(2)} is ${lcNum(byAmt[0].number)} (${cname(byAmt[0].client_id)}). The name didn't match.` };
+  return { invoice_id: null, client_id: null, sure: false, reason: byAmt.length ? `${byAmt.length} open invoices are for $${amt.toFixed(2)}; pick one.` : "No invoice or client matched." };
+}
+// records a Zelle payment (and marks the invoice paid once fully paid); returns the payment id
+async function recordZelle(env, z) {
+  const pr = await sbRest(env, "invoice_payments", { method: "POST", headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ invoice_id: z.invoice_id, client_id: z.client_id, paid_on: z.received_on, amount: r2z(z.amount), method: "Zelle",
+      reference: [z.sender, z.memo].filter(Boolean).join(" · ").slice(0, 200), note: "Recorded automatically from the Bank of America Zelle alert" }) });
+  if (!pr.ok) return null;
+  const pay = ((await pr.json()) || [])[0];
+  if (z.invoice_id) {
+    const inv = (await rows(env, `invoices?id=eq.${z.invoice_id}&select=id,total,status`))[0];
+    const sum = (await rows(env, `invoice_payments?invoice_id=eq.${z.invoice_id}&select=amount`)).reduce((s, p) => s + Number(p.amount || 0), 0);
+    if (inv && inv.status === "open" && sum >= Number(inv.total || 0) - 0.005)
+      await sbRest(env, `invoices?id=eq.${z.invoice_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+        body: JSON.stringify({ status: "paid", paid_at: `${z.received_on}T12:00:00`, paid_method: "Zelle" }) });
+  }
+  return pay ? pay.id : null;
+}
+export async function handleZelleEmail(env, raw) {
+  const mail = readEmail(raw);
+  const verified = fromBank(mail);
+  const received_on = etDay(new Date());
+  const message_id = (mail.messageId || `${mail.subject}|${mail.text.length}|${received_on}`).slice(0, 300);
+  const insert = async (row) => {
+    const r = await sbRest(env, "zelle_payments?on_conflict=message_id", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=representation" },
+      body: JSON.stringify({ message_id, received_on, subject: mail.subject.slice(0, 300), body: mail.text.slice(0, 4000), verified, ...row }) });
+    return r.ok ? ((await r.json()) || [])[0] : null;
+  };
+  if (!looksLikeZelle(mail)) {
+    // not a Zelle alert (for example Gmail's "confirm forwarding" email): keep it so the owner can read it in Billing > Zelle
+    const row = await insert({ status: "other", reason: "Not a Zelle payment alert." });
+    if (row) await notify(env, "pay", "Email at the Zelle address", mail.subject.slice(0, 120) || "(no subject)", "/crm/?go=billing&b=zelle");
+    return { status: "other" };
+  }
+  const z = { ...readZelle(mail), received_on };
+  const biz = (await rows(env, "business?id=eq.1&select=zelle_auto"))[0] || {};
+  let m = z.amount ? await zelleMatch(env, z) : { invoice_id: null, client_id: null, sure: false, reason: "Couldn't read the amount in this email." };
+  let reason = m.reason;
+  const auto = m.sure && verified && biz.zelle_auto !== false;
+  if (m.sure && !verified) reason += " Not recorded on its own: couldn't confirm the email came straight from Bank of America.";
+  if (m.sure && verified && biz.zelle_auto === false) reason += " Automatic recording is off.";
+  const row = await insert({ amount: z.amount, sender: z.sender.slice(0, 120), memo: z.memo.slice(0, 300), status: m.invoice_id || m.client_id ? "suggested" : "unmatched",
+    invoice_id: m.invoice_id, client_id: m.client_id, reason });
+  if (!row) return { status: "duplicate" };
+  const money = z.amount ? `$${z.amount.toFixed(2)}` : "A Zelle payment";
+  if (auto) {
+    const pid = await recordZelle(env, { ...z, invoice_id: m.invoice_id, client_id: m.client_id });
+    if (pid) {
+      await sbRest(env, `zelle_payments?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "recorded", payment_id: pid }) });
+      await notify(env, "pay", `Zelle received: ${money}`, `${z.sender || "Someone"} · recorded. ${reason}`.slice(0, 180), "/crm/?go=billing&b=zelle");
+      return { status: "recorded", id: row.id };
+    }
+  }
+  await notify(env, "pay", `Zelle to match: ${money}`, `${z.sender || "Unknown sender"}${z.memo ? " · “" + z.memo + "”" : ""}. Tap to match it.`.slice(0, 180), "/crm/?go=billing&b=zelle");
+  return { status: row.status, id: row.id };
+}
+
 // The daily job (and the owner's "Run now" button). Returns what it did.
 export async function runAutopay(env, opts = {}) {
   const out = { charged: 0, skipped: [], errors: [] };
@@ -1339,6 +1450,16 @@ export async function runAutopay(env, opts = {}) {
 }
 
 export default {
+  // emails routed to the Worker (the Zelle address)
+  async email(message, env, ctx) {
+    try {
+      if (message.rawSize > 2000000) return;
+      const raw = await new Response(message.raw).text();
+      await handleZelleEmail(env, raw);
+    } catch (e) {
+      console.log("zelle email failed", String(e));
+    }
+  },
   async scheduled(event, env, ctx) {
     ctx.waitUntil(runAutopay(env).catch((e) => console.log("autopay run failed", String(e))));
   },
