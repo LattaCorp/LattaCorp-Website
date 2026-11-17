@@ -21,6 +21,8 @@ assert.equal(fromBank(m), true);
 // a plain-text alert with "sent you" and a thousands separator
 m = readEmail(`From: alerts@bankofamerica.com\r\nSubject: You've received money with Zelle\r\nContent-Type: text/plain\r\n\r\nMaria Lopez sent you $1,240.00\r\nMessage: #318\r\n`);
 assert.deepEqual(readZelle(m), { amount: 1240, sender: "Maria Lopez", memo: "#318" });
+// money you SENT is never read as a payment
+assert.equal(looksLikeZelle(readEmail(`From: alerts@bankofamerica.com\r\nSubject: Zelle: You sent $40.00 to JOE LAWN\r\nContent-Type: text/plain\r\n\r\nYou sent $40.00 to JOE LAWN. JOE LAWN received it.\r\n`)), false);
 // not from the bank / faked results lower down are not trusted
 assert.equal(fromBank(readEmail(email({ top: "", subject: "Zelle: You received $5.00 from X", body: html("X", "5.00", "") }))), false, "no Cloudflare result");
 assert.equal(fromBank(readEmail(email({ top: "Authentication-Results: mx.cloudflare.net; dkim=fail", subject: "s", body: "x" }).replace("Received:", CF_OK + "\r\nReceived:"))), false, "a faked pass further down is ignored");

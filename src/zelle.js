@@ -112,6 +112,7 @@ const num = (s) => Number(String(s).replace(/,/g, ""));
 const clean = (s) => String(s || "").replace(/\s+/g, " ").replace(/^[\s:,-]+|[\s.,:-]+$/g, "").trim();
 export function looksLikeZelle(mail) {
   const t = (mail.subject + "\n" + mail.text).toLowerCase();
+  if (/\b(you sent|you've sent|you have sent|your payment to|payment request|you requested|sent to [a-z])/i.test(t)) return false; // money going out, or requests
   return /zelle/.test(t) && /(received|sent you|deposited|has been sent to you)/.test(t) && MONEY.test(t);
 }
 export function readZelle(mail) {
