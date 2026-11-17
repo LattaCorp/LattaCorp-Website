@@ -470,6 +470,7 @@ function matchInvProps(c, list) {
         });
     });
 }
+var billSub = {};
 function clientBillingSection(c, only) {
   var sec = el("div", "sec"),
     h = el("h3", null, "Billing");
@@ -656,10 +657,41 @@ function clientBillingSection(c, only) {
       return x.pid === k && (onacct === undefined || !!x.onacct === onacct);
     });
   }
+  /* Payment history, invoice history and the full statement each get their own tab, so there's no scrolling
+     from one to the next. The open tab is remembered per client. */
+  var stb = el("div", "subtabs"),
+    payP = el("div", "subpane"),
+    invP = el("div", "subpane"),
+    stP = el("div", "subpane"),
+    SUBS = [
+      ["pay", "Payment history" + (pays.length ? " (" + pays.length + ")" : ""), payP],
+      ["inv", "Invoice history" + (hist.length ? " (" + hist.length + ")" : ""), invP],
+      ["stmt", "Full statement", stP]
+    ],
+    cur = billSub[c.id] || "pay";
+  SUBS.forEach(function (t) {
+    var b = el("button", t[0] === cur ? "on" : "", t[1]);
+    b.type = "button";
+    b.addEventListener("click", function () {
+      billSub[c.id] = t[0];
+      [].forEach.call(stb.children, function (x) {
+        x.classList.toggle("on", x === b);
+      });
+      SUBS.forEach(function (u) {
+        u[2].hidden = u[0] !== t[0];
+      });
+    });
+    stb.appendChild(b);
+    t[2].hidden = t[0] !== cur;
+  });
+  sec.appendChild(stb);
+  sec.appendChild(payP);
+  sec.appendChild(invP);
+  sec.appendChild(stP);
   if (split) {
     var hs = el("h4", null, "Summary by property");
     hs.style.margin = "12px 0 6px";
-    sec.appendChild(hs);
+    stP.appendChild(hs);
     var ws = el("div", "invwrap"),
       ts = document.createElement("table");
     ts.className = "ptable";
@@ -748,14 +780,14 @@ function clientBillingSection(c, only) {
       ts.appendChild(stt);
     }
     ws.appendChild(ts);
-    sec.appendChild(ws);
+    stP.appendChild(ws);
     if (
       !only &&
       pays.some(function (x) {
         return x.onacct;
       })
     )
-      sec.appendChild(
+      stP.appendChild(
         el(
           "div",
           "note",
@@ -763,7 +795,7 @@ function clientBillingSection(c, only) {
         )
       );
   }
-  sec.appendChild(accountHistorySection(c, only));
+  stP.appendChild(accountHistorySection(c, only));
   /* invoice history */
   function invTable(list) {
     var w = el("div", "invwrap"),
@@ -828,24 +860,21 @@ function clientBillingSection(c, only) {
     s.style.cssText = "font-weight:700;margin:10px 0 4px";
     return s;
   }
-  var h1 = el("h4", null, "Invoice history");
-  h1.style.margin = "12px 0 6px";
-  sec.appendChild(h1);
-  if (!hist.length) sec.appendChild(el("div", "note", "No invoices yet."));
-  else if (!split) sec.appendChild(invTable(hist));
+  if (!hist.length) invP.appendChild(el("div", "note", "No invoices yet."));
+  else if (!split) invP.appendChild(invTable(hist));
   else
     keys.forEach(function (k) {
       var l = invsOf(k);
       if (!l.length) {
         if (k)
-          sec
+          invP
             .appendChild(sub(plabel(k)))
             .insertAdjacentHTML("beforeend", ' <span style="font-weight:400">— no invoices</span>');
         return;
       }
-      sec.appendChild(sub(plabel(k)));
+      invP.appendChild(sub(plabel(k)));
       if (!k && cps.length > 1) {
-        sec.appendChild(
+        invP.appendChild(
           el(
             "div",
             "note",
@@ -878,7 +907,7 @@ function clientBillingSection(c, only) {
           );
         });
         mb.style.margin = "4px 0 6px";
-        sec.appendChild(mb);
+        invP.appendChild(mb);
         var ab = el("div");
         ab.style.cssText = "display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;margin:4px 0 8px";
         var af = fld(
@@ -941,16 +970,13 @@ function clientBillingSection(c, only) {
             });
         });
         ab.appendChild(ag);
-        sec.appendChild(ab);
+        invP.appendChild(ab);
       }
-      sec.appendChild(invTable(l));
+      invP.appendChild(invTable(l));
     });
   /* payment history */
-  var h2 = el("h4", null, "Payment history");
-  h2.style.margin = "14px 0 6px";
-  sec.appendChild(h2);
   if (payErr) {
-    sec.appendChild(el("div", "note", "Run the Stage 18 SQL in Supabase to turn on payment history."));
+    payP.appendChild(el("div", "note", "Run the Stage 18 SQL in Supabase to turn on payment history."));
     return sec;
   }
   function payTable(list, label) {
@@ -998,20 +1024,20 @@ function clientBillingSection(c, only) {
     w2.appendChild(t2);
     return w2;
   }
-  if (!pays.length) sec.appendChild(el("div", "note", "No payments yet."));
-  else if (!split) sec.appendChild(payTable(pays, "Total paid"));
+  if (!pays.length) payP.appendChild(el("div", "note", "No payments yet."));
+  else if (!split) payP.appendChild(payTable(pays, "Total paid"));
   else {
     keys.forEach(function (k) {
       var l = paysOf(k);
       if (!l.length) {
         if (k)
-          sec
+          payP
             .appendChild(sub(plabel(k)))
             .insertAdjacentHTML("beforeend", ' <span style="font-weight:400">— no payments</span>');
         return;
       }
-      sec.appendChild(sub(plabel(k)));
-      sec.appendChild(payTable(l, "Paid"));
+      payP.appendChild(sub(plabel(k)));
+      payP.appendChild(payTable(l, "Paid"));
     });
     if (!only) {
       var gt = el(
@@ -1027,7 +1053,7 @@ function clientBillingSection(c, only) {
           )
       );
       gt.style.cssText = "font-weight:800;margin-top:8px";
-      sec.appendChild(gt);
+      payP.appendChild(gt);
     }
   }
   return sec;

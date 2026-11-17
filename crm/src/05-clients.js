@@ -248,6 +248,7 @@ function openClient(id) {
     p = pp.p,
     L = pp.L;
   p.classList.add("qpanel");
+  p.classList.add("popbig");
   L.appendChild(el("h2", null, c.name));
   if (c.company) L.appendChild(el("div", "popsub", c.company));
   var hd = el("div", "qhead");
