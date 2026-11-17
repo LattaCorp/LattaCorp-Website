@@ -8,7 +8,7 @@ var zelleRows = null,
 function loadZelle() {
   return sb
     .from("zelle_payments")
-    .select("id,created_at,received_on,amount,sender,memo,subject,verified,status,invoice_id,client_id,payment_id,reason")
+    .select("id,created_at,received_on,amount,sender,memo,subject,verified,status,invoice_id,invoice_ids,client_id,payment_id,payment_ids,reason")
     .order("created_at", { ascending: false })
     .limit(300)
     .then(
@@ -30,58 +30,100 @@ function zelleToMatch() {
 function invBal(inv) {
   return r2(Number(inv.total || 0) - invPaidSum(inv));
 }
-/* records the Zelle payment on an invoice (or on account for a client) and marks the alert matched */
-function zelleApply(z, inv, clientId) {
-  var cid = inv ? inv.client_id : clientId;
-  if (inv && Number(z.amount) > invBal(inv) + 0.005 &&
-    !confirm(money(z.amount) + " is more than the " + money(invBal(inv)) + " left on " + invNum(inv.number) + ". Record it anyway? The extra stays as a credit."))
+/* records the Zelle payment on one or more invoices (oldest first; any extra stays on the last one)
+   or on a client's account, and marks the alert matched */
+function zelleApply(z, invs, clientId) {
+  invs = (invs || []).filter(Boolean);
+  var cid = invs.length ? invs[0].client_id : clientId,
+    left = r2(z.amount),
+    owed = r2(invs.reduce(function (s, i) {
+      return s + invBal(i);
+    }, 0));
+  if (invs.length && left > owed + 0.005 &&
+    !confirm(money(z.amount) + " is more than the " + money(owed) + " owed on " + invs.map(function (i) { return invNum(i.number); }).join(", ") + ". Record it anyway? The extra stays as a credit."))
     return;
-  var row = {
-    invoice_id: inv ? inv.id : null,
-    client_id: cid,
-    paid_on: z.received_on,
-    amount: r2(z.amount),
-    method: "Zelle",
-    reference: [z.sender, z.memo].filter(Boolean).join(" · ").slice(0, 200),
-    note: "Matched from a Zelle alert"
-  };
+  var parts = invs.length
+    ? invs.map(function (i, k) {
+        var a = k === invs.length - 1 ? left : Math.min(left, invBal(i));
+        left = r2(left - a);
+        return { inv: i, a: r2(a) };
+      }).filter(function (p) {
+        return p.a > 0;
+      })
+    : [{ inv: null, a: left }];
+  var rowsIn = parts.map(function (p) {
+    return {
+      invoice_id: p.inv ? p.inv.id : null,
+      client_id: cid,
+      paid_on: z.received_on,
+      amount: p.a,
+      method: "Zelle",
+      reference: [z.sender, z.memo].filter(Boolean).join(" · ").slice(0, 200),
+      note: "Matched from a Zelle alert"
+    };
+  });
   sb.from("invoice_payments")
-    .insert(row)
+    .insert(rowsIn)
     .select()
-    .single()
     .then(function (r) {
-      if (r.error || !r.data) {
+      if (r.error || !r.data || !r.data.length) {
         alert("Could not record the payment.");
         return;
       }
-      invPays.unshift(r.data);
+      r.data.forEach(function (x) {
+        invPays.unshift(x);
+      });
       repData = null;
-      var p = { status: "recorded", payment_id: r.data.id, invoice_id: row.invoice_id, client_id: cid };
-      Promise.all([
-        inv ? syncInvPaid(inv, z.received_on, "Zelle") : null,
-        sb.from("zelle_payments").update(p).eq("id", z.id)
-      ]).then(function () {
+      var ids = r.data.map(function (x) {
+        return x.id;
+      });
+      var p = {
+        status: "recorded",
+        payment_id: ids[0],
+        payment_ids: ids,
+        invoice_id: invs.length ? invs[0].id : null,
+        invoice_ids: invs.map(function (i) {
+          return i.id;
+        }),
+        client_id: cid
+      };
+      Promise.all(
+        invs.map(function (i) {
+          return syncInvPaid(i, z.received_on, "Zelle");
+        }).concat([sb.from("zelle_payments").update(p).eq("id", z.id)])
+      ).then(function () {
         Object.assign(z, p);
         render();
       });
     });
 }
-/* takes a recorded Zelle payment back off (the invoice reopens) and puts the alert back in "To match" */
+/* takes a recorded Zelle payment back off (its invoices reopen) and puts the alert back in "To match" */
+function zelleInvs(z) {
+  var ids = z.invoice_ids && z.invoice_ids.length ? z.invoice_ids : z.invoice_id ? [z.invoice_id] : [];
+  return ids.map(function (id) {
+    return byId(invoices, id);
+  }).filter(Boolean);
+}
 function zelleUndo(z) {
-  if (!confirm("Take this " + money(z.amount) + " Zelle payment back off" + (z.invoice_id ? " invoice " + invNum((byId(invoices, z.invoice_id) || {}).number) : "") + "?")) return;
-  var inv = z.invoice_id ? byId(invoices, z.invoice_id) : null;
-  var step = z.payment_id ? sb.from("invoice_payments").delete().eq("id", z.payment_id) : Promise.resolve({});
+  var invs = zelleInvs(z),
+    pids = z.payment_ids && z.payment_ids.length ? z.payment_ids : z.payment_id ? [z.payment_id] : [];
+  if (!confirm("Take this " + money(z.amount) + " Zelle payment back off" + (invs.length ? " " + invs.map(function (i) { return invNum(i.number); }).join(", ") : "") + "?")) return;
+  var step = pids.length ? sb.from("invoice_payments").delete().in("id", pids) : Promise.resolve({});
   step.then(function (r) {
     if (r && r.error) {
       alert("Could not undo that.");
       return;
     }
     invPays = invPays.filter(function (x) {
-      return x.id !== z.payment_id;
+      return pids.indexOf(x.id) < 0;
     });
     repData = null;
-    var p = { status: "suggested", payment_id: null };
-    Promise.all([inv ? syncInvPaid(inv, z.received_on, "") : null, sb.from("zelle_payments").update(p).eq("id", z.id)]).then(function () {
+    var p = { status: "suggested", payment_id: null, payment_ids: [] };
+    Promise.all(
+      invs.map(function (i) {
+        return syncInvPaid(i, z.received_on, "");
+      }).concat([sb.from("zelle_payments").update(p).eq("id", z.id)])
+    ).then(function () {
       Object.assign(z, p);
       render();
     });
@@ -119,7 +161,8 @@ function zelleEmail(z, host) {
     });
 }
 function zelleCard(z) {
-  var inv = z.invoice_id ? byId(invoices, z.invoice_id) : null,
+  var invs = zelleInvs(z),
+    inv = invs[0] || null,
     card = el("div", "pcard zcard zs-" + z.status),
     hd = el("div", "zhd");
   hd.appendChild(el("b", "zamt", z.status === "other" ? "Email" : z.amount != null ? money(z.amount) : "$?"));
@@ -135,10 +178,24 @@ function zelleCard(z) {
     card.appendChild(el("div", "zwarn", "Couldn't confirm this email came straight from Bank of America. Check your bank before matching."));
   var acts = el("div", "acts");
   if (z.status === "suggested" || z.status === "unmatched") {
-    if (inv && inv.status === "open")
+    var openInvs = invs.filter(function (i) {
+      return i.status === "open";
+    });
+    if (openInvs.length)
       card.appendChild(
-        btn("Match to " + invNum(inv.number) + " · " + cname(inv.client_id) + " (" + money(invBal(inv)) + " due)", "btn sm", function () {
-          zelleApply(z, inv);
+        btn(
+          "Match to " + openInvs.map(function (i) { return invNum(i.number); }).join(" + ") + " · " + cname(openInvs[0].client_id) + " (" +
+            money(openInvs.reduce(function (s, i) { return s + invBal(i); }, 0)) + " due)",
+          "btn sm",
+          function () {
+            zelleApply(z, openInvs);
+          }
+        )
+      );
+    else if (z.client_id)
+      card.appendChild(
+        btn("Record on " + cname(z.client_id) + "'s account (no invoice)", "btn sm", function () {
+          zelleApply(z, [], z.client_id);
         })
       );
     if (card.lastChild.tagName === "BUTTON") card.lastChild.classList.add("zgo");
@@ -167,8 +224,8 @@ function zelleCard(z) {
     pick.input.addEventListener("change", function () {
       var v = pick.input.value;
       if (!v) return;
-      if (v.indexOf("i:") === 0) zelleApply(z, byId(invoices, v.slice(2)));
-      else zelleApply(z, null, v.slice(2));
+      if (v.indexOf("i:") === 0) zelleApply(z, [byId(invoices, v.slice(2))]);
+      else zelleApply(z, [], v.slice(2));
     });
     card.appendChild(pick);
     acts.appendChild(
@@ -177,7 +234,7 @@ function zelleCard(z) {
       })
     );
   } else if (z.status === "recorded") {
-    if (inv) acts.appendChild(el("span", "note", "On " + invNum(inv.number) + " · " + cname(inv.client_id)));
+    if (invs.length) acts.appendChild(el("span", "note", "On " + invs.map(function (i) { return invNum(i.number); }).join(", ") + " · " + cname(invs[0].client_id)));
     else if (z.client_id) acts.appendChild(el("span", "note", "On account · " + cname(z.client_id)));
     acts.appendChild(
       btn("Undo", "btn alt sm", function () {
@@ -248,7 +305,7 @@ function zelleSetup(host, open) {
         });
     });
     lb.appendChild(cb);
-    lb.appendChild(document.createTextNode(" Record sure matches on their own (invoice number in the memo, or the client's name and exact amount). Turn off to approve every Zelle by hand."));
+    lb.appendChild(document.createTextNode(" Record sure matches on their own: an invoice number, account number, phone, email, service address or client name in the memo, or the sender's name, when the amount fits that client's invoices. Turn off to approve every Zelle by hand."));
     box.appendChild(lb);
   }
   host.appendChild(box);

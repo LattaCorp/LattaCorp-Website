@@ -27,3 +27,7 @@ alter table public.business add column if not exists zelle_auto boolean not null
 alter table public.zelle_payments enable row level security;
 drop policy if exists "staff all zelle_payments" on public.zelle_payments;
 create policy "staff all zelle_payments" on public.zelle_payments for all to authenticated using (public.is_staff()) with check (public.is_staff());
+
+-- Stage 52b: one Zelle payment can pay several invoices (oldest first); Undo takes them all back.
+alter table public.zelle_payments add column if not exists invoice_ids uuid[] not null default '{}';
+alter table public.zelle_payments add column if not exists payment_ids uuid[] not null default '{}';

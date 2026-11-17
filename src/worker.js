@@ -1,6 +1,6 @@
 import { makeVapidKeys, sendPush } from "./push.js";
 import { stripe, stripeMode, verifyStripeSignature, cents } from "./stripe.js";
-import { readEmail, looksLikeZelle, readZelle, fromBank, invoiceNumbers, nameScore } from "./zelle.js";
+import { readEmail, looksLikeZelle, readZelle, fromBank, invoiceNumbers, findClients } from "./zelle.js";
 // Latta Corp website server code (Cloudflare Worker).
 // The static website is served automatically. This file only handles form submissions sent to /api/submit:
 // it emails them to the business through Resend. Settings: TO_EMAIL (wrangler.jsonc) and RESEND_API_KEY (a secret
@@ -1308,66 +1308,95 @@ export async function handlePayInvoice(request, env) {
 const r2z = (n) => Math.round(Number(n || 0) * 100) / 100;
 const lcNum = (n) => "LC-" + String(n || 0).padStart(4, "0");
 export async function zelleMatch(env, z) {
-  const open = await rows(env, "invoices?status=eq.open&select=id,number,total,client_id&limit=5000");
+  const open = await rows(env, "invoices?status=eq.open&select=id,number,total,client_id,issue_date&limit=5000");
   const pays = open.length ? await rows(env, `invoice_payments?invoice_id=in.(${open.map((i) => i.id).join(",")})&select=invoice_id,amount`) : [];
   const paid = {};
   for (const p of pays) paid[p.invoice_id] = (paid[p.invoice_id] || 0) + Number(p.amount || 0);
   for (const i of open) i.bal = r2z(Number(i.total || 0) - (paid[i.id] || 0));
+  const owing = open.filter((i) => i.bal > 0.004).sort((a, b) => String(a.issue_date || "").localeCompare(String(b.issue_date || "")) || a.number - b.number);
   const amt = r2z(z.amount), same = (a, b) => Math.abs(a - b) < 0.005;
-  const clients = await rows(env, "clients?select=id,name&limit=5000");
+  const clients = await rows(env, "clients?select=id,name,nickname,last_name,account_no,phone,phone2,email&limit=5000");
   const cname = (id) => (clients.find((c) => c.id === id) || {}).name || "a client";
+  const one = (inv, sure, reason) => ({ invoice_id: inv.id, invoice_ids: [inv.id], client_id: inv.client_id, sure, reason });
   // 1) an invoice number in the memo
   const nums = invoiceNumbers(z.memo);
   for (const [list, labeled] of [[nums.labeled, true], [nums.bare, false]]) {
     for (const n of list) {
       const inv = open.find((i) => Number(i.number) === n);
       if (!inv) continue;
-      const base = { invoice_id: inv.id, client_id: inv.client_id };
-      if (same(amt, inv.bal)) return { ...base, sure: true, reason: `Memo names invoice ${lcNum(n)} (${cname(inv.client_id)}) and the amount matches its balance.` };
-      if (labeled && amt < inv.bal) return { ...base, sure: true, reason: `Memo names invoice ${lcNum(n)} (${cname(inv.client_id)}). Part payment: $${amt.toFixed(2)} of $${inv.bal.toFixed(2)}.` };
-      return { ...base, sure: false, reason: `Memo mentions ${lcNum(n)} (${cname(inv.client_id)}), but its balance is $${inv.bal.toFixed(2)}.` };
+      if (same(amt, inv.bal)) return one(inv, true, `Memo names invoice ${lcNum(n)} (${cname(inv.client_id)}) and the amount matches its balance.`);
+      if (labeled && amt < inv.bal) return one(inv, true, `Memo names invoice ${lcNum(n)} (${cname(inv.client_id)}). Part payment: $${amt.toFixed(2)} of $${inv.bal.toFixed(2)}.`);
+      // the memo number didn't fit; keep looking at the other details before giving up on it
+      if (labeled) { z._hint = one(inv, false, `Memo mentions ${lcNum(n)} (${cname(inv.client_id)}), but its balance is $${inv.bal.toFixed(2)}.`); break; }
     }
   }
-  // 2) the sender's name (client names and their contacts, like an HOA manager)
-  const contacts = await rows(env, "client_contacts?select=client_id,name&limit=20000");
-  const score = {};
-  for (const c of clients) score[c.id] = nameScore(z.sender, c.name);
-  for (const c of contacts) score[c.client_id] = Math.max(score[c.client_id] || 0, nameScore(z.sender, c.name));
-  for (const level of [2, 1]) {
-    const who = Object.keys(score).filter((id) => score[id] === level);
-    if (!who.length) continue;
-    const invs = open.filter((i) => who.includes(i.client_id) && same(i.bal, amt));
-    if (invs.length === 1) return { invoice_id: invs[0].id, client_id: invs[0].client_id, sure: level === 2,
-      reason: `${z.sender} ${level === 2 ? "matches" : "may be family of"} ${cname(invs[0].client_id)}, and the amount matches invoice ${lcNum(invs[0].number)}.` };
-    if (who.length === 1) {
-      const all = open.filter((i) => i.client_id === who[0]);
-      const tot = r2z(all.reduce((s, i) => s + i.bal, 0));
-      return { invoice_id: null, client_id: who[0], sure: false,
-        reason: all.length > 1 && same(tot, amt) ? `${z.sender} matches ${cname(who[0])}; the amount covers all ${all.length} open invoices.`
-          : `${z.sender} ${level === 2 ? "matches" : "may be family of"} ${cname(who[0])}, but no open invoice has this amount.` };
+  // 2) who it's from: sender's name, or an account number, phone, email, address or name typed in the memo
+  const [contacts, props] = await Promise.all([rows(env, "client_contacts?select=client_id,name,phone,email&limit=20000"), rows(env, "properties?select=client_id,address&limit=20000")]);
+  const found = findClients(z.memo, z.sender, { clients, contacts, props });
+  const strong = found.filter((f) => f.score >= 2), weak = found.filter((f) => f.score === 1);
+  const fit = (f, sure) => {
+    const mine = owing.filter((i) => i.client_id === f.id);
+    const who = `${cname(f.id)} (${f.why})`;
+    if (!mine.length) return { invoice_id: null, invoice_ids: [], client_id: f.id, sure: false, reason: `From ${who}, but they have no open invoices.` };
+    const exact = mine.filter((i) => same(i.bal, amt));
+    if (exact.length) return one(exact[0], sure, `From ${who}; the amount matches invoice ${lcNum(exact[0].number)}.`);
+    // pays their oldest invoices first, when the amount covers them exactly
+    let run = 0;
+    for (let k = 0; k < mine.length; k++) {
+      run = r2z(run + mine[k].bal);
+      if (k > 0 && same(run, amt)) {
+        const ids = mine.slice(0, k + 1);
+        return { invoice_id: ids[0].id, invoice_ids: ids.map((i) => i.id), client_id: f.id, sure,
+          reason: `From ${who}; the amount pays invoices ${ids.map((i) => lcNum(i.number)).join(", ")}.` };
+      }
     }
+    if (mine.length === 1 && amt < mine[0].bal)
+      return one(mine[0], sure, `From ${who}. Part payment: $${amt.toFixed(2)} of the $${mine[0].bal.toFixed(2)} left on ${lcNum(mine[0].number)}.`);
+    return { invoice_id: null, invoice_ids: [], client_id: f.id, sure: false,
+      reason: `From ${who}, but $${amt.toFixed(2)} doesn't fit their open invoices ($${r2z(mine.reduce((s, i) => s + i.bal, 0)).toFixed(2)} owed). Pick how to apply it.` };
+  };
+  if (strong.length === 1) return fit(strong[0], true);
+  if (strong.length > 1) {
+    // several clients match (two "John Smith"s): the amount decides, if it fits only one of them
+    const tries = strong.map((f) => fit(f, true)).filter((r) => r.invoice_ids.length);
+    if (tries.length === 1) return tries[0];
+    const r = tries[0] || fit(strong[0], false);
+    return { ...r, sure: false, reason: `More than one client matches (${strong.map((f) => cname(f.id)).join(", ")}). ${r.reason}` };
   }
+  if (z._hint) return z._hint;
+  if (weak.length === 1) return fit(weak[0], false);
   // 3) only one open invoice has exactly this amount
-  const byAmt = open.filter((i) => same(i.bal, amt));
-  if (byAmt.length === 1) return { invoice_id: byAmt[0].id, client_id: byAmt[0].client_id, sure: false,
-    reason: `Only open invoice for $${amt.toFixed(2)} is ${lcNum(byAmt[0].number)} (${cname(byAmt[0].client_id)}). The name didn't match.` };
-  return { invoice_id: null, client_id: null, sure: false, reason: byAmt.length ? `${byAmt.length} open invoices are for $${amt.toFixed(2)}; pick one.` : "No invoice or client matched." };
+  const byAmt = owing.filter((i) => same(i.bal, amt));
+  if (byAmt.length === 1) return one(byAmt[0], false, `Only open invoice for $${amt.toFixed(2)} is ${lcNum(byAmt[0].number)} (${cname(byAmt[0].client_id)}). Nothing else matched, so check it.`);
+  return { invoice_id: null, invoice_ids: [], client_id: null, sure: false,
+    reason: byAmt.length ? `${byAmt.length} open invoices are for $${amt.toFixed(2)}; pick one.` : "No invoice or client matched." };
 }
-// records a Zelle payment (and marks the invoice paid once fully paid); returns the payment id
+// records a Zelle payment: one payment per invoice it covers (oldest first, any extra on the last one, or on the
+// client's account when no invoice was picked) and marks each invoice paid once fully paid. Returns the payment ids.
 async function recordZelle(env, z) {
-  const pr = await sbRest(env, "invoice_payments", { method: "POST", headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ invoice_id: z.invoice_id, client_id: z.client_id, paid_on: z.received_on, amount: r2z(z.amount), method: "Zelle",
-      reference: [z.sender, z.memo].filter(Boolean).join(" · ").slice(0, 200), note: "Recorded automatically from the Bank of America Zelle alert" }) });
-  if (!pr.ok) return null;
-  const pay = ((await pr.json()) || [])[0];
-  if (z.invoice_id) {
-    const inv = (await rows(env, `invoices?id=eq.${z.invoice_id}&select=id,total,status`))[0];
-    const sum = (await rows(env, `invoice_payments?invoice_id=eq.${z.invoice_id}&select=amount`)).reduce((s, p) => s + Number(p.amount || 0), 0);
-    if (inv && inv.status === "open" && sum >= Number(inv.total || 0) - 0.005)
-      await sbRest(env, `invoices?id=eq.${z.invoice_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
-        body: JSON.stringify({ status: "paid", paid_at: `${z.received_on}T12:00:00`, paid_method: "Zelle" }) });
+  const ids = (z.invoice_ids && z.invoice_ids.length ? z.invoice_ids : z.invoice_id ? [z.invoice_id] : []);
+  const invs = ids.length ? await rows(env, `invoices?id=in.(${ids.join(",")})&select=id,total,status`) : [];
+  const pays = ids.length ? await rows(env, `invoice_payments?invoice_id=in.(${ids.join(",")})&select=invoice_id,amount`) : [];
+  const balOf = (id) => { const inv = invs.find((i) => i.id === id) || {}; return r2z(Number(inv.total || 0) - pays.filter((p) => p.invoice_id === id).reduce((s, p) => s + Number(p.amount || 0), 0)); };
+  let left = r2z(z.amount);
+  const parts = ids.length ? ids.map((id, k) => { const a = k === ids.length - 1 ? left : Math.min(left, balOf(id)); left = r2z(left - a); return { id, a: r2z(a) }; }).filter((p) => p.a > 0)
+    : [{ id: null, a: left }];
+  const out = [];
+  for (const p of parts) {
+    const pr = await sbRest(env, "invoice_payments", { method: "POST", headers: { Prefer: "return=representation" },
+      body: JSON.stringify({ invoice_id: p.id, client_id: z.client_id, paid_on: z.received_on, amount: p.a, method: "Zelle",
+        reference: [z.sender, z.memo].filter(Boolean).join(" · ").slice(0, 200), note: "Recorded automatically from the Bank of America Zelle alert" }) });
+    if (!pr.ok) break;
+    const pay = ((await pr.json()) || [])[0];
+    if (pay) out.push(pay.id);
+    if (p.id) {
+      const inv = invs.find((i) => i.id === p.id);
+      if (inv && inv.status === "open" && balOf(p.id) - p.a <= 0.005)
+        await sbRest(env, `invoices?id=eq.${p.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" },
+          body: JSON.stringify({ status: "paid", paid_at: `${z.received_on}T12:00:00`, paid_method: "Zelle" }) });
+    }
   }
-  return pay ? pay.id : null;
+  return out;
 }
 export async function handleZelleEmail(env, raw) {
   const mail = readEmail(raw);
@@ -1393,13 +1422,13 @@ export async function handleZelleEmail(env, raw) {
   if (m.sure && !verified) reason += " Not recorded on its own: couldn't confirm the email came straight from Bank of America.";
   if (m.sure && verified && biz.zelle_auto === false) reason += " Automatic recording is off.";
   const row = await insert({ amount: z.amount, sender: z.sender.slice(0, 120), memo: z.memo.slice(0, 300), status: m.invoice_id || m.client_id ? "suggested" : "unmatched",
-    invoice_id: m.invoice_id, client_id: m.client_id, reason });
+    invoice_id: m.invoice_id, invoice_ids: m.invoice_ids || [], client_id: m.client_id, reason });
   if (!row) return { status: "duplicate" };
   const money = z.amount ? `$${z.amount.toFixed(2)}` : "A Zelle payment";
   if (auto) {
-    const pid = await recordZelle(env, { ...z, invoice_id: m.invoice_id, client_id: m.client_id });
-    if (pid) {
-      await sbRest(env, `zelle_payments?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "recorded", payment_id: pid }) });
+    const pids = await recordZelle(env, { ...z, invoice_id: m.invoice_id, invoice_ids: m.invoice_ids, client_id: m.client_id });
+    if (pids.length) {
+      await sbRest(env, `zelle_payments?id=eq.${row.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "recorded", payment_id: pids[0], payment_ids: pids }) });
       await notify(env, "pay", `Zelle received: ${money}`, `${z.sender || "Someone"} · recorded. ${reason}`.slice(0, 180), "/crm/?go=billing&b=zelle");
       return { status: "recorded", id: row.id };
     }

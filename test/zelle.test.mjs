@@ -42,12 +42,13 @@ let db;
 function fresh(auto = true) {
   db = {
     business: [{ id: 1, zelle_auto: auto }],
-    clients: [{ id: C1, name: "Smith, John" }, { id: C2, name: "Shingle Creek Reserve HOA" }],
+    clients: [{ id: C1, name: "Smith, John", phone: "(407) 555-0111", account_no: "A1042" }, { id: C2, name: "Shingle Creek Reserve HOA" }],
+    properties: [{ client_id: C1, address: "2148 The Oaks Blvd, Kissimmee, FL 34746" }, { client_id: C2, address: "1961 Willow Wood Drive" }],
     client_contacts: [{ client_id: C2, name: "Dana Whitfield" }],
     invoices: [
-      { id: I1, client_id: C1, number: 317, total: 125.5, status: "open" },
-      { id: I2, client_id: C2, number: 320, total: 450, status: "open" },
-      { id: I3, client_id: C2, number: 321, total: 90, status: "open" },
+      { id: I1, client_id: C1, number: 317, total: 125.5, status: "open", issue_date: "2026-10-01" },
+      { id: I2, client_id: C2, number: 320, total: 450, status: "open", issue_date: "2026-10-01" },
+      { id: I3, client_id: C2, number: 321, total: 90, status: "open", issue_date: "2026-11-01" },
     ],
     invoice_payments: [], zelle_payments: [], push_devices: [], staff: [], app_secrets: [],
   };
@@ -126,4 +127,26 @@ assert.equal(out.status, "unmatched");
 fresh();
 out = await handleZelleEmail(env, `From: Gmail Team <forwarding-noreply@google.com>\r\nSubject: (#123456) Gmail Forwarding Confirmation\r\nContent-Type: text/plain\r\n\r\nConfirmation code: 123456\r\nhttps://mail.google.com/mail/vf-abc\r\n`);
 assert.equal(out.status, "other"); assert(last().body.includes("123456"));
+// no invoice number, but the memo has the service address / phone / account number: recorded
+for (const memo of ["2148 The Oaks", "407-555-0111", "acct A1042"]) {
+  fresh();
+  out = await handleZelleEmail(env, email({ subject: "Zelle: You received $125.50 from J S", body: html("J S", "125.50", memo) }));
+  assert.equal(out.status, "recorded", memo + " " + JSON.stringify(last()));
+  assert.equal(db.invoice_payments[0].invoice_id, I1);
+}
+// the HOA pays both of its open invoices at once (oldest first): two payments, both invoices paid
+fresh();
+out = await handleZelleEmail(env, email({ subject: "Zelle: You received $540.00 from SHINGLE CREEK RESERVE", body: html("SHINGLE CREEK RESERVE", "540.00", "") }));
+assert.equal(out.status, "recorded", JSON.stringify(last()));
+assert.deepEqual(db.invoice_payments.map((p) => [p.invoice_id, p.amount]), [[I2, 450], [I3, 90]]);
+assert(db.invoices.filter((i) => i.client_id === C2).every((i) => i.status === "paid"));
+assert.equal(last().payment_ids.length, 2);
+// a part payment from a known client with one open invoice: recorded, invoice stays open
+fresh();
+out = await handleZelleEmail(env, email({ subject: "Zelle: You received $50.00 from JOHN SMITH", body: html("JOHN SMITH", "50.00", "") }));
+assert.equal(out.status, "recorded"); assert.equal(db.invoices[0].status, "open");
+// an amount that fits none of a known client's invoices waits for a tap
+fresh();
+out = await handleZelleEmail(env, email({ subject: "Zelle: You received $300.00 from SHINGLE CREEK RESERVE", body: html("SHINGLE CREEK RESERVE", "300.00", "") }));
+assert.equal(out.status, "suggested"); assert.equal(db.invoice_payments.length, 0); assert.equal(last().client_id, C2);
 console.log("zelle checks passed");

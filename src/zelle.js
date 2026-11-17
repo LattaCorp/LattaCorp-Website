@@ -163,3 +163,45 @@ export function nameScore(sender, name) {
   const last = a[a.length - 1];
   return hits >= 1 && b.has(last) ? 1 : 0;
 }
+
+// Who is this from? Looks at the sender's name and at everything typed in the memo: an account number, phone
+// number, email, service address or a client's name. Returns [{ id, score, why }], best first.
+//   score 3 = an exact detail in the memo (account number, phone, email, house number + street)
+//   score 2 = the client's (or one of their contacts') full name
+//   score 1 = likely family (same last name as the sender)
+const STREET_SKIP = new Set(["n", "s", "e", "w", "north", "south", "east", "west", "the", "old", "new"]);
+const digitsOnly = (s) => String(s || "").replace(/\D/g, "");
+export function findClients(memo, sender, { clients = [], contacts = [], props = [] }) {
+  const text = `${memo || ""} ${sender || ""}`;
+  const low = " " + text.toLowerCase().replace(/[^a-z0-9@.]+/g, " ") + " ";
+  const phones = [...text.matchAll(/(?:\+?1[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}/g)].map((m) => digitsOnly(m[0]).slice(-10));
+  const emails = [...text.matchAll(/[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}/gi)].map((m) => m[0].toLowerCase());
+  const memoKey = String(memo || "").toUpperCase().replace(/[^A-Z0-9]/g, " ");
+  const best = {};
+  const give = (id, score, why) => { if (id && (!best[id] || best[id].score < score)) best[id] = { id, score, why }; };
+  const phoneHit = (p) => { const d = digitsOnly(p).slice(-10); return d.length === 10 && phones.includes(d); };
+  for (const c of clients) {
+    const acct = String(c.account_no || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+    if (acct.length >= 3 && memoKey.split(/\s+/).includes(acct)) give(c.id, 3, `account number ${c.account_no} in the memo`);
+    if (phoneHit(c.phone) || phoneHit(c.phone2)) give(c.id, 3, "phone number in the memo");
+    if (c.email && emails.includes(String(c.email).toLowerCase())) give(c.id, 3, "email in the memo");
+    for (const n of [c.name, c.nickname]) {
+      if (n && nameScore(memo, n) === 2 && nameTokens(n).length) give(c.id, 2, "name in the memo");
+      if (n && sender) { const s = nameScore(sender, n); if (s) give(c.id, s, s === 2 ? "sender's name" : "same last name as the sender"); }
+    }
+    if (c.last_name && sender && nameTokens(sender).slice(-1)[0] === nameTokens(c.last_name)[0]) give(c.id, 1, "same last name as the sender");
+  }
+  for (const k of contacts) {
+    if (phoneHit(k.phone)) give(k.client_id, 3, `${k.name || "contact"}'s phone number in the memo`);
+    if (k.email && emails.includes(String(k.email).toLowerCase())) give(k.client_id, 3, `${k.name || "contact"}'s email in the memo`);
+    if (k.name && sender && nameScore(sender, k.name) === 2) give(k.client_id, 2, `sender is their contact ${k.name}`);
+    if (k.name && nameScore(memo, k.name) === 2) give(k.client_id, 2, `contact ${k.name} named in the memo`);
+  }
+  for (const p of props) {
+    const m = String(p.address || "").toLowerCase().match(/^\s*(\d+)\s+(.+)/);
+    if (!m) continue;
+    const street = m[2].replace(/[^a-z0-9 ]+/g, " ").split(/\s+/).find((w) => w.length >= 3 && !STREET_SKIP.has(w));
+    if (street && low.includes(` ${m[1]} `) && low.includes(` ${street} `)) give(p.client_id, 3, `service address (${m[1]} ${street}) in the memo`);
+  }
+  return Object.values(best).sort((a, b) => b.score - a.score);
+}
