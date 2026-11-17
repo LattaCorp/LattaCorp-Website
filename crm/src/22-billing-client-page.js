@@ -11,6 +11,7 @@ function acctLedger(cid, pid) {
     if (i.client_id !== cid) return;
     var zeroPaid = i.status === "paid" && Number(i.total) === 0;
     rows.push({
+      iv: i.id,
       pid: i.property_id || null,
       d: String(i.issue_date).slice(0, 10),
       ord: 0,
@@ -31,6 +32,7 @@ function acctLedger(cid, pid) {
       })
     )
       rows.push({
+        iv: i.id,
         pid: i.property_id || null,
         d: String(i.paid_at || i.issue_date).slice(0, 10),
         ord: 1,
@@ -192,11 +194,12 @@ function accountHistorySection(c, fixedPid) {
     if (!L.rows.length) add(["", "Nothing in this timeframe", "", "", ""], 0);
     L.rows.forEach(function (x) {
       var tr = add([mdy(x.d), x.desc, x.charge ? money(x.charge) : "", x.pay ? money(x.pay) : "", sm(x.bal)]);
-      if (x.pr) {
+      if (x.pr || x.iv) {
         tr.style.cursor = "pointer";
-        tr.title = "Edit this payment";
+        tr.title = x.pr ? "Edit this payment" : "Open invoice";
         tr.addEventListener("click", function () {
-          openPaymentEdit(x.pr);
+          if (x.pr) openPaymentEdit(x.pr);
+          else openInvoice(x.iv);
         });
       }
     });
@@ -472,7 +475,7 @@ function matchInvProps(c, list) {
 }
 var billSub = {};
 function clientBillingSection(c, only) {
-  var sec = el("div", "sec"),
+  var sec = el("div", "sec billsec"),
     h = el("h3", null, "Billing");
   sec.appendChild(h);
   if (billErr) {
@@ -582,6 +585,7 @@ function clientBillingSection(c, only) {
         return {
           date: String(i.paid_at || i.issue_date).slice(0, 10),
           inv: invNum(i.number),
+          ivid: i.id,
           method: i.paid_method || "",
           amount: Number(i.total),
           pr: null,
@@ -995,6 +999,15 @@ function clientBillingSection(c, only) {
     list.forEach(function (x) {
       tot += x.amount;
       var tr = document.createElement("tr");
+      if (x.pr || x.ivid) {
+        tr.style.cursor = "pointer";
+        tr.title = x.pr ? "Edit this payment" : "Open invoice";
+        tr.addEventListener("click", function (e) {
+          if (e.target.closest && e.target.closest(".gearwrap")) return;
+          if (x.pr) openPaymentEdit(x.pr);
+          else openInvoice(x.ivid);
+        });
+      }
       [mdy(x.date), x.inv, x.method, money(x.amount)].forEach(function (v, k) {
         var td = document.createElement("td");
         td.textContent = v;

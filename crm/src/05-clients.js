@@ -249,6 +249,16 @@ function openClient(id) {
     L = pp.L;
   p.classList.add("qpanel");
   p.classList.add("popbig");
+  // a click in the Billing tab makes whatever it opens stay inside this pop-up (see popSub)
+  p.addEventListener(
+    "click",
+    function (e) {
+      var t = e.target;
+      if (!t.closest || t.closest(".popinner")) return;
+      popBack = t.closest(".billsec") ? c.id : null;
+    },
+    true
+  );
   L.appendChild(el("h2", null, c.name));
   if (c.company) L.appendChild(el("div", "popsub", c.company));
   var hd = el("div", "qhead");

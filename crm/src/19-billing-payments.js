@@ -236,14 +236,16 @@ function openPaymentEdit(pr) {
         if (ni) tasks.push(syncInvPaid(ni, r.data.paid_on, r.data.method));
         Promise.all(tasks).then(function () {
           render();
-          openPayment(cid);
+          if (popBack) popSubBack();
+          else openPayment(cid);
         });
       });
   });
   acts.appendChild(save);
   acts.appendChild(
     btn("Cancel", "btn alt", function () {
-      openPayment(cid);
+      if (popBack) popSubBack();
+      else openPayment(cid);
     })
   );
   p.appendChild(acts);

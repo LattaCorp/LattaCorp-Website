@@ -328,6 +328,8 @@ $("topbtns").addEventListener(
 
 /* ---- panel helpers ---- */
 function panel() {
+  if (popBack && $("detail").classList.contains("on") && $("panel").classList.contains("popbig")) return popSub();
+  popBack = null;
   if (typeof hideReceiptViewer === "function") hideReceiptViewer();
   var p = $("panel");
   p.textContent = "";
@@ -461,7 +463,45 @@ new MutationObserver(function () {
   });
 }).observe(document.body, { childList: true, subtree: true });
 /* Pop-up layout for a client or a job: name and contact box on the left, tabs on the right. */
+/* Anything opened from a client's Billing tab (an invoice, a payment, a new invoice...) opens inside the client
+   pop-up, over the tabs, with a Back button. Back, the X, Escape or clicking outside returns to the same Billing tab. */
+var popBack = null,
+  popSubScroll = 0;
+function popSub() {
+  if (typeof hideReceiptViewer === "function") hideReceiptViewer();
+  var P = $("panel"),
+    h = P.querySelector(":scope > .popinner");
+  if (!h) {
+    var pb = P.querySelector(".popbody");
+    popSubScroll = pb ? pb.scrollTop : 0;
+    h = el("div");
+    P.appendChild(h);
+  }
+  h.textContent = "";
+  h.className = "panel popinner";
+  panelDirty = false;
+  lpFrame = null;
+  optMark(null);
+  var c = byId(clients, popBack),
+    bar = el("div", "popsubbar");
+  bar.appendChild(btn("\u2190 Back to " + (c ? dispName(c) : "client") + " \u00b7 Billing", "btn alt sm", popSubBack));
+  h.appendChild(bar);
+  h.appendChild(btn("\u00d7", "close", closeDetail)).setAttribute("aria-label", "Back");
+  h.scrollTop = 0;
+  return h;
+}
+function popSubBack() {
+  var cid = popBack;
+  popBack = null;
+  if (typeof hideReceiptViewer === "function") hideReceiptViewer();
+  if (!cid || !byId(clients, cid)) return closeDetail();
+  var y = popSubScroll;
+  openClient(cid);
+  var pb = $("panel").querySelector(".popbody");
+  if (pb) pb.scrollTop = y;
+}
 function popPanel() {
+  popBack = null;
   var p = panel();
   detailFull(true);
   p.classList.add("pop");
@@ -499,6 +539,7 @@ function popTabs(R, TABS, cur, onPick) {
     var b = el("button", t[0] === cur ? "on" : "", t[1]);
     b.type = "button";
     b.addEventListener("click", function () {
+      popBack = null;
       if (onPick) onPick(t[0]);
       [].forEach.call(bar.children, function (x) {
         x.classList.toggle("on", x === b);
@@ -586,6 +627,8 @@ function popTabs(R, TABS, cur, onPick) {
   });
 })();
 function closeDetail() {
+  if (popBack && $("panel").querySelector(":scope > .popinner")) return popSubBack();
+  popBack = null;
   if (typeof hideReceiptViewer === "function") hideReceiptViewer();
   $("detail").classList.remove("on");
   optMark(null);
