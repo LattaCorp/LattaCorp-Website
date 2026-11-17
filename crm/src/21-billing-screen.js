@@ -1344,6 +1344,78 @@ function openBizSettings() {
   s.style.marginTop = "14px";
   p.appendChild(s);
   autopaySettings(p);
+  cardSettings(p);
+}
+/* Credit card payments: owner switch, the surcharge (max 3%) and the first day it may be charged.
+   Card networks require telling Stripe (and Mastercard) 30 days before the first surcharge, so the start date
+   can't be earlier than 30 days after the day you notified them. */
+function cardSettings(p) {
+  var sec = el("div", "sec");
+  sec.style.marginTop = "22px";
+  sec.appendChild(el("h3", null, "Credit card payments"));
+  sec.appendChild(
+    el(
+      "div",
+      "note",
+      "Clients can pay an invoice by credit card from the invoice link or the portal. A surcharge is added to credit cards only; debit and prepaid cards are refused. Clients see the fee and total before paying and get a receipt listing it."
+    )
+  );
+  var on = !!(biz && biz.card_on),
+    pct = biz && biz.card_fee_pct != null ? Number(biz.card_fee_pct) : 3,
+    start = (biz && biz.card_start) || "";
+  var fee = fld("Surcharge (%), at most 3, and no more than what cards cost you", "number", String(pct));
+  fee.input.step = "0.1";
+  fee.input.min = "0";
+  fee.input.max = "3";
+  var sd = fld("First day the surcharge may be charged (30+ days after you notified Stripe and Mastercard)", "date", start);
+  var lb = el("label", "chk"),
+    cb = document.createElement("input");
+  cb.type = "checkbox";
+  cb.checked = on;
+  lb.appendChild(cb);
+  lb.appendChild(document.createTextNode(" Card payments are on"));
+  sec.appendChild(fee);
+  sec.appendChild(sd);
+  sec.appendChild(lb);
+  var st = el("div", "note");
+  sec.appendChild(st);
+  function showState() {
+    var today_ = today();
+    st.textContent = !cb.checked
+      ? "Off: clients don't see a card option."
+      : !sd.input.value
+        ? "Set the first day before turning cards on."
+        : sd.input.value > today_
+          ? "On from " + longDate(sd.input.value) + ". Until then clients don't see a card option."
+          : "On: clients can pay by credit card now (needs the Stripe publishable key in Cloudflare).";
+  }
+  showState();
+  if (!isOwner()) {
+    fee.input.disabled = sd.input.disabled = cb.disabled = true;
+    p.appendChild(sec);
+    return;
+  }
+  sec.appendChild(
+    btn("Save card settings", "btn sm", function () {
+      var v = Number(fee.input.value);
+      if (!(v >= 0 && v <= 3)) return alert("The surcharge has to be between 0 and 3%.");
+      if (cb.checked && !sd.input.value) return alert("Pick the first day the surcharge may be charged.");
+      if (cb.checked && !confirm("Turn on credit card payments with a " + v + "% surcharge from " + longDate(sd.input.value) + "?\n\nOnly do this once Stripe and Mastercard were told at least 30 days before that day."))
+        return;
+      var row = { card_on: cb.checked, card_fee_pct: v, card_start: sd.input.value || null };
+      sb.from("business")
+        .update(row)
+        .eq("id", 1)
+        .then(function (r) {
+          if (r.error) return alert("Could not save. Run the Stage 53 SQL in Supabase.");
+          Object.assign(biz, row);
+          showState();
+        });
+    })
+  );
+  cb.addEventListener("change", showState);
+  sd.input.addEventListener("change", showState);
+  p.appendChild(sec);
 }
 /* Automatic (bank) payments through Stripe: the owner's on/off switch, status and a "run now" button */
 function autopaySettings(p) {

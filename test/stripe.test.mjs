@@ -1,6 +1,6 @@
 // Checks for bank autopay: node test/stripe.test.mjs
 import { formEncode, verifyStripeSignature } from "../src/stripe.js";
-import { runAutopay, handleStripeWebhook, handlePayInvoice } from "../src/worker.js";
+import { runAutopay, handleStripeWebhook, handlePayInvoice, handleCard } from "../src/worker.js";
 import assert from "node:assert";
 
 // form encoding the way Stripe wants it
@@ -53,6 +53,9 @@ globalThis.fetch = async (url, opts = {}) => {
   url = String(url);
   if (url.startsWith("https://api.stripe.com/")) {
     stripeCalls.push({ url, body: opts.body, idem: opts.headers && opts.headers["Idempotency-Key"] });
+    const ct = url.match(/confirmation_tokens\/(ctoken_\w+)/);
+    if (ct) return new Response(JSON.stringify({ id: ct[1], payment_method_preview: { type: "card", card: { brand: "visa", last4: "4242", funding: ct[1].split("_")[1] } } }), { status: 200 });
+    if (url.endsWith("/payment_intents") && String(opts.body).includes("confirmation_token")) return new Response(JSON.stringify({ id: "pi_card" + stripeCalls.length, status: "succeeded", metadata: {} }), { status: 200 });
     if (url.includes("checkout/sessions")) return new Response(JSON.stringify({ id: "cs_" + stripeCalls.length, url: "https://checkout.stripe.com/x" }), { status: 200 });
     if (url.endsWith("/customers")) return new Response(JSON.stringify({ id: "cus_new" }), { status: 200 });
     return new Response(JSON.stringify({ id: "pi_" + stripeCalls.length, status: "processing" }), { status: 200 });
@@ -135,4 +138,40 @@ await handleStripeWebhook(new Request("https://x", { method: "POST", headers: { 
 assert.equal(db.invoices.find((i) => i.id === I1).status, "paid");
 assert.equal(db.invoice_payments.filter((p) => p.invoice_id === I1 && p.method === "Bank (online)").length, 1);
 r = await handlePayInvoice(payReq(TOK), env); assert.equal(r.status, 400, "paid invoice can't be paid again");
+
+// ---------- credit card with a surcharge ----------
+const cardReq = (b) => new Request("https://x/api/card", { method: "POST", body: JSON.stringify({ t: TOK, ...b }) });
+const envC = { ...env, STRIPE_PUBLISHABLE_KEY: "pk_test_x" };
+db = fresh(false); stripeCalls = [];
+db.clients.push({ id: C1, name: "Pay Client", email: "p@x.com" });
+db.invoices.push({ id: I1, client_id: C1, number: 200, total: 120, status: "open", share_token: TOK });
+// switched off: no card option, nothing charged
+r = await handleCard(cardReq({ action: "options" }), envC); j = await r.json(); assert.equal(j.on, false); assert.equal(j.pk, null);
+db.business[0].card_on = true; db.business[0].card_fee_pct = 3;
+// not before the start date (30 days after notifying)
+db.business[0].card_start = ymd(5);
+r = await handleCard(cardReq({ action: "options" }), envC); j = await r.json(); assert.equal(j.on, false, "waits for the start date");
+db.business[0].card_start = ymd(0);
+r = await handleCard(cardReq({ action: "options" }), envC); j = await r.json(); assert.equal(j.on, true); assert.equal(j.fee, 3); assert.equal(j.due, 120);
+// debit and prepaid cards are refused before any charge
+for (const f of ["debit", "prepaid", "unknown"]) {
+  r = await handleCard(cardReq({ action: "quote", ct: "ctoken_" + f }), envC); j = await r.json();
+  assert.equal(r.status, 400); assert(j.refused, f);
+}
+r = await handleCard(cardReq({ action: "pay", ct: "ctoken_debit", total: 120 }), envC); assert.equal(r.status, 400);
+assert(!stripeCalls.some((c) => c.url.endsWith("/payment_intents")), "a debit card is never charged");
+// a credit card gets the price with the fee shown
+r = await handleCard(cardReq({ action: "quote", ct: "ctoken_credit" }), envC); j = await r.json();
+assert.deepEqual([j.due, j.surcharge, j.total, j.card], [120, 3.6, 123.6, "Visa ending 4242"]);
+// paying a different total than quoted is refused
+r = await handleCard(cardReq({ action: "pay", ct: "ctoken_credit", total: 120 }), envC); assert.equal(r.status, 409);
+// paying: one charge of $123.60, invoice paid with $120 recorded, the $3.60 fee kept on the charge
+r = await handleCard(cardReq({ action: "pay", ct: "ctoken_credit", total: 123.6 }), envC); j = await r.json();
+assert.equal(j.paid, true, JSON.stringify(j));
+const piCall = stripeCalls.find((c) => c.url.endsWith("/payment_intents"));
+assert(piCall.body.includes("amount=12360") && piCall.body.includes("payment_method_types%5B0%5D=card"));
+assert.equal(db.invoices.find((i) => i.id === I1).status, "paid");
+const cp = db.invoice_payments.find((p) => p.invoice_id === I1);
+assert.equal(cp.amount, 120); assert.equal(cp.method, "Credit card"); assert(cp.note.includes("$3.60"));
+assert.equal(db.autopay_charges.find((c) => c.source === "card").surcharge, 3.6);
 console.log("stripe autopay checks passed");

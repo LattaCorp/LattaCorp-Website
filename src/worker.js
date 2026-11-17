@@ -1196,21 +1196,25 @@ async function saveSetup(env, setupIntentId, meta) {
 }
 
 async function recordAutopayPaid(env, pi) {
-  let ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status,source`))[0];
+  let ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status,source,surcharge,card`))[0];
   const md = pi.metadata || {};
   if (!ch && md.source === "paynow" && UUID.test(md.invoice_id || "") && UUID.test(md.client_id || "")) {
     await sbRest(env, "autopay_charges?on_conflict=payment_intent", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
       body: JSON.stringify({ invoice_id: md.invoice_id, client_id: md.client_id, payment_intent: pi.id, amount: Number(pi.amount || 0) / 100, status: "processing", source: "paynow" }) });
-    ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status,source`))[0];
+    ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status,source,surcharge,card`))[0];
   }
   if (!ch) return;
-  const online = ch.source === "paynow", how = online ? "Bank (online)" : "Bank autopay";
+  const online = ch.source === "paynow" || ch.source === "card", card = ch.source === "card";
+  const how = card ? "Credit card" : online ? "Bank (online)" : "Bank autopay";
   await sbRest(env, `autopay_charges?id=eq.${ch.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "succeeded", updated_at: new Date().toISOString() }) });
   const dup = await rows(env, `invoice_payments?reference=eq.${pi.id}&select=id`);
   const today = etDay();
   if (!dup.length) {
     await sbRest(env, "invoice_payments", { method: "POST", headers: { Prefer: "return=minimal" },
-      body: JSON.stringify({ invoice_id: ch.invoice_id, client_id: ch.client_id, paid_on: today, amount: ch.amount, method: how, reference: pi.id, note: online ? "Paid online by bank (Stripe)" : "Automatic payment (Stripe)" }) });
+      body: JSON.stringify({ invoice_id: ch.invoice_id, client_id: ch.client_id, paid_on: today, amount: ch.amount, method: how, reference: pi.id,
+        note: card ? `Paid online by ${ch.card || "credit card"} (Stripe). Card surcharge of ${money2(ch.surcharge)} charged on top: ${money2(Number(ch.amount) + Number(ch.surcharge || 0))} total.`
+          : online ? "Paid online by bank (Stripe)" : "Automatic payment (Stripe)" }) });
+    if (card) await cardReceipt(env, ch, pi.id);
   }
   const inv = (await rows(env, `invoices?id=eq.${ch.invoice_id}&select=id,number,total,status`))[0];
   const paid = (await rows(env, `invoice_payments?invoice_id=eq.${ch.invoice_id}&select=amount`)).reduce((a, p) => a + Number(p.amount || 0), 0);
@@ -1218,13 +1222,14 @@ async function recordAutopayPaid(env, pi) {
     await sbRest(env, `invoices?id=eq.${inv.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "paid", paid_at: new Date().toISOString(), paid_method: how }) });
   }
   const c = (await rows(env, `clients?id=eq.${ch.client_id}&select=name`))[0] || {};
-  await notify(env, "portal", `${online ? "Online bank payment" : "Autopay"} received: ${c.name || "a client"}`, `$${Number(ch.amount).toFixed(2)}${inv ? " · invoice " + inv.number : ""}`, "/crm/?go=billing");
-  await notifyClient(env, ch.client_id, "invoice", "Payment received ✓", `Your ${online ? "bank" : "automatic"} payment of $${Number(ch.amount).toFixed(2)} went through. Thank you!`, `${PORTAL_URL}?go=billing`);
+  const label = card ? "Card payment" : online ? "Online bank payment" : "Autopay";
+  await notify(env, "pay", `${label} received: ${c.name || "a client"}`, `$${Number(ch.amount).toFixed(2)}${card ? ` + $${Number(ch.surcharge || 0).toFixed(2)} card fee` : ""}${inv ? " · invoice " + inv.number : ""}`, "/crm/?go=billing");
+  await notifyClient(env, ch.client_id, "invoice", "Payment received ✓", `Your ${card ? "card" : online ? "bank" : "automatic"} payment of $${(Number(ch.amount) + Number(ch.surcharge || 0)).toFixed(2)} went through. Thank you!`, `${PORTAL_URL}?go=billing`);
 }
 async function recordAutopayFailed(env, pi) {
   const ch = (await rows(env, `autopay_charges?payment_intent=eq.${pi.id}&select=id,invoice_id,client_id,amount,status,source`))[0];
   if (!ch || ch.status === "failed") return;
-  const online = ch.source === "paynow";
+  const online = ch.source === "paynow" || ch.source === "card";
   const why = String((pi.last_payment_error && (pi.last_payment_error.message || pi.last_payment_error.code)) || "The bank didn't approve the payment.").slice(0, 300);
   await sbRest(env, `autopay_charges?id=eq.${ch.id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ status: "failed", failure: why, updated_at: new Date().toISOString() }) });
   // If it had been recorded as paid (a late bank return), take the payment back off.
@@ -1261,6 +1266,92 @@ export async function handleStripeWebhook(request, env) {
     }
   } catch (e) { console.log("stripe webhook error", ev.type, String(e)); return json({ error: "handler failed" }, 500); }
   return json({ received: true });
+}
+
+// ---------- Credit card payments ----------
+// Credit cards only, with a surcharge (business.card_fee_pct, never over 3%). Debit and prepaid cards are refused
+// before anything is charged: the page creates a Stripe "confirmation token" for the card, we look at its funding
+// type here, and only a credit card gets a price (invoice + fee) to approve. The client sees the fee and the new
+// total before paying, and gets a receipt that lists the fee on its own line.
+async function cardInvoice(env, tok) {
+  tok = String(tok || "").replace(/[^a-zA-Z0-9]/g, "");
+  if (tok.length < 32) return { error: "bad link" };
+  const inv = (await rows(env, `invoices?share_token=eq.${tok}&select=id,number,total,status,client_id`))[0];
+  if (!inv || inv.status !== "open") return { error: "This invoice is already paid or no longer open." };
+  const paid = (await rows(env, `invoice_payments?invoice_id=eq.${inv.id}&select=amount`)).reduce((a, p) => a + Number(p.amount || 0), 0);
+  const due = Math.round((Number(inv.total || 0) - paid) * 100) / 100;
+  if (due < 0.5) return { error: "Nothing is due on this invoice." };
+  return { inv, due, tok };
+}
+async function cardSettings(env) {
+  const b = (await rows(env, "business?id=eq.1&select=card_on,card_fee_pct,card_start"))[0] || {};
+  const on = !!(b.card_on && env.STRIPE_SECRET_KEY && env.STRIPE_PUBLISHABLE_KEY && (!b.card_start || b.card_start <= etDay()));
+  return { on, fee: Math.min(3, Math.max(0, Number(b.card_fee_pct == null ? 3 : b.card_fee_pct))) };
+}
+const feeOf = (due, pct) => Math.round(due * pct) / 100; // cents rounded: $120.00 at 3% = $3.60
+async function cardCheck(env, ct) {
+  if (!/^ctoken_[A-Za-z0-9_]+$/.test(String(ct || ""))) return { error: "Please enter your card again." };
+  const t = await stripe(env, "GET", `confirmation_tokens/${ct}`);
+  if (t.error) return { error: "Please enter your card again." };
+  const c = (t.payment_method_preview || {}).card || {};
+  if ((t.payment_method_preview || {}).type !== "card") return { error: "Please pay with a credit card." };
+  if (c.funding !== "credit")
+    return { error: c.funding === "debit" ? "Debit cards aren't accepted. Please use a credit card, or pay by bank for free." : c.funding === "prepaid" ? "Prepaid cards aren't accepted. Please use a credit card, or pay by bank for free." : "We couldn't confirm this is a credit card. Please use a different credit card, or pay by bank for free." , refused: true };
+  const brand = { visa: "Visa", mastercard: "Mastercard", amex: "American Express", discover: "Discover" }[c.brand] || "Card";
+  return { card: `${brand} ending ${c.last4 || "••••"}` };
+}
+export async function handleCard(request, env) {
+  let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
+  const set = await cardSettings(env);
+  const x = await cardInvoice(env, d.t);
+  if (d.action === "options") return json({ on: set.on && !x.error, fee: set.fee, pk: set.on ? env.STRIPE_PUBLISHABLE_KEY : null, due: x.due || 0 });
+  if (!set.on) return json({ error: "Card payments aren't available right now. Please pay by bank, Zelle or cash." }, 503);
+  if (x.error) return json({ error: x.error }, 400);
+  const chk = await cardCheck(env, d.ct);
+  if (chk.error) return json({ error: chk.error, refused: !!chk.refused }, 400);
+  const surcharge = feeOf(x.due, set.fee), total = Math.round((x.due + surcharge) * 100) / 100;
+  if (d.action === "quote") return json({ ok: true, due: x.due, surcharge, total, fee: set.fee, card: chk.card });
+  if (d.action !== "pay") return json({ error: "bad request" }, 400);
+  if (Math.abs(Number(d.total) - total) > 0.005) return json({ error: "The amount changed. Please review it again.", total }, 409);
+  const busy = await rows(env, `autopay_charges?invoice_id=eq.${x.inv.id}&status=eq.processing&select=id`);
+  if (busy.length) return json({ error: "A payment for this invoice is already processing." }, 409);
+  const c = (await rows(env, `clients?id=eq.${x.inv.client_id}&select=id,name,email,stripe_customer_id`))[0] || {};
+  let cust = c.stripe_customer_id;
+  if (!cust) {
+    const r = await stripe(env, "POST", "customers", { name: c.name, email: EMAIL_RE.test(c.email || "") ? c.email : undefined, metadata: { client_id: x.inv.client_id } }, `cust-${x.inv.client_id}`);
+    if (r.error) return json({ error: r.error.message }, 502);
+    cust = r.id;
+    await sbRest(env, `clients?id=eq.${x.inv.client_id}`, { method: "PATCH", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ stripe_customer_id: cust }) });
+  }
+  const md = { invoice_id: x.inv.id, client_id: x.inv.client_id, invoice_number: String(x.inv.number), source: "card", invoice_amount: x.due.toFixed(2), surcharge: surcharge.toFixed(2) };
+  const pi = await stripe(env, "POST", "payment_intents", {
+    amount: cents(total), currency: "usd", customer: cust, confirm: true, confirmation_token: d.ct,
+    payment_method_types: ["card"], return_url: `${SITE}/d/?t=${x.tok}&paid=card`,
+    description: `Latta Corp invoice ${lcNum(x.inv.number)} (${money2(x.due)} + ${money2(surcharge)} card surcharge)`,
+    statement_descriptor_suffix: `INV ${x.inv.number}`.slice(0, 22), metadata: md,
+  }, `card-${x.inv.id}-${d.ct}`);
+  if (pi.error) return json({ error: pi.error.message || "The card was declined." }, 402);
+  await sbRest(env, "autopay_charges?on_conflict=payment_intent", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
+    body: JSON.stringify({ invoice_id: x.inv.id, client_id: x.inv.client_id, payment_intent: pi.id, amount: x.due, surcharge, card: chk.card, status: "processing", source: "card" }) });
+  if (pi.status === "succeeded") { await recordAutopayPaid(env, pi); return json({ ok: true, paid: true, total }); }
+  if (pi.status === "requires_action") return json({ ok: true, action: true, client_secret: pi.client_secret });
+  if (pi.status === "processing") return json({ ok: true, processing: true });
+  return json({ error: "The card was declined. Please try another credit card or pay by bank." }, 402);
+}
+async function cardReceipt(env, ch, piId) {
+  try {
+    const c = (await rows(env, `clients?id=eq.${ch.client_id}&select=name,email`))[0] || {};
+    const inv = (await rows(env, `invoices?id=eq.${ch.invoice_id}&select=number`))[0] || {};
+    if (!EMAIL_RE.test(c.email || "") || !env.RESEND_API_KEY) return;
+    const amt = Number(ch.amount), fee = Number(ch.surcharge || 0), tot = amt + fee;
+    const row = (a, b, bold) => `<tr><td style="padding:6px 0;${bold ? "font-weight:700;border-top:1px solid #e4ece1" : ""}">${a}</td><td style="padding:6px 0;text-align:right;${bold ? "font-weight:700;border-top:1px solid #e4ece1" : ""}">${b}</td></tr>`;
+    await sendViaResend(env, { from: INVOICE_FROM, to: [c.email], reply_to: SUPPORT_EMAIL, subject: `Receipt: invoice ${lcNum(inv.number)} paid · ${money2(tot)}`,
+      html: `<div style="font-family:Arial,sans-serif;color:#1c2a20;max-width:520px"><h2 style="color:#1b552b">Payment received. Thank you!</h2>
+<p>${esc(c.name || "")}, here is your receipt from Latta Corp Of Central Florida.</p>
+<table style="width:100%;border-collapse:collapse;font-size:15px">${row(`Invoice ${lcNum(inv.number)}`, money2(amt))}${row("Credit card surcharge", money2(fee))}${row("Total charged", money2(tot), true)}</table>
+<p style="font-size:13px;color:#58675c">Paid ${etDay()} with ${esc(ch.card || "a credit card")}. Payment ID ${piId}.<br>Bank (ACH), Zelle, cash and check payments have no surcharge.</p></div>`,
+      text: `Payment received. Thank you!\nInvoice ${lcNum(inv.number)}: ${money2(amt)}\nCredit card surcharge: ${money2(fee)}\nTotal charged: ${money2(tot)}\nPaid ${etDay()} with ${ch.card || "a credit card"}. Payment ID ${piId}.` });
+  } catch (e) { console.log("card receipt failed", String(e)); }
 }
 
 // "Pay now by bank" from an invoice link (anyone holding the invoice link can pay that one invoice).
@@ -1496,7 +1587,7 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/api/health") {
       // Safe status check (shows whether the settings exist, never their values).
-      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), crmKeySet: Boolean(env.SUPABASE_SECRET_KEY), turnstileSet: Boolean(env.TURNSTILE_SECRET_KEY), stripeSet: Boolean(env.STRIPE_SECRET_KEY), stripeWebhookSet: Boolean(env.STRIPE_WEBHOOK_SECRET), sendsTo: (env.TO_EMAIL || DEFAULT_TO) ? (env.TO_EMAIL || DEFAULT_TO).replace(/^(.).*(@.*)$/, "$1***$2") : null });
+      return json({ ok: true, emailKeySet: Boolean(env.RESEND_API_KEY), crmKeySet: Boolean(env.SUPABASE_SECRET_KEY), turnstileSet: Boolean(env.TURNSTILE_SECRET_KEY), stripeSet: Boolean(env.STRIPE_SECRET_KEY), stripeWebhookSet: Boolean(env.STRIPE_WEBHOOK_SECRET), stripePublishableSet: Boolean(env.STRIPE_PUBLISHABLE_KEY), sendsTo: (env.TO_EMAIL || DEFAULT_TO) ? (env.TO_EMAIL || DEFAULT_TO).replace(/^(.).*(@.*)$/, "$1***$2") : null });
     }
     if (url.pathname === "/api/submit") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
@@ -1525,6 +1616,10 @@ export default {
     if (url.pathname === "/api/pay") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
       return handlePay(request, env);
+    }
+    if (url.pathname === "/api/card") {
+      if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
+      return handleCard(request, env);
     }
     if (url.pathname === "/api/pay-invoice") {
       if (request.method !== "POST") return json({ error: "method not allowed" }, 405);
