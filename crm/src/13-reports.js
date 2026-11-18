@@ -212,7 +212,7 @@ function computeReport(from, to) {
         });
     });
     (rs[1].data || []).forEach(function (v) {
-      if (Number(v.price) > 0 && v.paid_at)
+      if (Number(v.price) > 0 && v.paid_at && !isAlreadyBilled(v))
         pays.push({
           date: String(v.paid_at).slice(0, 10),
           type: "Paid at visit",

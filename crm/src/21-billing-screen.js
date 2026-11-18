@@ -427,7 +427,10 @@ function renderToBill(list, bg) {
     var det = document.createElement("details");
     det.appendChild(el("summary", null, "See the visits"));
     vs.forEach(function (v) {
-      det.appendChild(
+      var row = el("div", "tbrow");
+      row.style.cssText =
+        "display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;margin:4px 0";
+      row.appendChild(
         el(
           "div",
           "note",
@@ -440,10 +443,72 @@ function renderToBill(list, bg) {
             money(v.price)
         )
       );
+      var mb = btn("Mark as billed", "btn alt sm", function () {
+        markBilled(v, mb);
+      });
+      mb.title = "Already invoiced or paid some other way: take it off the To bill list without making an invoice";
+      row.appendChild(mb);
+      det.appendChild(row);
     });
+    if (vs.length > 1) {
+      var ab = btn("Mark all " + vs.length + " as billed", "btn alt sm", function () {
+        markBilled(vs, ab);
+      });
+      ab.style.marginTop = "6px";
+      det.appendChild(ab);
+    }
     card.appendChild(det);
     list.appendChild(card);
   });
+}
+
+/* "Mark as billed": a finished visit that was already invoiced or paid some other way (for example a Zelle payment
+   recorded on account) comes off To bill without a new invoice. It is stamped paid_method "Already billed", which
+   Reports and the payment backfill skip so the money is never counted twice. Undo it from the visit on the Schedule. */
+var ALREADY_BILLED = "Already billed";
+function isAlreadyBilled(v) {
+  return v && v.paid_method === ALREADY_BILLED;
+}
+function markBilled(vs, b) {
+  vs = [].concat(vs);
+  var what =
+    vs.length === 1
+      ? "the " + dshort(vs[0].scheduled_date) + " visit (" + money(vs[0].price) + ")"
+      : vs.length + " visits";
+  if (
+    !confirm(
+      "Mark " +
+        what +
+        " for " +
+        cname(vs[0].client_id) +
+        " as already billed?\n\nIt comes off To bill and no invoice is made. You can undo it from the visit on the Schedule."
+    )
+  )
+    return;
+  if (b) b.disabled = true;
+  var ids = vs.map(function (v) {
+    return v.id;
+  });
+  sb.from("visits")
+    .update({ paid_at: new Date().toISOString(), paid_method: ALREADY_BILLED })
+    .in("id", ids)
+    .then(function (r) {
+      if (r.error) {
+        if (b) b.disabled = false;
+        alert("Could not save that.");
+        return;
+      }
+      unbilled = unbilled.filter(function (v) {
+        return ids.indexOf(v.id) < 0;
+      });
+      visits.forEach(function (v) {
+        if (ids.indexOf(v.id) > -1) {
+          v.paid_at = new Date().toISOString();
+          v.paid_method = ALREADY_BILLED;
+        }
+      });
+      render();
+    });
 }
 
 /* ---- Invoice detail ---- */

@@ -676,7 +676,7 @@ function backfillCards(host) {
     .limit(5000)
     .then(function (r) {
       var vs = (r.error ? [] : r.data || []).filter(function (v) {
-        return v.paid_method !== "No charge" && Number(v.price) > 0;
+        return v.paid_method !== "No charge" && !isAlreadyBilled(v) && Number(v.price) > 0;
       });
       var oa = invPays.filter(function (x) {
           return !x.invoice_id && x.client_id;

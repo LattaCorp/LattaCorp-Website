@@ -225,11 +225,15 @@ function visitCard(v, after, showJob, opts) {
           oi.style.alignSelf = "center";
           a.appendChild(oi);
         } else if (v.paid_at) {
-          var pn = el("span", "chip won", "Paid" + (v.paid_method ? " · " + v.paid_method : ""));
+          var pn = el(
+            "span",
+            "chip won",
+            isAlreadyBilled(v) ? ALREADY_BILLED : "Paid" + (v.paid_method ? " · " + v.paid_method : "")
+          );
           pn.style.alignSelf = "center";
           a.appendChild(pn);
           a.appendChild(
-            btn("Undo paid", "btn alt sm", function () {
+            btn(isAlreadyBilled(v) ? "Undo" : "Undo paid", "btn alt sm", function () {
               patch({ paid_at: null, paid_method: "" });
             })
           );
