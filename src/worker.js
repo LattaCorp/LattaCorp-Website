@@ -1217,7 +1217,7 @@ async function recordAutopayPaid(env, pi) {
   if (!dup.length) {
     await sbRest(env, "invoice_payments", { method: "POST", headers: { Prefer: "return=minimal" },
       body: JSON.stringify({ invoice_id: ch.invoice_id, client_id: ch.client_id, paid_on: today, amount: ch.amount, method: how, reference: pi.id,
-        note: card ? `Paid online by ${ch.card || "credit card"} (Stripe). Card surcharge of ${money2(ch.surcharge)} charged on top: ${money2(Number(ch.amount) + Number(ch.surcharge || 0))} total.`
+        note: card && !(Number(ch.surcharge) > 0) ? `Paid online by ${ch.card || "credit card"} (Stripe), no surcharge.` : card ? `Paid online by ${ch.card || "credit card"} (Stripe). Card surcharge of ${money2(ch.surcharge)} charged on top: ${money2(Number(ch.amount) + Number(ch.surcharge || 0))} total.`
           : online ? "Paid online by bank (Stripe)" : "Automatic payment (Stripe)" }) });
     if (card) await cardReceipt(env, ch, pi.id);
   }
@@ -1228,7 +1228,7 @@ async function recordAutopayPaid(env, pi) {
   }
   const c = (await rows(env, `clients?id=eq.${ch.client_id}&select=name`))[0] || {};
   const label = card ? "Card payment" : online ? "Online bank payment" : "Autopay";
-  await notify(env, "pay", `${label} received: ${c.name || "a client"}`, `$${Number(ch.amount).toFixed(2)}${card ? ` + $${Number(ch.surcharge || 0).toFixed(2)} card fee` : ""}${inv ? " · invoice " + inv.number : ""}`, "/crm/?go=billing");
+  await notify(env, "pay", `${label} received: ${c.name || "a client"}`, `$${Number(ch.amount).toFixed(2)}${card && Number(ch.surcharge) > 0 ? ` + $${Number(ch.surcharge).toFixed(2)} card fee` : ""}${inv ? " · invoice " + inv.number : ""}`, "/crm/?go=billing");
   await notifyClient(env, ch.client_id, "invoice", "Payment received ✓", `Your ${card ? "card" : online ? "bank" : "automatic"} payment of $${(Number(ch.amount) + Number(ch.surcharge || 0)).toFixed(2)} went through. Thank you!`, `${PORTAL_URL}?go=billing`);
 }
 async function recordAutopayFailed(env, pi) {
@@ -1290,8 +1290,12 @@ async function cardInvoice(env, tok) {
 }
 async function cardSettings(env) {
   const b = (await rows(env, "business?id=eq.1&select=card_on,card_fee_pct,card_start"))[0] || {};
-  const on = !!(b.card_on && env.STRIPE_SECRET_KEY && env.STRIPE_PUBLISHABLE_KEY && (!b.card_start || b.card_start <= etDay()));
-  return { on, fee: Math.min(3, Math.max(0, Number(b.card_fee_pct == null ? 3 : b.card_fee_pct))) };
+  // cards are taken as soon as they're switched on; the surcharge only applies from card_start
+  // (30 days after notifying the card networks). Before that day credit cards are charged with no fee.
+  const on = !!(b.card_on && env.STRIPE_SECRET_KEY && env.STRIPE_PUBLISHABLE_KEY);
+  const pct = Math.min(3, Math.max(0, Number(b.card_fee_pct == null ? 3 : b.card_fee_pct)));
+  const started = !!(b.card_start && b.card_start <= etDay());
+  return { on, fee: started ? pct : 0, feeFrom: started ? null : b.card_start || null, laterFee: pct };
 }
 const feeOf = (due, pct) => Math.round(due * pct) / 100; // cents rounded: $120.00 at 3% = $3.60
 async function cardCheck(env, ct) {
@@ -1310,6 +1314,7 @@ export async function handleCard(request, env) {
   const set = await cardSettings(env);
   const x = await cardInvoice(env, d.t);
   if (d.action === "options") return json({ on: set.on && !x.error, fee: set.fee, pk: set.on ? env.STRIPE_PUBLISHABLE_KEY : null, due: x.due || 0 });
+  const noFee = !(set.fee > 0);
   if (!set.on) return json({ error: "Card payments aren't available right now. Please pay by bank, Zelle or cash." }, 503);
   if (x.error) return json({ error: x.error }, 400);
   const chk = await cardCheck(env, d.ct);
@@ -1332,11 +1337,11 @@ export async function handleCard(request, env) {
   const pi = await stripe(env, "POST", "payment_intents", {
     amount: cents(total), currency: "usd", customer: cust, confirm: true, confirmation_token: d.ct,
     payment_method_types: ["card"], return_url: `${SITE}/d/?t=${x.tok}&paid=card`,
-    description: `Latta Corp invoice ${lcNum(x.inv.number)} (${money2(x.due)} + ${money2(surcharge)} card surcharge)`,
+    description: noFee ? `Latta Corp invoice ${lcNum(x.inv.number)}` : `Latta Corp invoice ${lcNum(x.inv.number)} (${money2(x.due)} + ${money2(surcharge)} card surcharge)`,
     statement_descriptor_suffix: `INV ${x.inv.number}`.slice(0, 22), metadata: md,
     // tells Stripe and the card networks which part is the surcharge; Stripe checks it's allowed for this card
-    amount_details: { surcharge: { amount: cents(surcharge), enforce_validation: "enabled" } },
-  }, `card-${x.inv.id}-${d.ct}`, SURCHARGE_VERSION);
+    amount_details: noFee ? undefined : { surcharge: { amount: cents(surcharge), enforce_validation: "enabled" } },
+  }, `card-${x.inv.id}-${d.ct}`, noFee ? undefined : SURCHARGE_VERSION);
   if (pi.error) {
     console.log("card payment refused", pi.error.code || "", pi.error.message || "");
     return json({ error: /surcharge/i.test(pi.error.message || "") ? "This card can't be used with a surcharge. Please use a different credit card, or pay by bank for free." : pi.error.message || "The card was declined." }, 402);
@@ -1358,9 +1363,9 @@ async function cardReceipt(env, ch, piId) {
     await sendViaResend(env, { from: INVOICE_FROM, to: [c.email], reply_to: SUPPORT_EMAIL, subject: `Receipt: invoice ${lcNum(inv.number)} paid · ${money2(tot)}`,
       html: `<div style="font-family:Arial,sans-serif;color:#1c2a20;max-width:520px"><h2 style="color:#1b552b">Payment received. Thank you!</h2>
 <p>${esc(c.name || "")}, here is your receipt from Latta Corp Of Central Florida.</p>
-<table style="width:100%;border-collapse:collapse;font-size:15px">${row(`Invoice ${lcNum(inv.number)}`, money2(amt))}${row("Credit card surcharge", money2(fee))}${row("Total charged", money2(tot), true)}</table>
+<table style="width:100%;border-collapse:collapse;font-size:15px">${row(`Invoice ${lcNum(inv.number)}`, money2(amt))}${fee > 0 ? row("Credit card surcharge", money2(fee)) : ""}${row("Total charged", money2(tot), true)}</table>
 <p style="font-size:13px;color:#58675c">Paid ${etDay()} with ${esc(ch.card || "a credit card")}. Payment ID ${piId}.<br>Bank (ACH), Zelle, cash and check payments have no surcharge.</p></div>`,
-      text: `Payment received. Thank you!\nInvoice ${lcNum(inv.number)}: ${money2(amt)}\nCredit card surcharge: ${money2(fee)}\nTotal charged: ${money2(tot)}\nPaid ${etDay()} with ${ch.card || "a credit card"}. Payment ID ${piId}.` });
+      text: `Payment received. Thank you!\nInvoice ${lcNum(inv.number)}: ${money2(amt)}${fee > 0 ? `\nCredit card surcharge: ${money2(fee)}` : ""}\nTotal charged: ${money2(tot)}\nPaid ${etDay()} with ${ch.card || "a credit card"}. Payment ID ${piId}.` });
   } catch (e) { console.log("card receipt failed", String(e)); }
 }
 

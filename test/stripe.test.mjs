@@ -150,7 +150,21 @@ r = await handleCard(cardReq({ action: "options" }), envC); j = await r.json(); 
 db.business[0].card_on = true; db.business[0].card_fee_pct = 3;
 // not before the start date (30 days after notifying)
 db.business[0].card_start = ymd(5);
-r = await handleCard(cardReq({ action: "options" }), envC); j = await r.json(); assert.equal(j.on, false, "waits for the start date");
+r = await handleCard(cardReq({ action: "options" }), envC); j = await r.json();
+assert.equal(j.on, true); assert.equal(j.fee, 0, "before the start date: cards with no fee");
+r = await handleCard(cardReq({ action: "quote", ct: "ctoken_credit" }), envC); j = await r.json();
+assert.deepEqual([j.surcharge, j.total], [0, 120]);
+r = await handleCard(cardReq({ action: "quote", ct: "ctoken_debit" }), envC); assert.equal(r.status, 400, "debit still refused");
+// (a no-fee payment: charged $120, no surcharge field, normal API version)
+{
+  const saveDb = JSON.parse(JSON.stringify(db)), saveCalls = stripeCalls.length;
+  r = await handleCard(cardReq({ action: "pay", ct: "ctoken_credit", total: 120 }), envC); j = await r.json();
+  assert.equal(j.paid, true, JSON.stringify(j));
+  const c0 = stripeCalls.slice(saveCalls).find((c) => c.url.endsWith("/payment_intents"));
+  assert(c0.body.includes("amount=12000") && !c0.body.includes("amount_details") && !c0.version);
+  assert(db.invoice_payments.find((p) => p.invoice_id === I1).note.includes("no surcharge"));
+  db = saveDb; stripeCalls = stripeCalls.slice(0, saveCalls);
+}
 db.business[0].card_start = ymd(0);
 r = await handleCard(cardReq({ action: "options" }), envC); j = await r.json(); assert.equal(j.on, true); assert.equal(j.fee, 3); assert.equal(j.due, 120);
 // debit and prepaid cards are refused before any charge

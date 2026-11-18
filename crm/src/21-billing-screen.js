@@ -1367,7 +1367,7 @@ function cardSettings(p) {
   fee.input.step = "0.1";
   fee.input.min = "0";
   fee.input.max = "3";
-  var sd = fld("First day the surcharge may be charged (30+ days after you notified Stripe and Mastercard)", "date", start);
+  var sd = fld("Surcharge starts on (30+ days after you notified Stripe). Before this day credit cards are taken with no fee", "date", start);
   var lb = el("label", "chk"),
     cb = document.createElement("input");
   cb.type = "checkbox";
@@ -1384,10 +1384,10 @@ function cardSettings(p) {
     st.textContent = !cb.checked
       ? "Off: clients don't see a card option."
       : !sd.input.value
-        ? "Set the first day before turning cards on."
+        ? "On, with no surcharge (no start date set). Credit cards only; needs the Stripe publishable key in Cloudflare."
         : sd.input.value > today_
-          ? "On from " + longDate(sd.input.value) + ". Until then clients don't see a card option."
-          : "On: clients can pay by credit card now (needs the Stripe publishable key in Cloudflare).";
+          ? "On: credit cards are taken now with no fee. The " + fee.input.value + "% surcharge starts " + longDate(sd.input.value) + "."
+          : "On: credit cards are taken with a " + fee.input.value + "% surcharge (needs the Stripe publishable key in Cloudflare).";
   }
   showState();
   if (!isOwner()) {
@@ -1399,8 +1399,9 @@ function cardSettings(p) {
     btn("Save card settings", "btn sm", function () {
       var v = Number(fee.input.value);
       if (!(v >= 0 && v <= 3)) return alert("The surcharge has to be between 0 and 3%.");
-      if (cb.checked && !sd.input.value) return alert("Pick the first day the surcharge may be charged.");
-      if (cb.checked && !confirm("Turn on credit card payments with a " + v + "% surcharge from " + longDate(sd.input.value) + "?\n\nOnly do this once Stripe and Mastercard were told at least 30 days before that day."))
+      if (cb.checked && !confirm(sd.input.value
+          ? "Turn on credit card payments now (no fee), with the " + v + "% surcharge starting " + longDate(sd.input.value) + "?\n\nThat day must be at least 30 days after you notified Stripe."
+          : "Turn on credit card payments with no surcharge?"))
         return;
       var row = { card_on: cb.checked, card_fee_pct: v, card_start: sd.input.value || null };
       sb.from("business")

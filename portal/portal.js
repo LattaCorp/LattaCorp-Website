@@ -394,7 +394,7 @@
     return cardOpt;
   }
   function cardBtn(tok, fee) {
-    var a = el("a", "btn ghost", t("Pay by card") + " (+" + String(fee).replace(/\.0+$/, "") + "%)");
+    var a = el("a", "btn ghost", t("Pay by card") + (fee > 0 ? " (+" + String(fee).replace(/\.0+$/, "") + "%)" : ""));
     a.href = "../d/?t=" + encodeURIComponent(tok) + "&card=1";
     a.style.minHeight = "38px"; a.style.padding = "0 14px"; a.style.display = "inline-flex"; a.style.alignItems = "center";
     return a;
