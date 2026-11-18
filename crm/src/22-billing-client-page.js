@@ -66,6 +66,12 @@ function acctLedger(cid, pid) {
       pr: x
     });
   });
+  /* A client with only one property: anything without a property (like a payment on account) is on that property. */
+  var one = clientProps(cid);
+  if (one.length === 1)
+    rows.forEach(function (r) {
+      if (!r.pid) r.pid = one[0].id;
+    });
   if (pid === "none")
     rows = rows.filter(function (r) {
       return !r.pid;
@@ -492,6 +498,7 @@ function matchInvProps(c, list) {
 }
 var billSub = {};
 function clientBillingSection(c, only) {
+  var sole = clientProps(c.id).length === 1 ? clientProps(c.id)[0].id : "";
   var sec = el("div", "sec billsec"),
     h = el("h3", null, "Billing");
   sec.appendChild(h);
@@ -606,7 +613,7 @@ function clientBillingSection(c, only) {
           method: i.paid_method || "",
           amount: Number(i.total),
           pr: null,
-          pid: i.property_id || ""
+          pid: i.property_id || sole
         };
       });
     var ent = invPays
@@ -621,7 +628,7 @@ function clientBillingSection(c, only) {
           method: x.method,
           amount: Number(x.amount),
           pr: x,
-          pid: iv ? iv.property_id || "" : "",
+          pid: (iv && iv.property_id) || sole,
           onacct: !iv
         };
       });
@@ -640,10 +647,10 @@ function clientBillingSection(c, only) {
     return p.id;
   });
   mine.forEach(function (i) {
-    var k = i.property_id || "";
+    var k = i.property_id || sole;
     if (k && keys.indexOf(k) < 0) keys.push(k);
   });
-  keys.push("");
+  if (!sole) keys.push("");
   only = only && keys.indexOf(only) > -1 ? only : "";
   if (split && cps.length > 1) {
     var vf = fld(
@@ -670,7 +677,7 @@ function clientBillingSection(c, only) {
   }
   function invsOf(k) {
     return hist.filter(function (i) {
-      return (i.property_id || "") === k;
+      return (i.property_id || sole) === k;
     });
   }
   function paysOf(k, onacct) {
@@ -730,7 +737,7 @@ function clientBillingSection(c, only) {
         py = paysOf(k),
         uv = k
           ? ub.filter(function (v) {
-              return v.property_id === k;
+              return v.property_id === k || (k === sole && !v.property_id);
             })
           : ub.filter(function (v) {
               return !v.property_id || keys.indexOf(v.property_id) < 0;
@@ -804,6 +811,7 @@ function clientBillingSection(c, only) {
     stP.appendChild(ws);
     if (
       !only &&
+      !sole &&
       pays.some(function (x) {
         return x.onacct;
       })

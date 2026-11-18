@@ -190,20 +190,24 @@ function propPicker(cs, label, emptyText) {
   emptyText = emptyText || "Whole account / no specific property";
   var w = fld(label || "Property", "select", "", [["", emptyText]]);
   function fill() {
-    var cur = w.input.value;
+    var cur = w.input.value,
+      ps = clientProps(cs.input.value);
     w.input.textContent = "";
-    var o = document.createElement("option");
-    o.value = "";
-    o.textContent = emptyText;
-    w.input.appendChild(o);
-    clientProps(cs.input.value).forEach(function (p) {
+    // only one property: it's their Main, so there's no "no property" choice
+    if (ps.length !== 1) {
+      var o = document.createElement("option");
+      o.value = "";
+      o.textContent = emptyText;
+      w.input.appendChild(o);
+    }
+    ps.forEach(function (p) {
       var op = document.createElement("option");
       op.value = p.id;
       op.textContent = (p.label ? p.label + " \u00b7 " : "") + p.address;
       w.input.appendChild(op);
     });
     w.input.value = cur;
-    if (w.input.value !== cur) w.input.value = "";
+    if (w.input.value !== cur) w.input.value = ps.length === 1 ? ps[0].id : "";
   }
   cs.input.addEventListener("change", fill);
   fill();
