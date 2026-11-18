@@ -689,7 +689,7 @@ function clientBillingSection(c, only) {
       ["inv", "Invoice history" + (hist.length ? " (" + hist.length + ")" : ""), invP],
       ["stmt", "Full statement", stP]
     ],
-    cur = billSub[c.id] || "pay";
+    cur = billSub[c.id] || "stmt";
   SUBS.forEach(function (t) {
     var b = el("button", t[0] === cur ? "on" : "", t[1]);
     b.type = "button";
