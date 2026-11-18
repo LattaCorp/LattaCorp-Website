@@ -5,6 +5,11 @@
 function fdate(s) {
   return s ? pd(s).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" }) : "";
 }
+/* Same-day order in account history and statements: invoices first (default) or payments first. Remembered on this device. */
+var acctPayFirst = false;
+try {
+  acctPayFirst = localStorage.getItem("lc_acct_payfirst") === "1";
+} catch (e) {}
 function acctLedger(cid, pid) {
   var rows = [];
   invoices.forEach(function (i) {
@@ -70,7 +75,7 @@ function acctLedger(cid, pid) {
       return r.pid === pid;
     });
   rows.sort(function (a, b) {
-    return a.d < b.d ? -1 : a.d > b.d ? 1 : a.ord - b.ord || a.n - b.n;
+    return a.d < b.d ? -1 : a.d > b.d ? 1 : (acctPayFirst ? b.ord - a.ord : a.ord - b.ord) || a.n - b.n;
   });
   return rows;
 }
@@ -138,10 +143,22 @@ function accountHistorySection(c, fixedPid) {
       )
     );
   pf.style.margin = "0";
+  var of = fld("Same day, show first", "select", acctPayFirst ? "pay" : "inv", [
+    ["inv", "Invoices first"],
+    ["pay", "Payments first"]
+  ]);
+  of.style.margin = "0";
+  of.input.addEventListener("change", function () {
+    acctPayFirst = of.input.value === "pay";
+    try {
+      localStorage.setItem("lc_acct_payfirst", acctPayFirst ? "1" : "0");
+    } catch (e) {}
+  });
   if (cps.length > 1 && !fixedPid) bar.appendChild(pf);
   bar.appendChild(ks);
   bar.appendChild(cf);
   bar.appendChild(ct);
+  bar.appendChild(of);
   box.appendChild(bar);
   var host = el("div");
   box.appendChild(host);
@@ -222,7 +239,7 @@ function accountHistorySection(c, fixedPid) {
       host.appendChild(b2);
     }
   }
-  [ks.input, cf.input, ct.input, pf.input].forEach(function (x) {
+  [ks.input, cf.input, ct.input, pf.input, of.input].forEach(function (x) {
     x.addEventListener("change", draw);
   });
   draw();
