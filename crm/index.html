@@ -489,6 +489,8 @@ main.wide{max-width:none;margin:0;padding:16px 24px}
 #invpaper th{background:var(--forest);color:#fff;text-align:left;padding:9px 10px;font-size:.8rem;letter-spacing:.05em;text-transform:uppercase}#invpaper th:first-child{border-radius:8px 0 0 0}#invpaper th:last-child{border-radius:0 8px 0 0}#invpaper th.r,#invpaper td.r{text-align:right}
 #invpaper td{padding:10px;border-bottom:1px solid #e6ece4;vertical-align:top;width:auto;color:#1d2a20;font-weight:400;white-space:normal}#invpaper tbody tr:nth-child(even) td{background:#f8fbf6}#invpaper td:first-child{width:96px;white-space:nowrap}
 #invpaper tfoot td{border-bottom:0;background:#fff!important;padding-top:14px;font-size:1.1rem}#invpaper tfoot td.r b:last-child{color:var(--forest);font-size:1.3rem}
+#invpaper table.stmt td.r:nth-last-child(-n+3){white-space:nowrap}#invpaper table.stmt tfoot td{font-size:.92rem}#invpaper table.stmt tfoot td.r b:last-child{font-size:1rem}
+@media(max-width:700px){#invpaper table.stmt th,#invpaper table.stmt td{padding:7px 3px;font-size:.7rem}#invpaper table.stmt tbody td{overflow-wrap:anywhere}#invpaper table.stmt th{letter-spacing:0;font-size:.6rem}#invpaper table.stmt td:first-child{width:auto}#invpaper table.stmt tfoot td,#invpaper table.stmt tfoot td.r b:last-child{font-size:.74rem}}
 #invpaper .paidstamp{display:inline-block;border:3px solid #2f7d3f;color:#2f7d3f;font-weight:800;padding:4px 14px;border-radius:8px;transform:rotate(-4deg);margin:8px 0}#invpaper .paidstamp.void{border-color:#b3261e;color:#b3261e}
 #invpaper .pay{margin:20px 0 0;padding:14px 16px;background:#f1f8ee;border:1px solid #dcebd7;border-left:5px solid #2f7d3f;border-radius:8px}#invpaper .pay b{color:var(--forest)}
 #invpaper .foot{text-align:center;color:#2f7d3f;margin-top:24px;font-size:1rem;font-weight:700;font-family:"Playfair Display",Georgia,serif}
@@ -1401,7 +1403,7 @@ html[data-theme="dark"] :is(.exgrid thead th,.taxbox th,.ptable th){background:v
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="config.js"></script>
-<script src="app.js?v=242"></script>
+<script src="app.js?v=244"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>

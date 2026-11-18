@@ -300,7 +300,7 @@ function showStatement(c, from, to, pid) {
         "</div>"
       : "") +
     "</div>" +
-    '<table class="itab"><thead><tr><th>Date</th><th>Description</th><th class="r">Charges</th><th class="r">Payments</th><th class="r">Balance</th></tr></thead><tbody>' +
+    '<table class="itab stmt"><thead><tr><th>Date</th><th>Description</th><th class="r">Charges</th><th class="r">Payments</th><th class="r">Balance</th></tr></thead><tbody>' +
     rows +
     '</tbody><tfoot><tr><td></td><td class="r"><b>Period totals</b></td><td class="r"><b>' +
     esc(money(L.charges)) +
@@ -386,7 +386,7 @@ function showStatementSplit(c, from, to) {
     secs +=
       '<div style="margin-top:16px;font-weight:800">' +
       esc(lab(k)) +
-      '</div><table class="itab"><thead><tr><th>Date</th><th>Description</th><th class="r">Charges</th><th class="r">Payments</th><th class="r">Balance</th></tr></thead><tbody>' +
+      '</div><table class="itab stmt"><thead><tr><th>Date</th><th>Description</th><th class="r">Charges</th><th class="r">Payments</th><th class="r">Balance</th></tr></thead><tbody>' +
       rows +
       '</tbody><tfoot><tr><td></td><td class="r"><b>Property totals</b></td><td class="r"><b>' +
       esc(money(L.charges)) +
@@ -398,7 +398,7 @@ function showStatementSplit(c, from, to) {
   });
   var box = document.createElement("div");
   box.innerHTML =
-    '<div style="font-weight:800;margin-bottom:4px">Summary by property</div><table class="itab"><thead><tr><th>Property</th><th class="r">Charges</th><th class="r">Payments</th><th class="r">Balance</th></tr></thead><tbody>' +
+    '<div style="font-weight:800;margin-bottom:4px">Summary by property</div><table class="itab stmt"><thead><tr><th>Property</th><th class="r">Charges</th><th class="r">Payments</th><th class="r">Balance</th></tr></thead><tbody>' +
     sumRows +
     '</tbody><tfoot><tr><td class="r"><b>Account total</b></td><td class="r"><b>' +
     esc(money(r2(T[0]))) +
