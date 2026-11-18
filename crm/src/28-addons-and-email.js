@@ -203,12 +203,10 @@ function openBatchDeliver(onlyIds) {
     body.textContent = "";
     var all = pool(),
       withEmail = all.filter(function (i) {
-        var c = byId(clients, i.client_id);
-        return c && c.email && !i.emailed_at;
+        return invEmails(i.client_id).length && !i.emailed_at;
       }),
       noEmail = all.filter(function (i) {
-        var c = byId(clients, i.client_id);
-        return !(c && c.email);
+        return !invEmails(i.client_id).length;
       }),
       done = all.filter(function (i) {
         return i.emailed_at;
@@ -272,7 +270,7 @@ function openBatchDeliver(onlyIds) {
         r.appendChild(ck);
         var l = el("span");
         l.appendChild(el("b", null, cname(inv.client_id)));
-        l.appendChild(el("span", "note", invNum(inv.number) + " · " + c.email));
+        l.appendChild(el("span", "note", invNum(inv.number) + " · " + invEmails(inv.client_id).join(", ")));
         r.appendChild(l);
         r.appendChild(el("b", "bdamt", money(inv.total)));
         lst.appendChild(r);

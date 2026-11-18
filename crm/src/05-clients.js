@@ -301,11 +301,10 @@ function openClient(id) {
   function drawMini() {
     ccMini.textContent = "";
     var list = ccErr ? [] : clientCC(c.id);
-    if (!list.length) return;
-    ccMini.appendChild(el("h4", null, "Other contacts"));
+    if (list.length) ccMini.appendChild(el("h4", null, "Other contacts"));
     list.forEach(function (x) {
       var r = el("div", "popccr");
-      r.appendChild(el("b", null, (x.name || "(no name)") + (x.role ? " · " + x.role : "")));
+      r.appendChild(el("b", null, (x.name || "(no name)") + (x.role ? " · " + x.role : "") + (x.gets_invoices ? " · gets invoices" : "")));
       if (x.phone) {
         var ph = el("a", null, x.phone);
         ph.href = "tel:" + digits(x.phone);
@@ -321,6 +320,12 @@ function openClient(id) {
       if (xr.firstChild) r.appendChild(xr);
       ccMini.appendChild(r);
     });
+    if (!ccErr)
+      ccMini.appendChild(
+        btn("+ Add contact", "btn alt sm", function () {
+          openClientForm(c, true);
+        })
+      );
   }
   drawMini();
   ccMiniRedraw = drawMini;
@@ -495,6 +500,18 @@ function openClient(id) {
   );
   more.appendChild(mr);
 }
+/* every address an invoice email goes to: the client's email plus contacts marked "Gets invoices" */
+function invEmails(cid) {
+  var c = byId(clients, cid),
+    out = [];
+  if (c && c.email) out.push(String(c.email).trim());
+  (ccErr ? [] : clientCC(cid)).forEach(function (x) {
+    if (x.gets_invoices && x.email) out.push(String(x.email).trim());
+  });
+  return out.filter(function (e, i) {
+    return /@/.test(e) && out.map(function (z) { return z.toLowerCase(); }).indexOf(e.toLowerCase()) === i;
+  });
+}
 /* ---- other contacts on a client (spouse, board members...) ---- */
 function clientCC(id) {
   return ccontacts.filter(function (x) {
@@ -620,6 +637,16 @@ function ccForm(c, x, holder) {
   box.appendChild(g);
   var nt = fld("Notes", "text", x ? x.notes : "");
   box.appendChild(nt);
+  /* invoice emails go to this person too */
+  var gi = document.createElement("input");
+  gi.type = "checkbox";
+  gi.style.width = "auto";
+  gi.checked = !!(x && x.gets_invoices);
+  var gl = el("label");
+  gl.style.cssText = "display:flex;gap:8px;align-items:center;margin:0 0 10px;font-weight:600";
+  gl.appendChild(gi);
+  gl.appendChild(document.createTextNode("Gets invoices (invoice emails go to this person too)"));
+  box.appendChild(gl);
   /* client portal: this person may sign in to see this account (needs an email) */
   var pa = null;
   if (c.portal_access !== undefined) {
@@ -646,8 +673,13 @@ function ccForm(c, x, holder) {
       role: rl.input.value.trim(),
       phone: ph.input.value.trim(),
       email: em.input.value.trim(),
-      notes: nt.input.value.trim()
+      notes: nt.input.value.trim(),
+      gets_invoices: gi.checked
     };
+    if (gi.checked && !row.email) {
+      alert("Invoices need an email for this contact.");
+      return;
+    }
     if (pa) {
       if (pa.checked && !row.email) {
         alert("Portal access needs an email for this contact.");
@@ -864,7 +896,7 @@ function propForm(c, pr, holder) {
     holder.insertBefore(box, holder.firstChild);
   }
 }
-function openClientForm(c) {
+function openClientForm(c, addContact) {
   var p = panel();
   p.appendChild(el("h2", null, c ? "Edit client" : "New client"));
   var n = fld("Name", "text", c && c.name),
@@ -895,6 +927,112 @@ function openClientForm(c) {
   if (c && c.account_no) p.appendChild(el("p", "note", "Account #" + c.account_no));
   p.appendChild(bp);
   p.appendChild(nt);
+  // other contacts: spouse, HOA manager, accounts payable... each can get the invoice emails too
+  var ccRows = [],
+    ccRemoved = [],
+    ccWrap = el("div", "ccedit");
+  if (!ccErr) {
+    ccWrap.appendChild(el("h3", null, "Other contacts"));
+    ccWrap.appendChild(el("div", "note", "Spouse, HOA manager, accounts payable… Tick “Gets invoices” to send them the invoice emails too."));
+    var ccList = el("div");
+    ccWrap.appendChild(ccList);
+    var addRow = function (x) {
+      var r = el("div", "pcard ccrow"),
+        g2 = el("div", "grid2"),
+        f = {
+          name: fld("Name", "text", x ? x.name : ""),
+          role: fld("Role", "text", x ? x.role : ""),
+          phone: fld("Phone", "tel", x ? x.phone : ""),
+          email: fld("Email", "email", x ? x.email : "")
+        };
+      f.role.input.placeholder = "Spouse, HOA manager…";
+      ["name", "role", "phone", "email"].forEach(function (k) {
+        g2.appendChild(f[k]);
+      });
+      r.appendChild(g2);
+      var lb = el("label", "chk"),
+        gi = document.createElement("input");
+      gi.type = "checkbox";
+      gi.checked = !!(x && x.gets_invoices);
+      lb.appendChild(gi);
+      lb.appendChild(document.createTextNode(" Gets invoices"));
+      r.appendChild(lb);
+      var item = { x: x, f: f, gi: gi, el: r };
+      r.appendChild(
+        btn("Remove", "btn alt sm", function () {
+          if (x) ccRemoved.push(x);
+          ccRows = ccRows.filter(function (z) {
+            return z !== item;
+          });
+          r.remove();
+        })
+      );
+      ccRows.push(item);
+      ccList.appendChild(r);
+      return item;
+    };
+    if (c)
+      clientCC(c.id).forEach(function (x) {
+        addRow(x);
+      });
+    ccWrap.appendChild(
+      btn("+ Add another contact", "btn alt sm", function () {
+        addRow(null).f.name.input.focus();
+      })
+    );
+    p.appendChild(ccWrap);
+    if (addContact)
+      setTimeout(function () {
+        var it = addRow(null);
+        it.el.scrollIntoView({ block: "center" });
+        it.f.name.input.focus();
+      }, 0);
+  }
+  /* saves the contact rows for client id `cid`; resolves when done */
+  function saveContacts(cid) {
+    var jobs_ = [];
+    ccRemoved.forEach(function (x) {
+      jobs_.push(
+        sb.from("client_contacts").delete().eq("id", x.id).then(function (r) {
+          if (!r.error)
+            ccontacts = ccontacts.filter(function (z) {
+              return z.id !== x.id;
+            });
+        })
+      );
+    });
+    ccRows.forEach(function (it) {
+      var row = {
+        name: it.f.name.input.value.trim(),
+        role: it.f.role.input.value.trim(),
+        phone: it.f.phone.input.value.trim(),
+        email: it.f.email.input.value.trim(),
+        gets_invoices: it.gi.checked && !!it.f.email.input.value.trim()
+      };
+      if (!row.name && !row.phone && !row.email) return;
+      if (it.x) {
+        var same = ["name", "role", "phone", "email", "gets_invoices"].every(function (k) {
+          return String(it.x[k] == null ? "" : it.x[k]) === String(row[k]);
+        });
+        if (same) return;
+        jobs_.push(
+          sb.from("client_contacts").update(row).eq("id", it.x.id).select().single().then(function (r) {
+            if (r.data) Object.assign(it.x, r.data);
+          })
+        );
+      } else
+        jobs_.push(
+          sb.from("client_contacts")
+            .insert(Object.assign({ client_id: cid }, row))
+            .select()
+            .single()
+            .then(function (r) {
+              if (r.data) ccontacts.push(r.data);
+            })
+        );
+    });
+    return Promise.all(jobs_);
+  }
   function hint() {
     ln.input.placeholder = guessLast(n.input.value) || "Auto from name";
   }
@@ -910,6 +1048,14 @@ function openClientForm(c) {
   var save = btn("Save", "btn", function () {
     if (!n.input.value.trim()) {
       alert("Enter a name.");
+      return;
+    }
+    var noMail = ccRows.filter(function (it) {
+      return it.gi.checked && !it.f.email.input.value.trim();
+    })[0];
+    if (noMail) {
+      alert("A contact marked “Gets invoices” needs an email.");
+      noMail.f.email.input.focus();
       return;
     }
     if (!c && !addr.input.value.trim()) {
@@ -959,8 +1105,10 @@ function openClientForm(c) {
             return;
           }
           Object.assign(c, r.data);
-          render();
-          openClient(c.id);
+          saveContacts(c.id).then(function () {
+            render();
+            openClient(c.id);
+          });
         });
     } else {
       row.source = "Added by hand";
@@ -990,8 +1138,10 @@ function openClientForm(c) {
             .then(function (q) {
               if (q.data) props.push(q.data);
               else alert("Client saved, but the address did not save. Add it from the client page.");
-              render();
-              openClient(r.data.id);
+              saveContacts(r.data.id).then(function () {
+                render();
+                openClient(r.data.id);
+              });
             });
         });
     }

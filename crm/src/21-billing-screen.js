@@ -509,8 +509,8 @@ function openInvoice(id) {
     if (c && c.email) {
       var em = el("a", "btn alt", "Email");
       em.href = remind
-        ? mailHref(c.email, "Payment reminder: invoice " + invNum(inv.number), text)
-        : mailHref(c.email, "Invoice " + invNum(inv.number) + " from " + bizv("name", "Latta Corp"), text);
+        ? mailHref(invEmails(c.id).join(","), "Payment reminder: invoice " + invNum(inv.number), text)
+        : mailHref(invEmails(c.id).join(","), "Invoice " + invNum(inv.number) + " from " + bizv("name", "Latta Corp"), text);
       em.addEventListener("click", function () {
         remind ? stampInv(inv) : markSent(inv);
       });
@@ -1252,7 +1252,7 @@ function openBillMonth() {
       }
       if (c && c.email) {
         var em = el("a", "btn sm", "Email");
-        em.href = mailHref(c.email, "Invoice " + invNum(inv.number) + " from " + bizv("name", "Latta Corp"), msg);
+        em.href = mailHref(invEmails(c.id).join(","), "Invoice " + invNum(inv.number) + " from " + bizv("name", "Latta Corp"), msg);
         em.addEventListener("click", sent);
         a.appendChild(em);
       }

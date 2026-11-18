@@ -561,12 +561,17 @@ export async function handleInvoiceEmail(request, env) {
   const invs = (await ir.json()) || [];
   const cids = [...new Set(invs.map((i) => i.client_id))];
   const cl = cids.length ? await (await sbRest(env, `clients?id=in.(${cids.join(",")})&select=id,name,email`)).json() : [];
+  // other contacts marked "Gets invoices" (spouse, HOA manager, accounts payable) get the same email
+  const ccr = cids.length ? await sbRest(env, `client_contacts?client_id=in.(${cids.join(",")})&gets_invoices=eq.true&select=client_id,email`) : null;
+  const extra = ccr && ccr.ok ? (await ccr.json()) || [] : [];
   let biz = {}; try { biz = ((await (await sbRest(env, "business?select=*&limit=1")).json()) || [])[0] || {}; } catch {}
   const zelle = String(biz.zelle || "407-470-5309");
   const failed = [], msgs = [], meta = [];
   for (const inv of invs) {
     const c = cl.find((x) => x.id === inv.client_id) || {};
-    const to = String(c.email || "").trim();
+    const tos = [...new Set([c.email, ...extra.filter((x) => x.client_id === inv.client_id).map((x) => x.email)]
+      .map((e) => String(e || "").trim()).filter((e) => EMAIL_RE.test(e)).map((e) => e.toLowerCase()))].slice(0, 10);
+    const to = tos[0] || "";
     if (inv.emailed_at) { failed.push({ id: inv.id, error: "already emailed" }); continue; }
     if (inv.status === "void") { failed.push({ id: inv.id, error: "void" }); continue; }
     if (!EMAIL_RE.test(to)) { failed.push({ id: inv.id, error: "no email on file" }); continue; }
@@ -582,9 +587,9 @@ export async function handleInvoiceEmail(request, env) {
       small: `Pay with Zelle to ${esc(zelle)} (please include ${num} in the note), or cash or check on our next visit. Thank you for letting us treat your lawn with a "Latta" love!`,
       foot: "Questions about this invoice? Reply to this email, or write to",
     };
-    msgs.push({ from: INVOICE_FROM, to: [to], reply_to: SUPPORT_EMAIL, subject: `Invoice ${num} from Latta Corp · ${money2(inv.total)}`,
+    msgs.push({ from: INVOICE_FROM, to: tos, reply_to: SUPPORT_EMAIL, subject: `Invoice ${num} from Latta Corp · ${money2(inv.total)}`,
       html: portalEmail(parts), text: portalText(parts) });
-    meta.push({ id: inv.id, to });
+    meta.push({ id: inv.id, to: tos.join(", ") });
   }
   const sent = [];
   if (msgs.length) {
