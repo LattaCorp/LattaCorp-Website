@@ -1,5 +1,5 @@
 import { makeVapidKeys, sendPush } from "./push.js";
-import { stripe, stripeMode, verifyStripeSignature, cents } from "./stripe.js";
+import { stripe, stripeMode, verifyStripeSignature, cents, SURCHARGE_VERSION } from "./stripe.js";
 import { readEmail, looksLikeZelle, readZelle, fromBank, invoiceNumbers, findClients } from "./zelle.js";
 // Latta Corp website server code (Cloudflare Worker).
 // The static website is served automatically. This file only handles form submissions sent to /api/submit:
@@ -1334,8 +1334,13 @@ export async function handleCard(request, env) {
     payment_method_types: ["card"], return_url: `${SITE}/d/?t=${x.tok}&paid=card`,
     description: `Latta Corp invoice ${lcNum(x.inv.number)} (${money2(x.due)} + ${money2(surcharge)} card surcharge)`,
     statement_descriptor_suffix: `INV ${x.inv.number}`.slice(0, 22), metadata: md,
-  }, `card-${x.inv.id}-${d.ct}`);
-  if (pi.error) return json({ error: pi.error.message || "The card was declined." }, 402);
+    // tells Stripe and the card networks which part is the surcharge; Stripe checks it's allowed for this card
+    amount_details: { surcharge: { amount: cents(surcharge), enforce_validation: "enabled" } },
+  }, `card-${x.inv.id}-${d.ct}`, SURCHARGE_VERSION);
+  if (pi.error) {
+    console.log("card payment refused", pi.error.code || "", pi.error.message || "");
+    return json({ error: /surcharge/i.test(pi.error.message || "") ? "This card can't be used with a surcharge. Please use a different credit card, or pay by bank for free." : pi.error.message || "The card was declined." }, 402);
+  }
   await sbRest(env, "autopay_charges?on_conflict=payment_intent", { method: "POST", headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
     body: JSON.stringify({ invoice_id: x.inv.id, client_id: x.inv.client_id, payment_intent: pi.id, amount: x.due, surcharge, card: chk.card, status: "processing", source: "card" }) });
   if (pi.status === "succeeded") { await recordAutopayPaid(env, pi); return json({ ok: true, paid: true, total }); }

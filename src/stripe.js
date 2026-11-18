@@ -17,9 +17,11 @@ export function formEncode(obj, prefix, out = []) {
   return out.join("&");
 }
 
-export async function stripe(env, method, path, params, idempotencyKey) {
+// `version` sets a Stripe-Version for one call (card surcharges need a preview version).
+export async function stripe(env, method, path, params, idempotencyKey, version) {
   if (!env.STRIPE_SECRET_KEY) return { error: { message: "Stripe is not connected yet." } };
   const headers = { Authorization: `Bearer ${env.STRIPE_SECRET_KEY}` };
+  if (version) headers["Stripe-Version"] = version;
   let url = API + path, body;
   if (method === "GET") { if (params) url += "?" + formEncode(params); }
   else { headers["Content-Type"] = "application/x-www-form-urlencoded"; body = formEncode(params || {}); }
@@ -49,3 +51,6 @@ export async function verifyStripeSignature(payload, header, secret, now = Math.
 }
 
 export const cents = (n) => Math.round(Number(n || 0) * 100);
+// Stripe's card surcharge field (amount_details[surcharge]) is in public preview: it marks the fee as a surcharge for
+// the card networks, and Stripe refuses it on debit/prepaid cards or above the allowed maximum.
+export const SURCHARGE_VERSION = "2026-10-28.preview";
