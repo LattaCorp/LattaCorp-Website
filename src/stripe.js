@@ -53,4 +53,4 @@ export async function verifyStripeSignature(payload, header, secret, now = Math.
 export const cents = (n) => Math.round(Number(n || 0) * 100);
 // Stripe's card surcharge field (amount_details[surcharge]) is in public preview: it marks the fee as a surcharge for
 // the card networks, and Stripe refuses it on debit/prepaid cards or above the allowed maximum.
-export const SURCHARGE_VERSION = "2026-10-28.preview";
+export const SURCHARGE_VERSION = "2026-03-25.preview"; // the version Stripe named for surcharging (support ticket, Nov 19 2026)

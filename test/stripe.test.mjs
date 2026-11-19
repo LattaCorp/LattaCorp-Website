@@ -185,7 +185,7 @@ assert.equal(j.paid, true, JSON.stringify(j));
 const piCall = stripeCalls.find((c) => c.url.endsWith("/payment_intents"));
 assert(piCall.body.includes("amount=12360") && piCall.body.includes("payment_method_types%5B0%5D=card"));
 assert(piCall.body.includes("amount_details%5Bsurcharge%5D%5Bamount%5D=360") && piCall.body.includes("enforce_validation%5D=enabled"), "the $3.60 is flagged as a surcharge");
-assert.equal(piCall.version, "2026-10-28.preview");
+assert.equal(piCall.version, "2026-03-25.preview");
 assert.equal(db.invoices.find((i) => i.id === I1).status, "paid");
 const cp = db.invoice_payments.find((p) => p.invoice_id === I1);
 assert.equal(cp.amount, 120); assert.equal(cp.method, "Credit card"); assert(cp.note.includes("$3.60"));
