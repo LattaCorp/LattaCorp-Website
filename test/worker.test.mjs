@@ -128,6 +128,8 @@ r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
   calls = []; r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "addon", picks: ["Mulching", "Hedge trimming"], details: "" }, true);
   assert.equal(r.status, 200); const add = calls.find((c) => c.u.includes("/rest/v1/leads")).body; assert.equal(add.kind, "Service change request");
   assert(add.fields.some((f) => f.label === "Services wanted" && f.value === "Mulching, Hedge trimming"));
+  calls = []; r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "service", picks: ["Irrigation"], details: "Sprinkler head broken by the mower" }, true);
+  assert.equal(r.status, 200); const svc = calls.find((c) => c.u.includes("/rest/v1/leads")).body; assert.equal(svc.kind, "Service request"); assert.equal(svc.service, "Irrigation");
   calls = []; r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "billing", details: "Why two charges?" }, true);
   assert.equal(r.status, 200); assert.equal(calls.find((c) => c.u.includes("/rest/v1/leads")).body.kind, "Billing question");
   r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "addon", picks: [], details: "" }, true); assert.equal(r.status, 400);

@@ -430,7 +430,7 @@ export async function handlePortalRequest(request, env) {
     { label: "Email", value: email },
     { label: "Phone", value: String(d.phone || acct.client.phone || "").slice(0, 60) },
     { label: "Service address", value: String(d.address || "").slice(0, 300) },
-    { label: "Services wanted", value: picks },
+    { label: k === "service" ? "Services involved" : "Services wanted", value: picks },
     { label: isQuote ? "Work wanted" : "Details", value: details },
     { label: "Sent from", value: "Client portal" },
   ].filter((f) => f.value);

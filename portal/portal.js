@@ -125,8 +125,9 @@
     "Service request": "Solicitud de servicio", "Quote request": "Solicitud de cotización",
     "Service change request": "Cambio de servicio", "Billing question": "Pregunta sobre facturación",
     "Something was missed or damaged": "Algo se pasó por alto o se dañó", "Add a service or change my plan": "Agregar un servicio o cambiar mi plan", "Question about my bill": "Pregunta sobre mi factura",
-    "Pick what to add or change": "Elija qué agregar o cambiar", "Details (optional)": "Detalles (opcional)", "Pick what to add, or describe what you need.": "Elija qué agregar o describa lo que necesita.",
-    "Hedge trimming": "Poda de setos", "Tree trimming": "Poda de árboles", "Mulching": "Mantillo", "Weed spraying (beds and cracks)": "Fumigación de maleza (jardineras y grietas)", "Irrigation": "Riego", "Upgrade my plan": "Mejorar mi plan",
+    "Pick what to add or change": "Elija qué agregar o cambiar", "What's this about?": "¿De qué se trata?", "Which services does this involve?": "¿Qué servicios incluye?",
+    "Mowing": "Corte de césped", "Edging": "Bordeado", "Weed-whacking": "Recorte de maleza", "Blowing": "Soplado", "Other": "Otro", "Details (optional)": "Detalles (opcional)", "Pick what to add, or describe what you need.": "Elija qué agregar o describa lo que necesita.",
+    "Hedge trimming": "Poda de setos", "Tree trimming": "Poda de árboles", "Mulching": "Mantillo", "Weed spraying (beds and cracks)": "Fumigación de maleza (jardineras y grietas)", "Irrigation": "Riego", "Weed spraying": "Fumigación de maleza", "Upgrade my plan": "Mejorar mi plan",
     "No photos yet. We'll add photos from your visits here.": "Aún no hay fotos. Aquí agregaremos fotos de sus visitas.",
     "Your account": "Su cuenta", "Contact info": "Información de contacto", "Properties": "Propiedades", "People with access": "Personas con acceso",
     "Signed in as": "Sesión iniciada como", "Sign out": "Cerrar sesión", "Need to change something?": "¿Necesita cambiar algo?",
@@ -780,16 +781,25 @@
     var f = el("form"); f.noValidate = true; p.appendChild(f);
     // Request types: each one arrives in Foreman's Leads (Client Requests column) labeled by type.
     var kind = "service";
-    var fs = el("fieldset", "rtypes"); fs.appendChild(el("legend", null, t("What do you need?")));
-    var ADDS = ["Hedge trimming", "Tree trimming", "Mulching", "Weed spraying (beds and cracks)", "Upgrade my plan"];
-    var addBox = el("div", "rpicks hide"); addBox.appendChild(el("p", "rph", t("Pick what to add or change")));
-    ADDS.forEach(function (n) { var lb = el("label", "chk"), cb = el("input"); cb.type = "checkbox"; cb.value = n; lb.appendChild(cb); lb.appendChild(document.createTextNode(" " + t(n))); addBox.appendChild(lb); });
+    var fs = el("fieldset", "rtypes"); fs.appendChild(el("legend", null, t("What's this about?")));
+    // A checklist under each type that has one: which services a problem involves, or what to add.
+    var PICKS = {
+      service: ["Which services does this involve?", ["Mowing", "Edging", "Weed-whacking", "Blowing", "Hedge trimming", "Tree trimming", "Mulching", "Weed spraying", "Irrigation", "Other"]],
+      addon: ["Pick what to add or change", ["Hedge trimming", "Tree trimming", "Mulching", "Weed spraying (beds and cracks)", "Upgrade my plan"]]
+    };
+    var addBox = el("div", "rpicks");
+    function drawPicks() {
+      addBox.textContent = ""; var pk = PICKS[kind]; addBox.classList.toggle("hide", !pk); if (!pk) return;
+      addBox.appendChild(el("p", "rph", t(pk[0])));
+      var g = el("div", "rpgrid"); addBox.appendChild(g);
+      pk[1].forEach(function (n) { var lb = el("label", "chk"), cb = el("input"); cb.type = "checkbox"; cb.value = n; lb.appendChild(cb); lb.appendChild(document.createTextNode(" " + t(n))); g.appendChild(lb); });
+    }
     [["service", "Something was missed or damaged"], ["addon", "Add a service or change my plan"], ["billing", "Question about my bill"], ["quote", "Quote for other work"]].forEach(function (x) {
       var lb = el("label", "rtype" + (x[0] === kind ? " on" : "")), r = el("input"); r.type = "radio"; r.name = "rkind"; r.value = x[0]; r.checked = x[0] === kind;
-      r.onchange = function () { kind = x[0]; [].forEach.call(fs.querySelectorAll(".rtype"), function (c) { c.classList.toggle("on", c.contains(r)); }); addBox.classList.toggle("hide", kind !== "addon"); dsp.textContent = kind === "addon" ? t("Details (optional)") : t("Details"); };
+      r.onchange = function () { kind = x[0]; [].forEach.call(fs.querySelectorAll(".rtype"), function (c) { c.classList.toggle("on", c.contains(r)); }); drawPicks(); dsp.textContent = kind === "addon" ? t("Details (optional)") : t("Details"); };
       lb.appendChild(r); lb.appendChild(document.createTextNode(" " + t(x[1]))); fs.appendChild(lb);
     });
-    f.appendChild(fs); f.appendChild(addBox);
+    f.appendChild(fs); f.appendChild(addBox); drawPicks();
     var props = data.properties || [];
     var pl = el("label", "f"); pl.appendChild(el("span", null, t("Property"))); var ps = el("select"); pl.appendChild(ps);
     props.forEach(function (x) { var o = el("option", null, (x.label && x.label !== x.address ? x.label + " · " : "") + (x.address || "")); o.value = x.address || x.label || ""; ps.appendChild(o); });
@@ -800,7 +810,7 @@
     var sb2 = el("button", "btn", t("Send request")); sb2.type = "submit"; f.appendChild(sb2);
     f.addEventListener("submit", function (e) {
       e.preventDefault();
-      var picks = kind === "addon" ? [].map.call(addBox.querySelectorAll("input:checked"), function (c) { return c.value; }) : [];
+      var picks = PICKS[kind] ? [].map.call(addBox.querySelectorAll("input:checked"), function (c) { return c.value; }) : [];
       if (!ta.value.trim() && !picks.length) { er.textContent = t(kind === "addon" ? "Pick what to add, or describe what you need." : "Please describe what you need."); er.classList.remove("hide"); ta.focus(); return; }
       sb2.disabled = true; sb2.textContent = t("Sending..."); er.classList.add("hide");
       sb.auth.getSession().then(function (r) {
