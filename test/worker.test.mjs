@@ -124,6 +124,13 @@ r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
   const lead = calls.find((c) => c.u.includes("/rest/v1/leads")); assert.equal(lead.body.client_id, "11111111-1111-4111-8111-111111111111"); assert.equal(lead.body.kind, "Quote request");
   mail = calls.find((c) => c.u.includes("api.resend.com")); assert.equal(mail.body.subject, "Quote – Pat Lee – 9 Palm Dr · Portal"); assert.equal(mail.body.reply_to, "pat@example.com");
   const asUser = calls.find((c) => c.u.includes("rpc/portal_account")); assert.equal(asUser.headers.Authorization, "Bearer usertoken", "asked as the client, not with the secret key");
+  // add-a-service request with picks and no details: saved as a Service change request listing the picks
+  calls = []; r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "addon", picks: ["Mulching", "Hedge trimming"], details: "" }, true);
+  assert.equal(r.status, 200); const add = calls.find((c) => c.u.includes("/rest/v1/leads")).body; assert.equal(add.kind, "Service change request");
+  assert(add.fields.some((f) => f.label === "Services wanted" && f.value === "Mulching, Hedge trimming"));
+  calls = []; r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "billing", details: "Why two charges?" }, true);
+  assert.equal(r.status, 200); assert.equal(calls.find((c) => c.u.includes("/rest/v1/leads")).body.kind, "Billing question");
+  r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "addon", picks: [], details: "" }, true); assert.equal(r.status, 400);
   acctOk = false; r = await post("/api/portal/request", { client_id: "11111111-1111-4111-8111-111111111111", kind: "service", details: "x" }, true); assert.equal(r.status, 403); acctOk = true;
   // invite: staff only
   calls = []; r = await post("/api/portal/invite", { client_id: "11111111-1111-4111-8111-111111111111", email: "jane@example.com", name: "Jane Doe" }, true);

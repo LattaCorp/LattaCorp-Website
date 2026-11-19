@@ -7,7 +7,7 @@ function esc(x){return String(x).replace(/&/g,"&amp;").replace(/</g,"&lt;")}
 function drawDetail(kind,key){var d=(kind==="a"?AR:SV)[key];if(!d)return false;var h='<div class="band tband"><div class="wrap"><h1>'+esc(d.t)+'</h1><p>'+esc(d.lead)+'</p></div></div><section><div class="wrap"><a class="back" href="#/services">&larr; Back to Services</a><div class="dgrid"><div class="dtext">';
 if(kind==="a"){h+='<h2>About this area</h2><p>'+esc(d.body)+'</p><h2>What we do here</h2><ul>';Object.keys(SVN).forEach(function(k){h+='<li><a href="#/services/'+k+'">'+esc(SVN[k])+'</a></li>'});h+='</ul><p><a href="'+d.extra[1]+'">'+esc(d.extra[0])+'</a></p>'}
 else{h+='<h2>What\'s included</h2><ul>'+d.inc.map(function(x){return'<li>'+esc(x)+'</li>'}).join("")+'</ul><h2>Good to know</h2><ul>'+d.know.map(function(x){return'<li>'+esc(x)+'</li>'}).join("")+'</ul>'}
-h+='<div class="cta"><a class="btn" href="#/services/quote">Get a quote</a><a class="btn alt" href="tel:4074705309">Call or text 407-470-5309</a></div></div><div class="dimg"><img data-img="'+d.img+'" width="1400" height="1050" alt=""></div></div></div></section>';
+h+='<div class="cta"><a class="btn" href="#/services/quote">Get a quote</a><a class="btn alt" href="sms:+14074705309">Text us at 407-470-5309</a></div></div><div class="dimg"><img data-img="'+d.img+'" width="1400" height="1050" alt=""></div></div></div></section>';
 h+='<section class="mint"><div class="wrap"><h2>'+(kind==="a"?"Our services":"Related services")+'</h2><div class="chips">';
 if(kind==="a"){Object.keys(SVN).forEach(function(k){h+='<a href="#/services/'+k+'">'+esc(SVN[k])+'</a>'})}else{d.rel.forEach(function(k){h+='<a href="#/services/'+k+'">'+esc(SVN[k])+'</a>'})}
 h+='</div><h2 style="margin-top:28px">Other areas we serve</h2><div class="chips">';Object.keys(AR).forEach(function(k){if(!(kind==="a"&&k===key))h+='<a href="#/services/areas/'+k+'">'+esc(AR[k].t)+'</a>'});
@@ -17,10 +17,10 @@ document.title=t(d.title)+" | Latta Corp";if(lang==="es"){walkText();walkAttrs()
 
 function setHoa(k){var v=HV[k],b=document.querySelector("#hoa .band .wrap");b.innerHTML="<h1></h1><p></p>";b.firstChild.textContent=v.h;b.lastChild.textContent=v.p;
 function li(a){return"<ul>"+a.map(function(x){return"<li>"+esc(x)+"</li>"}).join("")+"</ul>"}
-var tail=(k==="hoa"||k==="property-managers")?' <a href="#/community">HOA Requests</a>.':' <a href="tel:4074705309">407-470-5309</a>.';
+var tail=(k==="hoa"||k==="property-managers")?' <a href="#/community">HOA Requests</a>.':' <a href="sms:+14074705309">407-470-5309</a>.';
 var e=v.el,h=(e?'<div class="elite"><span class="ek">'+esc(e.k)+'</span><h2>'+esc(e.h)+'</h2><p>'+esc(e.p)+'</p>'+li(e.l)+'<p class="ef">'+esc(e.f)+'</p><a class="btn" href="#hf" id="elbtn">'+esc(e.b)+'</a> <a class="btn alt" href="#/services">Compare all plans</a></div>':'')+'<div class="svcbox"><h2>'+esc(v.bt)+'</h2><p>'+esc(v.bp)+'</p>'+li(v.bl)+'<p class="res">'+esc(HRES)+'</p><p>'+esc(v.br)+tail+'</p></div>'
 +'<h2>'+esc(v.wt)+'</h2>'+li(v.wl)+'<h2>'+esc(v.jt)+'</h2>'+li(v.jl)+'<h2>'+esc(v.pt)+'</h2><p>'+esc(v.pp)+(v.pl?' <a href="#/services">See our maintenance plans</a>.':'')+'</p><h2>Coverage</h2><p>'+esc(v.cv||HCOV)+'</p>'
-+'<div class="cta"><a class="btn alt" href="tel:4074705309">Call or text 407-470-5309</a><a class="btn alt" href="#/portfolio">See our work</a></div><div class="pnote"><b>Client Portal</b> <span class="soon">NEW!</span><p>See your visits, invoices, and requests online. <a href="/portal/">Sign in</a></p></div>';
++'<div class="cta"><a class="btn alt" href="sms:+14074705309">Text us at 407-470-5309</a><a class="btn alt" href="#/portfolio">See our work</a></div><div class="pnote"><b>Client Portal</b> <span class="soon">NEW!</span><p>See your visits, invoices, and requests online. <a href="/portal/">Sign in</a></p></div>';
 document.getElementById("hdt").innerHTML=h;var eb=document.getElementById("elbtn");if(eb)eb.addEventListener("click",function(ev){ev.preventDefault();var ta=document.querySelector("#hf textarea"),f=document.getElementById("hf");if(ta&&!ta.value)ta.value=t("I am interested in the Elite plan.");f.scrollIntoView({behavior:"smooth",block:"start"});var fi=f.querySelector("input");if(fi)setTimeout(function(){fi.focus({preventScroll:true})},500)});
 var sel=document.querySelector("#hf select");if(sel&&!sel.dataset.manual){[].forEach.call(sel.options,function(o){if(o.text===v.r)sel.value=o.value||o.text})}
 if(lang==="es"){walkText()}document.title=t(v.t)+" | Latta Corp"}
@@ -47,6 +47,9 @@ function refresh(){var c=document.getElementById("comm").value,inc=CONTRACT[c]||
 
 var flagged=[].some.call(sv.querySelectorAll("input:checked"),function(i){var l=i.parentNode;return l.hasAttribute("data-tip")||(showO&&l.classList.contains("oth"))});var ack=document.getElementById("ack");document.getElementById("ackrow").style.display=flagged?"flex":"none";ack.required=flagged;if(!flagged)ack.checked=false}
 document.getElementById("comm").addEventListener("change",refresh);sv.addEventListener("change",refresh);
+// Customer Service: "Are you a current client?" Yes shows the Client Portal shortcut.
+[].forEach.call(document.querySelectorAll('#ctf input[name=cc]'),function(r){r.addEventListener("change",function(){document.getElementById("ccportal").hidden=!(r.checked&&r.value==="Yes")})});
+[].forEach.call(document.querySelectorAll('.ynb input'),function(r){r.addEventListener("change",function(){[].forEach.call(document.querySelectorAll('input[name="'+r.name+'"]'),function(x){x.closest(".ynb").classList.toggle("on",x.checked)})})});
 // Weed spraying pop-up: opens when the box is ticked; closes with X, Got it, Escape, or a click outside.
 var wn=document.getElementById("wn"),wfocus=null;
 function closeWn(){wn.classList.remove("on");if(wfocus)wfocus.focus()}
@@ -111,8 +114,8 @@ window.addEventListener("resize",dots);window.addEventListener("hashchange",func
 
 [["qf","t-qf"],["cf","t-cf"],["ctf","t-ctf"]].forEach(function(a){var f=document.getElementById(a[0]),t=document.getElementById(a[1]);
 f.addEventListener("submit",function(e){submitForm(f,t,e)});
-t.querySelector("[data-again]").addEventListener("click",function(){f.reset();t.style.display="none";f.style.display="";var x=f.querySelector("input,select,textarea");if(x)x.focus()})});
-[["hf","t-hf"]].forEach(function(a){var f=document.getElementById(a[0]),t=document.getElementById(a[1]);f.addEventListener("submit",function(e){submitForm(f,t,e)});t.querySelector("[data-again]").addEventListener("click",function(){f.reset();t.style.display="none";f.style.display="";var x=f.querySelector("input,select,textarea");if(x)x.focus()})});
+t.querySelector("[data-again]").addEventListener("click",function(){f.reset();[].forEach.call(f.querySelectorAll(".ynb.on"),function(x){x.classList.remove("on")});var cp=f.querySelector("#ccportal");if(cp)cp.hidden=true;t.style.display="none";f.style.display="";var x=f.querySelector("input,select,textarea");if(x)x.focus()})});
+[["hf","t-hf"]].forEach(function(a){var f=document.getElementById(a[0]),t=document.getElementById(a[1]);f.addEventListener("submit",function(e){submitForm(f,t,e)});t.querySelector("[data-again]").addEventListener("click",function(){f.reset();[].forEach.call(f.querySelectorAll(".ynb.on"),function(x){x.classList.remove("on")});var cp=f.querySelector("#ccportal");if(cp)cp.hidden=true;t.style.display="none";f.style.display="";var x=f.querySelector("input,select,textarea");if(x)x.focus()})});
 document.querySelector("#hf select").addEventListener("change",function(){this.dataset.manual="1"});
 document.getElementById("hf").addEventListener("reset",function(){var sl=this.querySelector("select");if(sl)delete sl.dataset.manual});
 

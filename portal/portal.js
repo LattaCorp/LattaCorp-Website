@@ -123,6 +123,10 @@
     "Please describe what you need.": "Por favor describa lo que necesita.", "Your requests": "Sus solicitudes", "No requests yet.": "Aún no hay solicitudes.",
     "Received": "Recibida", "In progress": "En proceso", "Quote sent": "Cotización enviada", "Approved": "Aprobada", "Closed": "Cerrada",
     "Service request": "Solicitud de servicio", "Quote request": "Solicitud de cotización",
+    "Service change request": "Cambio de servicio", "Billing question": "Pregunta sobre facturación",
+    "Something was missed or damaged": "Algo se pasó por alto o se dañó", "Add a service or change my plan": "Agregar un servicio o cambiar mi plan", "Question about my bill": "Pregunta sobre mi factura",
+    "Pick what to add or change": "Elija qué agregar o cambiar", "Details (optional)": "Detalles (opcional)", "Pick what to add, or describe what you need.": "Elija qué agregar o describa lo que necesita.",
+    "Hedge trimming": "Poda de setos", "Tree trimming": "Poda de árboles", "Mulching": "Mantillo", "Weed spraying (beds and cracks)": "Fumigación de maleza (jardineras y grietas)", "Irrigation": "Riego", "Upgrade my plan": "Mejorar mi plan",
     "No photos yet. We'll add photos from your visits here.": "Aún no hay fotos. Aquí agregaremos fotos de sus visitas.",
     "Your account": "Su cuenta", "Contact info": "Información de contacto", "Properties": "Propiedades", "People with access": "Personas con acceso",
     "Signed in as": "Sesión iniciada como", "Sign out": "Cerrar sesión", "Need to change something?": "¿Necesita cambiar algo?",
@@ -774,31 +778,35 @@
     var p = panel(host, t("New request"));
     if (flash) { var ok = el("p", "ok", t(flash)); ok.setAttribute("role", "status"); p.appendChild(ok); flash = ""; }
     var f = el("form"); f.noValidate = true; p.appendChild(f);
+    // Request types: each one arrives in Foreman's Leads (Client Requests column) labeled by type.
     var kind = "service";
-    f.appendChild(el("p", "muted", t("What do you need?")));
-    var seg = el("div", "seg");
-    [["service", t("Service or a problem")], ["quote", t("Quote for other work")]].forEach(function (x) {
-      var bt = el("button", null, x[1]); bt.type = "button"; bt.setAttribute("aria-pressed", x[0] === kind ? "true" : "false");
-      bt.onclick = function () { kind = x[0]; [].forEach.call(seg.children, function (c) { c.setAttribute("aria-pressed", c === bt ? "true" : "false"); }); };
-      seg.appendChild(bt);
+    var fs = el("fieldset", "rtypes"); fs.appendChild(el("legend", null, t("What do you need?")));
+    var ADDS = ["Hedge trimming", "Tree trimming", "Mulching", "Weed spraying (beds and cracks)", "Upgrade my plan"];
+    var addBox = el("div", "rpicks hide"); addBox.appendChild(el("p", "rph", t("Pick what to add or change")));
+    ADDS.forEach(function (n) { var lb = el("label", "chk"), cb = el("input"); cb.type = "checkbox"; cb.value = n; lb.appendChild(cb); lb.appendChild(document.createTextNode(" " + t(n))); addBox.appendChild(lb); });
+    [["service", "Something was missed or damaged"], ["addon", "Add a service or change my plan"], ["billing", "Question about my bill"], ["quote", "Quote for other work"]].forEach(function (x) {
+      var lb = el("label", "rtype" + (x[0] === kind ? " on" : "")), r = el("input"); r.type = "radio"; r.name = "rkind"; r.value = x[0]; r.checked = x[0] === kind;
+      r.onchange = function () { kind = x[0]; [].forEach.call(fs.querySelectorAll(".rtype"), function (c) { c.classList.toggle("on", c.contains(r)); }); addBox.classList.toggle("hide", kind !== "addon"); dsp.textContent = kind === "addon" ? t("Details (optional)") : t("Details"); };
+      lb.appendChild(r); lb.appendChild(document.createTextNode(" " + t(x[1]))); fs.appendChild(lb);
     });
-    f.appendChild(seg);
+    f.appendChild(fs); f.appendChild(addBox);
     var props = data.properties || [];
     var pl = el("label", "f"); pl.appendChild(el("span", null, t("Property"))); var ps = el("select"); pl.appendChild(ps);
     props.forEach(function (x) { var o = el("option", null, (x.label && x.label !== x.address ? x.label + " · " : "") + (x.address || "")); o.value = x.address || x.label || ""; ps.appendChild(o); });
     var oo = el("option", null, t("Other address")); oo.value = ""; ps.appendChild(oo); f.appendChild(pl);
-    var dl = el("label", "f"); dl.appendChild(el("span", null, t("Details"))); var ta = el("textarea"); ta.placeholder = t("Tell us what you need, where, and any timing that matters."); if (prefill) ta.value = prefill; dl.appendChild(ta); f.appendChild(dl);
+    var dl = el("label", "f"), dsp = el("span", null, t("Details")); dl.appendChild(dsp); var ta = el("textarea"); ta.placeholder = t("Tell us what you need, where, and any timing that matters."); if (prefill) ta.value = prefill; dl.appendChild(ta); f.appendChild(dl);
     var phl = el("label", "f"); phl.appendChild(el("span", null, t("Phone"))); var ph = el("input"); ph.type = "tel"; ph.autocomplete = "tel"; ph.value = data.client.phone || ""; phl.appendChild(ph); f.appendChild(phl);
     var er = el("p", "err hide"); er.setAttribute("role", "alert"); f.appendChild(er);
     var sb2 = el("button", "btn", t("Send request")); sb2.type = "submit"; f.appendChild(sb2);
     f.addEventListener("submit", function (e) {
       e.preventDefault();
-      if (!ta.value.trim()) { er.textContent = t("Please describe what you need."); er.classList.remove("hide"); ta.focus(); return; }
+      var picks = kind === "addon" ? [].map.call(addBox.querySelectorAll("input:checked"), function (c) { return c.value; }) : [];
+      if (!ta.value.trim() && !picks.length) { er.textContent = t(kind === "addon" ? "Pick what to add, or describe what you need." : "Please describe what you need."); er.classList.remove("hide"); ta.focus(); return; }
       sb2.disabled = true; sb2.textContent = t("Sending..."); er.classList.add("hide");
       sb.auth.getSession().then(function (r) {
         var tok = r.data && r.data.session && r.data.session.access_token;
         return fetch("/api/portal/request", { method: "POST", headers: { "content-type": "application/json", authorization: "Bearer " + tok },
-          body: JSON.stringify({ client_id: curId, kind: kind, address: ps.value, details: ta.value.trim(), phone: ph.value.trim(), lang: lang }) });
+          body: JSON.stringify({ client_id: curId, kind: kind, picks: picks, address: ps.value, details: ta.value.trim(), phone: ph.value.trim(), lang: lang }) });
       }).then(function (r) {
         if (!r.ok) throw new Error(String(r.status));
         flash = "Sent! We'll get back to you within 1 to 3 business days.";

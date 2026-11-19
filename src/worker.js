@@ -76,7 +76,7 @@ async function sendViaResend(env, payload) {
 //   Message – Jane Doe                      Proposal – Jane Doe – Oak Grove HOA, 9 Palm Dr
 //   Sign-up $45/visit – Jane Doe – 123 Main St
 // "(Spanish)" is added when the visitor used the Spanish site, so you know to reply in Spanish.
-const SUBJECT_WORD = { "Quote request": "Quote", "Service request": "Service Request", "Contact message": "Message", "Proposal request": "Proposal", "Instant quote signup": "Sign-up" };
+const SUBJECT_WORD = { "Quote request": "Quote", "Service request": "Service Request", "Contact message": "Message", "Proposal request": "Proposal", "Instant quote signup": "Sign-up", "Service change request": "Service Change", "Billing question": "Billing Question" };
 function emailSubject(kind, fields, lang) {
   const get = (re) => ((fields.find((f) => re.test(f.label)) || {}).value || "").replace(/\s+/g, " ").trim();
   const name = get(/name$/i) || get(/name/i);
@@ -418,16 +418,19 @@ export async function handlePortalRequest(request, env) {
   const acct = await portalAccountAs(env, token, d && d.client_id);
   if (!acct) return json({ error: "Not allowed." }, 403);
   const email = await callerEmail(request, env);
-  const isQuote = String(d.kind) === "quote";
-  const kind = isQuote ? "Quote request" : "Service request";
+  const k = String(d.kind || "service");
+  const isQuote = k === "quote";
+  const kind = { quote: "Quote request", addon: "Service change request", billing: "Billing question" }[k] || "Service request";
+  const picks = (Array.isArray(d.picks) ? d.picks : []).map((x) => String(x).slice(0, 60)).filter(Boolean).slice(0, 12).join(", ");
   const details = String(d.details || "").trim().slice(0, 3000);
-  if (!details) return json({ error: "Please describe what you need." }, 400);
+  if (!details && !picks) return json({ error: "Please describe what you need." }, 400);
   const fields = [
     { label: "Full name", value: String((acct.me && acct.me.name) || acct.client.name || "") },
     { label: "Account", value: String(acct.client.name || "") },
     { label: "Email", value: email },
     { label: "Phone", value: String(d.phone || acct.client.phone || "").slice(0, 60) },
     { label: "Service address", value: String(d.address || "").slice(0, 300) },
+    { label: "Services wanted", value: picks },
     { label: isQuote ? "Work wanted" : "Details", value: details },
     { label: "Sent from", value: "Client portal" },
   ].filter((f) => f.value);

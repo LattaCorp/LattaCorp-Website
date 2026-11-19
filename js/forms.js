@@ -25,6 +25,7 @@ function formCollect(f){
       var txt=el.value&&el.value!=="on"?el.value:(el.closest("label")?englishText(el.closest("label"),"input"):"Yes");
       if(!fs){out.push({label:key,value:"Yes"});return}
       (groups[key]=groups[key]||[]).push(txt);return}
+    if(el.type==="radio"){if(!el.checked)return;var rf=el.closest("fieldset"),rl=rf&&rf.querySelector("legend");out.push({label:(rl?englishText(rl):el.name).replace(/\s*\*$/,"").trim(),value:el.value});return}
     var v=(el.value||"").trim();if(!v)return;
     out.push({label:formLabel(el),value:v});
   });

@@ -6,6 +6,7 @@
    working columns. Making the job from an approved card keeps it under Approved for two weeks with a "View job"
    link (all of them show when the Approved pill is on). Declined holds declined, expired and lost ones. */
 var PIPE_COLS = [
+  ["client", "Client Requests", "Clients"],
   ["new", "New Requests", "New"],
   ["quoted", "Pending Quotes", "Pending"],
   ["approved", "Approved by Client", "Approved"],
@@ -112,8 +113,29 @@ function pipeAddr(it) {
   var ps = cid ? clientProps(cid) : [];
   return ps[0] ? ps[0].address : "";
 }
+/* Client Requests: a new request from someone who is already a client (sent from the portal, matched to a client by
+   email or phone, or who answered "Yes" to "Are you a current client?") gets its own column, first on the board,
+   so it can be handled before new leads. Once it gets a quote or a job it moves along like any other card. */
+function digits(x) {
+  return String(x || "").replace(/\D/g, "").slice(-10);
+}
+function leadClientMatch(l) {
+  if (l.client_id && byId(clients, l.client_id)) return true;
+  var said = (Array.isArray(l.fields) ? l.fields : []).some(function (f) {
+    return f && /current client/i.test(f.label || "") && /^(yes|s[ií])/i.test(String(f.value || ""));
+  });
+  if (said) return true;
+  var em = String(l.email || "").trim().toLowerCase(),
+    ph = digits(l.phone);
+  return clients.some(function (c) {
+    if (c.archived) return false;
+    if (em && String(c.email || "").trim().toLowerCase() === em) return true;
+    return ph.length === 10 && (digits(c.phone) === ph || digits(c.phone2) === ph);
+  });
+}
 function pipeCol(it) {
   if (it.archived) return "archived";
+  if (it.stage === "new" && it.lead && !it.est && leadClientMatch(it.lead)) return "client";
   return it.stage === "won" ? "approved" : it.stage;
 }
 function recentJob(it) {
@@ -128,7 +150,7 @@ function renderLeads() {
     it.stage = pipeStage(it);
     it.archived = pipeArchived(it);
   });
-  var counts = { new: 0, quoted: 0, approved: 0, lost: 0, archived: 0 };
+  var counts = { client: 0, new: 0, quoted: 0, approved: 0, lost: 0, archived: 0 };
   items.forEach(function (it) {
     counts[pipeCol(it)]++;
   });
@@ -136,7 +158,7 @@ function renderLeads() {
     grp = el("div", "fgrp");
   PIPE_COLS.slice()
     .sort(function (x, y) {
-      var o = ["approved", "lost", "new", "quoted", "archived"];
+      var o = ["client", "approved", "lost", "new", "quoted", "archived"];
       return o.indexOf(x[0]) - o.indexOf(y[0]);
     })
     .forEach(function (c) {
@@ -213,7 +235,7 @@ function renderLeads() {
           "pempty",
           query
             ? "Nothing matches."
-            : { new: "No new requests.", quoted: "No quotes waiting.", approved: "Nothing approved right now.", lost: "Nothing declined.", archived: "Nothing archived." }[c[0]]
+            : { client: "No requests from clients.", new: "No new requests.", quoted: "No quotes waiting.", approved: "Nothing approved right now.", lost: "Nothing declined.", archived: "Nothing archived." }[c[0]]
         )
       );
     set.forEach(function (it) {
@@ -237,7 +259,7 @@ function pipeCard(it) {
   var left = el("div");
   left.appendChild(el("b", null, pipeName(it)));
   var what = (e && e.title) || (l && l.service) || (e ? "" : l.kind) || "";
-  var src = [l ? "Website " + (l.kind || "request").toLowerCase() : "", e ? estNum(e.number, e.doc_type) : ""].filter(Boolean).join(" · ");
+  var src = [l ? (/portal/i.test(JSON.stringify(l.fields || "")) ? "Portal " : "Website ") + (l.kind || "request").toLowerCase() : "", e ? estNum(e.number, e.doc_type) : ""].filter(Boolean).join(" · ");
   left.appendChild(el("div", "sub", [what, src].filter(Boolean).join(" · ")));
   var ad = pipeAddr(it);
   if (ad) left.appendChild(el("div", "sub", ad));

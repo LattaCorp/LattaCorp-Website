@@ -198,6 +198,7 @@ dialog .x{position:absolute;top:8px;right:8px;width:40px;height:40px;border-radi
 .prow{display:flex;gap:10px;flex-wrap:wrap}
 @media (max-width:620px){.list li:has(.pacts){flex-wrap:wrap}.list li .pacts{width:100%;justify-content:flex-start;margin-top:6px}}
 label.chk{display:flex;gap:10px;align-items:flex-start;margin:0 0 8px;font-weight:600;font-size:.95rem}label.chk input{width:20px;height:20px;margin-top:2px;flex:none;accent-color:var(--forest)}
+.rtypes{border:0;padding:0;margin:0 0 12px;display:flex;flex-direction:column;gap:8px}.rtypes legend{font-weight:700;margin:0 0 8px;padding:0}.rtype{display:flex;align-items:center;gap:10px;padding:11px 14px;border:1px solid var(--line,#dfe8dc);border-radius:10px;background:#fff;font-weight:600;cursor:pointer}.rtype.on{border:2px solid var(--forest,#1b552b);background:var(--mint,#eff8ec)}.rtype input{width:20px;height:20px;margin:0;flex:none;accent-color:var(--forest,#1b552b)}.rpicks{border:1px solid var(--line,#dfe8dc);border-radius:10px;padding:12px 14px 4px;margin:0 0 12px;background:#fff}.rpicks.hide{display:none}.rph{margin:0 0 8px;font-weight:700;color:var(--forest,#1b552b)}
 .newsitem{padding:12px 0;border-top:1px solid var(--line)}.newsitem:first-of-type{border-top:0;padding-top:4px}.newsitem p{margin:6px 0}.newsitem .btn{margin-top:4px}
 .seg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));border-radius:12px!important;max-width:360px;border:1px solid var(--line,#dfe8dc);border-radius:999px;overflow:hidden}
 .seg button:nth-child(-n+2){border-bottom:1px solid var(--line,#dfe8dc)!important}.seg button{flex:1;min-width:0;background:none;border:0!important;border-radius:0!important;margin:0;padding:10px 4px;font-size:.86rem;white-space:nowrap;font:inherit;font-weight:700;color:var(--forest,#1b552b);cursor:pointer;box-shadow:none}
@@ -306,6 +307,10 @@ html[data-theme="dark"] .guide .gsec.mine{background:var(--dk9);border:1px solid
 html[data-theme="dark"] .topic{color:var(--dk35)}
 html[data-theme="dark"] .loading{color:var(--dk4)}
 html[data-theme="dark"] .btn.alt.danger{color:var(--dk11);border-color:var(--brick)}
+html[data-theme="dark"] .rtype{border:1px solid var(--dk12);background:var(--dk8)}
+html[data-theme="dark"] .rtype.on{border:2px solid var(--dk5);background:var(--dk9)}
+html[data-theme="dark"] .rpicks{border:1px solid var(--dk12);background:var(--dk8)}
+html[data-theme="dark"] .rph{color:var(--dk2)}
 html[data-theme="dark"] .newsitem{border-top:1px solid var(--dk12)}
 html[data-theme="dark"] .seg{border:1px solid var(--dk12)}
 html[data-theme="dark"] .seg button:nth-child(-n+2){border-bottom:1px solid var(--dk12)!important}
@@ -397,7 +402,7 @@ html[data-theme="dark"] .band .btn.ghost{background:transparent!important;color:
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="../crm/config.js"></script>
 <script src="guides.js?v=2"></script>
-<script src="portal.js?v=25"></script>
+<script src="portal.js?v=26"></script>
 <script>if("serviceWorker"in navigator)addEventListener("load",function(){navigator.serviceWorker.register("sw.js",{scope:"./"}).catch(function(){})});</script>
 </body>
 </html>
