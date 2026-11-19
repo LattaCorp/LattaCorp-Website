@@ -1,5 +1,7 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"Weed spraying (beds and walkways)": "Fumigación de maleza (jardineras y aceras)",
+"Live in an HOA community we maintain?": "¿Vive en una comunidad HOA que atendemos?",
 "Customer Service": "Servicio al cliente",
 "Questions about your service, your account, or anything else? We're happy to help.": "¿Preguntas sobre su servicio, su cuenta o cualquier otra cosa? Con gusto le ayudamos.",
 "HOA Requests": "Solicitudes HOA",
@@ -310,7 +312,7 @@ var ES={
 "What we handle": "Lo que manejamos",
 "Mowing, edging, weed-whacking, and blowing": "Corte, bordeado, desmalezado y soplado",
 "Hedge, palm, and oak trimming": "Poda de setos, palmeras y robles",
-"Weed control in beds and walkways": "Control de maleza en jardineras y senderos",
+"Weed spraying in beds and walkways (turf weeds by a subcontractor)": "Fumigación de maleza en jardineras y aceras (la maleza del césped la atiende un subcontratista)",
 "Dogi-Pot stations": "Estaciones Dogi-Pot",
 "Plans that fit": "Planes que se ajustan",
 "Our Elite plan includes tree trimming about two times a year, which suits property managers and commercial properties.": "Nuestro plan Elite incluye poda de árboles unas dos veces al año, ideal para administradores de propiedades y propiedades comerciales.",
