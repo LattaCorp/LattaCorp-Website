@@ -1,5 +1,7 @@
 // Spanish translations. Each English sentence on the site is a key; its Spanish version is the value.
 var ES={
+"Customer Service": "Servicio al cliente",
+"Questions about your service, your account, or anything else? We're happy to help.": "¿Preguntas sobre su servicio, su cuenta o cualquier otra cosa? Con gusto le ayudamos.",
 "HOA Requests": "Solicitudes HOA",
 "HOA request": "Solicitud HOA",
 "HOA Service Requests": "Solicitudes de servicio HOA",
