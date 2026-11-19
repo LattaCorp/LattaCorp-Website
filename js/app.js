@@ -17,7 +17,7 @@ document.title=t(d.title)+" | Latta Corp";if(lang==="es"){walkText();walkAttrs()
 
 function setHoa(k){var v=HV[k],b=document.querySelector("#hoa .band .wrap");b.innerHTML="<h1></h1><p></p>";b.firstChild.textContent=v.h;b.lastChild.textContent=v.p;
 function li(a){return"<ul>"+a.map(function(x){return"<li>"+esc(x)+"</li>"}).join("")+"</ul>"}
-var tail=(k==="hoa"||k==="property-managers")?' <a href="#/community">Service Requests</a>.':' <a href="tel:4074705309">407-470-5309</a>.';
+var tail=(k==="hoa"||k==="property-managers")?' <a href="#/community">HOA Requests</a>.':' <a href="tel:4074705309">407-470-5309</a>.';
 var e=v.el,h=(e?'<div class="elite"><span class="ek">'+esc(e.k)+'</span><h2>'+esc(e.h)+'</h2><p>'+esc(e.p)+'</p>'+li(e.l)+'<p class="ef">'+esc(e.f)+'</p><a class="btn" href="#hf" id="elbtn">'+esc(e.b)+'</a> <a class="btn alt" href="#/services">Compare all plans</a></div>':'')+'<div class="svcbox"><h2>'+esc(v.bt)+'</h2><p>'+esc(v.bp)+'</p>'+li(v.bl)+'<p class="res">'+esc(HRES)+'</p><p>'+esc(v.br)+tail+'</p></div>'
 +'<h2>'+esc(v.wt)+'</h2>'+li(v.wl)+'<h2>'+esc(v.jt)+'</h2>'+li(v.jl)+'<h2>'+esc(v.pt)+'</h2><p>'+esc(v.pp)+(v.pl?' <a href="#/services">See our maintenance plans</a>.':'')+'</p><h2>Coverage</h2><p>'+esc(v.cv||HCOV)+'</p>'
 +'<div class="cta"><a class="btn alt" href="tel:4074705309">Call or text 407-470-5309</a><a class="btn alt" href="#/portfolio">See our work</a></div><div class="pnote"><b>Client Portal</b> <span class="soon">NEW!</span><p>See your visits, invoices, and requests online. <a href="/portal/">Sign in</a></p></div>';
@@ -47,6 +47,13 @@ function refresh(){var c=document.getElementById("comm").value,inc=CONTRACT[c]||
 
 var flagged=[].some.call(sv.querySelectorAll("input:checked"),function(i){var l=i.parentNode;return l.hasAttribute("data-tip")||(showO&&l.classList.contains("oth"))});var ack=document.getElementById("ack");document.getElementById("ackrow").style.display=flagged?"flex":"none";ack.required=flagged;if(!flagged)ack.checked=false}
 document.getElementById("comm").addEventListener("change",refresh);sv.addEventListener("change",refresh);
+// Weed spraying pop-up: opens when the box is ticked; closes with X, Got it, Escape, or a click outside.
+var wn=document.getElementById("wn"),wfocus=null;
+function closeWn(){wn.classList.remove("on");if(wfocus)wfocus.focus()}
+sv.addEventListener("change",function(e){var i=e.target;if(i.value!=="Weed spraying"||!i.checked)return;wfocus=i;document.getElementById("wn1").textContent=tr(WEEDNOTE[0]);document.getElementById("wn2").textContent=tr(WEEDNOTE[1]);wn.classList.add("on");document.getElementById("wnok").focus()});
+document.getElementById("wnx").addEventListener("click",closeWn);document.getElementById("wnok").addEventListener("click",closeWn);
+wn.addEventListener("click",function(e){if(e.target===wn)closeWn()});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&wn.classList.contains("on"))closeWn()});
 
 
 
