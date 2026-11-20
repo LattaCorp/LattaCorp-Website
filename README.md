@@ -65,6 +65,7 @@ it rebuilds `crm/app.js` and bumps the version numbers so phones pick up the cha
 | Price calculator and estimates form | `23-price-calculator.js` |
 | Inventory | `24-inventory.js` |
 | Winter break, Reset schedule, re-spacing after a visit done on another day, Shift days, Catch up overdue | `33-schedule-tools.js` |
+| Open days (how busy each coming work day is; Schedule, Jobs, Leads, new-job form) | `34-open-days.js` |
 
 Screens, colors and layout (CSS) are in `crm/index.html`. `crm/sw.js` keeps the app installable and opening fast.
 Code style: formatted with Prettier (settings in `crm/src/.prettierrc`).

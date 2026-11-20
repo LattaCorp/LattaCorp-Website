@@ -287,6 +287,8 @@ function renderJobs() {
   );
   tb.appendChild(document.createTextNode(" "));
   tb.appendChild(btn("Services", "btn alt", openServices));
+  tb.appendChild(document.createTextNode(" "));
+  tb.appendChild(btn("Open days", "btn alt", openOpenDays));
   var list = $("list");
   list.textContent = "";
   if (jobsErr) {
@@ -740,6 +742,13 @@ function openJobForm(client, job, pre) {
   g.appendChild(sd);
   g.appendChild(ed);
   p.appendChild(g);
+  if (!job)
+    p.appendChild(
+      odPicker(function (d) {
+        sd.input.value = d;
+        sd.input.dispatchEvent(new Event("change"));
+      })
+    );
   p.appendChild(wb);
   if (cw) p.appendChild(cw);
   p.appendChild(ins);

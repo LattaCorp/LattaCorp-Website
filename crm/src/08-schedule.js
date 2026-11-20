@@ -484,6 +484,7 @@ function renderSchedule() {
     })
   );
   if (s3 && isOwner()) $("topbtns").appendChild(btn("Crew", "btn alt", openCrew));
+  $("topbtns").appendChild(btn("Open days", "btn alt", openOpenDays));
   $("topbtns").appendChild(
     btn("Shift days", "btn alt", function () {
       openShiftDays(smode === "day" ? selDate : today());

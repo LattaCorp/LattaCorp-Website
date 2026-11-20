@@ -193,6 +193,8 @@ function renderLeads() {
   );
   $("topbtns").appendChild(document.createTextNode(" "));
   $("topbtns").appendChild(btn("Price calculator", "btn alt", openCalc));
+  $("topbtns").appendChild(document.createTextNode(" "));
+  $("topbtns").appendChild(btn("Open days", "btn alt", openOpenDays));
   var list = $("list");
   list.textContent = "";
   var cols = PIPE_COLS.filter(function (c) {
