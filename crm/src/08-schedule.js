@@ -89,8 +89,14 @@ function visitCard(v, after, showJob, opts) {
     l.appendChild(el("div", "note", "Crew: " + crewName(v.crew_id)));
   if (v.status !== "scheduled" || showJob === false)
     l.appendChild(el("div", "note", dshort(v.scheduled_date)));
+  if (v.status === "scheduled" && j && vKind(v) === "visit" && winterOn(j) && inWinter(v.scheduled_date))
+    l.appendChild(el("div", "note", "❄ Winter break: every 2 weeks"));
   if (v.status === "scheduled" && v.weather_from) {
-    var wn = el("div", "note", "Moved by weather from " + dshort(v.weather_from));
+    var wn = el(
+      "div",
+      "note",
+      (/^[sm]\|/.test(v.weather_batch || "") ? "Moved from " : "Moved by weather from ") + dshort(v.weather_from)
+    );
     wn.style.color = "#1f5f9a";
     l.appendChild(wn);
   }
@@ -160,16 +166,38 @@ function visitCard(v, after, showJob, opts) {
     if (v.status === "scheduled") {
       a.appendChild(
         btn("Done", "btn sm", function () {
-          var pp = { status: "done", completed_at: new Date().toISOString() };
-          if (!billErr && !(Number(v.price) > 0)) {
-            var ans = prompt(
-              "This visit has no price yet, so it can't be billed. Enter the price for this visit, or leave it blank to set it later:",
-              ""
+          // done on another day than planned: the visit moves to that day, then Foreman offers to line up the next ones
+          function finish(day) {
+            var pp = { status: "done", completed_at: doneStamp(day) },
+              moved = day !== v.scheduled_date;
+            if (moved) {
+              pp.scheduled_date = day;
+              if (wxOn()) {
+                pp.weather_from = null;
+                pp.weather_batch = null;
+              }
+            }
+            if (!billErr && !(Number(v.price) > 0)) {
+              var ans = prompt(
+                "This visit has no price yet, so it can't be billed. Enter the price for this visit, or leave it blank to set it later:",
+                ""
+              );
+              var n = ans == null ? NaN : parseFloat(ans);
+              if (n > 0) pp.price = n;
+            }
+            patch(
+              pp,
+              moved && j && j.frequency !== "once"
+                ? function () {
+                    (billErr ? Promise.resolve() : loadUnbilled()).then(function () {
+                      offerRespace([v], after);
+                    });
+                  }
+                : null
             );
-            var n = ans == null ? NaN : parseFloat(ans);
-            if (n > 0) pp.price = n;
           }
-          patch(pp);
+          if (v.scheduled_date === today()) finish(today());
+          else pickDoneDay(v, a, finish, btns);
         })
       );
       a.appendChild(
@@ -456,6 +484,11 @@ function renderSchedule() {
     })
   );
   if (s3 && isOwner()) $("topbtns").appendChild(btn("Crew", "btn alt", openCrew));
+  $("topbtns").appendChild(
+    btn("Shift days", "btn alt", function () {
+      openShiftDays(smode === "day" ? selDate : today());
+    })
+  );
   $("topbtns").appendChild(btn("Schedule settings", "btn alt", openSchedSettings));
   var list = $("list");
   list.textContent = "";
@@ -488,6 +521,14 @@ function renderSchedule() {
     sub.appendChild(b);
   });
   list.appendChild(sub);
+  if (smode === "overdue" && od.length) {
+    var cu = el("div", "wxbar");
+    cu.appendChild(
+      el("span", null, od.length + " past visit" + (od.length > 1 ? "s" : "") + " still marked scheduled. Sort them out in one go:")
+    );
+    cu.appendChild(btn("Catch up overdue", "btn sm", openCatchUp));
+    list.appendChild(cu);
+  }
   var set = smode === "upcoming" ? up : smode === "overdue" ? od : dn;
   set = set.filter(function (v) {
     if (!query) return true;
@@ -558,7 +599,7 @@ function renderSchedule() {
     if (smode !== "done") {
       h.appendChild(
         btn("Push to next day", "btn alt sm", function () {
-          pushDay(d, g.length);
+          openShiftDays(d, d);
         })
       );
     }
@@ -1121,8 +1162,19 @@ function wxBanners(list, d) {
       var x = g[k];
       if (!x.hit) return;
       var man = k.charAt(0) === "m",
+        sh = k.charAt(0) === "s",
         t = man
           ? "↔ Catch-up change: " + x.adj + " visit" + (x.adj > 1 ? "s" : "") + " adjusted."
+          : sh
+          ? "⇥ Days shifted" +
+            (x.first ? " from " + dshort(x.first) : "") +
+            ": " +
+            x.moved +
+            " stop" +
+            (x.moved === 1 ? "" : "s") +
+            " moved" +
+            (x.adj ? " · " + x.adj + " catch-up change" + (x.adj > 1 ? "s" : "") : "") +
+            "."
           : "☔ Weather delay" +
             (x.first ? " from " + dshort(x.first) : "") +
             ": " +
@@ -1135,7 +1187,7 @@ function wxBanners(list, d) {
       var b = el("div", "wxbar");
       b.appendChild(el("span", null, t));
       b.appendChild(
-        btn(man ? "Undo" : "Undo weather delay", "btn alt sm", function () {
+        btn(man || sh ? "Undo" : "Undo weather delay", "btn alt sm", function () {
           undoWeather(k);
         })
       );
@@ -1619,6 +1671,7 @@ function openSchedSettings() {
   ]);
   p.appendChild(ov);
   p.appendChild(el("p", "note", "Saved on this device, so your phone and computer can open on different views."));
+  winterSettingsBox(p);
   var a = el("div", "actions");
   a.appendChild(
     btn("Save", "btn", function () {

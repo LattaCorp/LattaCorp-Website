@@ -34,17 +34,16 @@ function visitDates(job) {
     end = addDays(t, 84);
   if (job.frequency === "once") return [job.start_date];
   if (job.end_date && job.end_date < end) end = job.end_date;
-  var step = job.frequency === "weekly" ? 7 : 14,
-    out = [],
-    d = job.start_date,
+  // counts from the reset date when the schedule was reset, otherwise from the start date;
+  // weekly jobs on the winter break go every 2 weeks inside the winter window (see 33-schedule-tools.js)
+  var out = [],
+    d = job.anchor_date || job.start_date,
     floor = addDays(t, -7);
-  if (d < floor) {
-    var days = Math.round((pd(floor) - pd(d)) / 86400000);
-    d = addDays(d, Math.ceil(days / step) * step);
-  }
+  if (job.anchor_date && job.anchor_date > floor) floor = job.anchor_date;
+  if (job.start_date > floor) floor = job.start_date;
   while (d <= end) {
-    out.push(d);
-    d = addDays(d, step);
+    if (d >= floor) out.push(d);
+    d = addDays(d, visitStep(job, d));
   }
   return out;
 }
@@ -55,7 +54,7 @@ function topUp() {
     if (j.status !== "active") return;
     var lastV = visits
         .filter(function (v) {
-          return v.job_id === j.id;
+          return v.job_id === j.id && (!j.anchor_date || v.orig_date >= j.anchor_date);
         })
         .sort(function (a, b) {
           return a.orig_date < b.orig_date ? 1 : -1;
@@ -380,6 +379,7 @@ function openJob(id) {
     el("span", "qst " + (j.status === "active" ? "ok" : j.status === "paused" ? "wait" : "no"), j.status === "active" ? "Active" : j.status === "paused" ? "Paused" : "Ended")
   );
   hd.appendChild(el("span", "qnum", flabel(j.frequency) + " · " + money(j.price) + " per visit"));
+  if (winterOn(j)) hd.appendChild(el("span", "qst wait", "❄ Winter break " + winterText()));
   L.appendChild(hd);
   var who = el("div", "popbox");
   who.appendChild(el("h4", null, "Client"));
@@ -415,6 +415,8 @@ function openJob(id) {
   var dt = document.createElement("table");
   [
     ["How often", flabel(j.frequency)],
+    ["Winter break", winterLine(j)],
+    ["Schedule counts from", j.anchor_date ? dshort(j.anchor_date) + " (reset)" : ""],
     ["Price", money(j.price) + " per visit"],
     ["Starts", dshort(j.start_date)],
     ["Ends", j.end_date ? dshort(j.end_date) : ""],
@@ -441,6 +443,12 @@ function openJob(id) {
       openJobForm(c, j);
     })
   );
+  if (j.status === "active" && j.frequency !== "once")
+    acts.appendChild(
+      btn("Reset schedule", "btn alt sm", function () {
+        openResetSchedule(j);
+      })
+    );
   if (j.status === "active" && j.frequency !== "once")
     acts.appendChild(
       btn("Pause", "btn alt sm", function () {
@@ -699,8 +707,13 @@ function openJobForm(client, job, pre) {
     }
     lastSvc = sv.input.value;
   });
+  var wb = checkRow(
+    "Winter break: every 2 weeks from " + winterText() + ", then weekly again",
+    job ? job.winter_break !== false : true
+  );
   fq.input.addEventListener("change", function () {
     ed.hidden = fq.input.value === "once";
+    wb.hidden = fq.input.value !== "weekly";
   });
   if (pre && !job) {
     if (pre.property_id && byId(props, pre.property_id)) ps.input.value = pre.property_id;
@@ -716,6 +729,7 @@ function openJobForm(client, job, pre) {
     p.insertBefore(el("p", "note", pre.from || ""), p.children[2] || null);
   }
   ed.hidden = fq.input.value === "once";
+  wb.hidden = fq.input.value !== "weekly";
   p.appendChild(cs);
   p.appendChild(ps);
   p.appendChild(sv);
@@ -726,6 +740,7 @@ function openJobForm(client, job, pre) {
   g.appendChild(sd);
   g.appendChild(ed);
   p.appendChild(g);
+  p.appendChild(wb);
   if (cw) p.appendChild(cw);
   p.appendChild(ins);
   var a = el("div", "actions");
@@ -759,6 +774,9 @@ function openJobForm(client, job, pre) {
       end_date: !once && ed.input.value ? ed.input.value : null,
       instructions: ins.input.value.trim()
     };
+    if (jobs.length && "winter_break" in jobs[0]) row.winter_break = wb.box.checked;
+    // a new start date restarts the count from that date
+    if (job && job.start_date !== row.start_date && job.anchor_date) row.anchor_date = null;
     if (s3 && cw) row.crew_id = cw.input.value || null;
     save.disabled = true;
     if (!job) {
@@ -785,6 +803,7 @@ function openJobForm(client, job, pre) {
       job.frequency !== row.frequency ||
       job.start_date !== row.start_date ||
       (job.end_date || null) !== row.end_date;
+    var wchg = "winter_break" in row && row.frequency === "weekly" && job.winter_break !== row.winter_break;
     sb.from("jobs")
       .update(row)
       .eq("id", job.id)
@@ -798,7 +817,8 @@ function openJobForm(client, job, pre) {
         }
         Object.assign(job, r.data);
         var fut;
-        if (sched && job.status === "active")
+        if (!sched && wchg && job.status === "active") fut = syncJobVisits([job]);
+        else if (sched && job.status === "active")
           fut = sb
             .from("visits")
             .delete()
@@ -974,6 +994,7 @@ function clientJobsSection(c) {
           .join(" · ")
       )
     );
+    if (winterOn(j) && j.status === "active") card.appendChild(el("div", "note", "❄ " + winterLine(j)));
     var a = el("div", "acts");
     a.appendChild(
       btn("Open", "btn alt sm", function () {
