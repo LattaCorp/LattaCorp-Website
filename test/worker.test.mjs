@@ -84,13 +84,15 @@ r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
 // ---- client portal ----
 {
   const envP = { ...env, FROM_EMAIL: "Latta Corp Website <website@lattacorpfl.com>" };
-  let calls = [], allowed = true, recent = [], staff = true, acctOk = true;
+  let calls = [], allowed = true, recent = [], ipMisses = [], staff = true, acctOk = true;
   globalThis.fetch = async (url, opts = {}) => {
     const u = String(url); const body = opts.body ? (() => { try { return JSON.parse(opts.body); } catch { return opts.body; } })() : null;
     calls.push({ u, body, headers: opts.headers || {} });
+    if (u.includes("/rest/v1/portal_signins?select") && u.includes("ip=eq.")) return new Response(JSON.stringify(ipMisses), { status: 200 });
     if (u.includes("/rest/v1/portal_signins?select")) return new Response(JSON.stringify(recent), { status: 200 });
     if (u.includes("/rest/v1/portal_signins")) return new Response("", { status: 201 });
     if (u.includes("rpc/portal_email_allowed")) return new Response(JSON.stringify(allowed), { status: 200 });
+    if (u.includes("rpc/portal_signin_emails")) return new Response(JSON.stringify(allowed ? ["jane@example.com", "cowanmollya@gmail.com", "pat@example.com"] : []), { status: 200 });
     if (u.includes("/auth/v1/admin/users")) return new Response("{}", { status: 422 });
     if (u.includes("/auth/v1/admin/generate_link")) return new Response(JSON.stringify({ properties: { email_otp: "482913", hashed_token: "abc123", verification_type: "magiclink" } }), { status: 200 });
     if (u.includes("/auth/v1/user")) return new Response(JSON.stringify({ email: "pat@example.com" }), { status: 200 });
@@ -111,9 +113,27 @@ r = await worker.fetch(mk(), env); assert.equal(r.status, 200);
   assert.equal(mail.body.reply_to, "Support@LattaCorpFL.com"); assert(mail.body.html.includes("automated message")); assert(mail.body.text.includes("482913"));
   assert.equal(mail.body.headers["Auto-Submitted"], "auto-generated");
   assert(calls.find((c) => c.u.includes("/rest/v1/portal_signins") && c.body && c.body.sent === true), "logged");
-  // unknown email: same answer, but nothing is created or sent
-  calls = []; allowed = false; r = await post("/api/portal/code", { email: "stranger@example.com" });
-  assert.equal(r.status, 200); assert(!calls.some((c) => c.u.includes("generate_link") || c.u.includes("resend")), "nothing sent to strangers");
+  assert.equal((await r.clone().json()).to, "jane@example.com");
+  // Gmail dots: typed cowan.mollya@ -> code goes to cowanmollya@ (on file), and the page is told where it went
+  calls = []; r = await post("/api/portal/code", { email: "Cowan.Mollya@gmail.com" });
+  assert.equal(r.status, 200); assert.equal((await r.json()).to, "cowanmollya@gmail.com");
+  mail = calls.find((c) => c.u.includes("api.resend.com")); assert.deepEqual(mail.body.to, ["cowanmollya@gmail.com"]);
+  assert(calls.find((c) => c.u.includes("generate_link")).body.email === "cowanmollya@gmail.com", "code made for the email on file");
+  assert(calls.find((c) => c.u.includes("/rest/v1/portal_signins") && c.body && c.body.sent_to === "cowanmollya@gmail.com"), "log says where it went");
+  // small typo: gmial.com -> on file
+  calls = []; r = await post("/api/portal/code", { email: "cowanmollya@gmial.com" });
+  assert.equal((await r.json()).to, "cowanmollya@gmail.com");
+  // not on file: told so, nothing created or sent
+  calls = []; r = await post("/api/portal/code", { email: "stranger@example.com" });
+  assert.equal(r.status, 200); assert.equal((await r.json()).nomatch, true);
+  assert(!calls.some((c) => c.u.includes("generate_link") || c.u.includes("resend")), "nothing sent to strangers");
+  assert(calls.find((c) => c.u.includes("/rest/v1/portal_signins") && c.body && c.body.sent === false), "miss logged");
+  // one device trying lots of emails not on file: has to wait
+  ipMisses = [1, 2, 3, 4, 5].map(() => ({ created_at: new Date().toISOString() })); calls = [];
+  r = await worker.fetch(new Request("https://x.test/api/portal/code", { method: "POST", headers: { "content-type": "application/json", "CF-Connecting-IP": "1.2.3.4" }, body: JSON.stringify({ email: "jane@example.com" }) }), envP);
+  const jw = await r.json(); assert.equal(jw.wait, "device"); assert(jw.minutes >= 1); assert(!calls.some((c) => c.u.includes("resend"))); ipMisses = [];
+  calls = []; allowed = false; r = await post("/api/portal/code", { email: "jane@example.com" });
+  assert.equal((await r.json()).nomatch, true);
   // too soon after the last code: no new email
   allowed = true; recent = [{ created_at: new Date().toISOString() }]; calls = []; r = await post("/api/portal/code", { email: "jane@example.com" });
   assert.equal(r.status, 200); assert(!calls.some((c) => c.u.includes("resend")), "rate limited"); recent = [];

@@ -96,6 +96,15 @@
     "Staff view": "Vista del personal", "Open the CRM": "Abrir el CRM", "accounts": "cuentas", "archived": "archivado", "Find a client": "Buscar cliente", "What the client sees": "Lo que ve el cliente",
     "Staff view: sending is turned off here so nothing goes out in the client's name. Their form looks like this for them, with their properties and phone filled in.": "Vista del personal: el envío está desactivado para que nada salga a nombre del cliente. Así ve el cliente su formulario.",
     "Can't find it? Check your Spam or Junk folder. It comes from website@lattacorpfl.com.": "¿No lo encuentra? Revise su carpeta de Spam o Correo no deseado. Llega de website@lattacorpfl.com.",
+    "The email you entered doesn't match what we have on record. Please check it and try again, or email": "El correo que escribió no coincide con el que tenemos registrado. Revíselo e intente de nuevo, o escriba a",
+    "for help.": "para recibir ayuda.",
+    "Too many emails were tried from this device. Please try again in": "Se probaron demasiados correos desde este dispositivo. Intente de nuevo en",
+    "We sent a code to": "Le enviamos un código a",
+    "Credit cards": "Tarjetas de crédito", "accepted with a": "se aceptan con un cargo del",
+    "card fee. Paying by bank is always free.": "por uso de tarjeta. Pagar con su banco siempre es gratis.",
+    "accepted with no fee for now. Starting": "se aceptan sin cargo por ahora. A partir del",
+    "credit card payments have a": "los pagos con tarjeta de crédito tienen un cargo del",
+    "accepted. Paying by bank is always free.": "se aceptan. Pagar con su banco siempre es gratis.",
     "Too many codes were requested for this email. Please use the newest code we sent, or try again in": "Se pidieron demasiados códigos para este correo. Use el código más reciente que le enviamos, o intente de nuevo en",
     "minutes": "minutos", "We just sent a code. Please wait a minute before asking for another.": "Acabamos de enviarle un código. Espere un minuto antes de pedir otro.",
     "This email isn't linked to an account yet. Call or text 407-470-5309 and we'll set it up.": "Este correo aún no está vinculado a una cuenta. Llame o envíe un texto al 407-470-5309 y lo configuramos.",
@@ -197,7 +206,18 @@
     }).then(function (j) {
       if (j && j.wait === "minutes") { var e = new Error("limit"); e.msg = t("Too many codes were requested for this email. Please use the newest code we sent, or try again in") + " " + j.minutes + " " + t("minutes") + "."; throw e; }
       if (j && j.wait === "seconds") { var e2 = new Error("limit"); e2.msg = t("We just sent a code. Please wait a minute before asking for another."); throw e2; }
+      if (j && j.wait === "device") { var e3 = new Error("limit"); e3.msg = t("Too many emails were tried from this device. Please try again in") + " " + j.minutes + " " + t("minutes") + "."; throw e3; }
+      if (j && j.nomatch) { var e4 = new Error("nomatch"); e4.nomatch = true; throw e4; }
+      if (j && j.to) store("lc-portal-email", j.to); // the email on file the code went to (it's checked against that one)
+      return j || {};
     });
+  }
+  // "That email doesn't match what we have on record..." with the support email as a tap-to-email link.
+  function noMatch(id) {
+    var p = $(id); p.textContent = ""; p.classList.remove("hide");
+    var a = document.createElement("a"); a.href = "mailto:Support@LattaCorpFL.com"; a.textContent = "Support@LattaCorpFL.com";
+    p.appendChild(document.createTextNode(t("The email you entered doesn't match what we have on record. Please check it and try again, or email") + " "));
+    p.appendChild(a); p.appendChild(document.createTextNode(" " + t("for help.")));
   }
   function showSignin(msg) {
     $("app").classList.add("hide"); $("signin").classList.remove("hide"); $("acctsel").classList.add("hide");
@@ -210,10 +230,10 @@
     var email = $("siemail").value.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { showErr("sierr", t("Enter a valid email.")); return; }
     var b = $("sendbtn"); b.disabled = true; b.textContent = t("Sending...");
-    requestCode(email).then(function () {
-      store("lc-portal-email", email); $("sentto").textContent = email;
+    requestCode(email).then(function (j) {
+      var to = j.to || email; store("lc-portal-email", to); $("sentto").textContent = to;
       $("emailform").classList.add("hide"); $("codeform").classList.remove("hide"); showErr("codeerr", ""); $("sicode").value = ""; $("sicode").focus();
-    }).catch(function (er) { showErr("sierr", (er && er.msg) || t("Something went wrong. Please try again, or call or text 407-470-5309.")); })
+    }).catch(function (er) { if (er && er.nomatch) { noMatch("sierr"); $("siemail").focus(); } else showErr("sierr", (er && er.msg) || t("Something went wrong. Please try again, or call or text 407-470-5309.")); })
       .then(function () { b.disabled = false; b.textContent = t("Send my code"); });
   });
   $("sicode").addEventListener("input", function () { this.value = this.value.replace(/\D/g, "").slice(0, 8); if (this.value.length === 8) $("codeform").requestSubmit(); });
@@ -685,6 +705,18 @@
       apx.appendChild(b);
     });
     host.appendChild(pay);
+    // Credit card fee notice (e.g. "Credit card payments have a 3% fee starting December 18"), when cards are on.
+    var firstOpen = (data.invoices || []).filter(function (i) { return (i.status === "due" || i.status === "past_due") && i.token; })[0];
+    if (firstOpen && !isStaff) cardInfo(firstOpen.token).then(function (o) {
+      if (!o || !o.on) return;
+      var pct = String(o.fee > 0 ? o.fee : o.later).replace(/\.0+$/, "");
+      var cn = el("p", "small");
+      cn.appendChild(el("b", null, t("Credit cards") + ": "));
+      cn.appendChild(document.createTextNode(o.fee > 0 ? t("accepted with a") + " " + pct + "% " + t("card fee. Paying by bank is always free.")
+        : o.from && o.later > 0 ? t("accepted with no fee for now. Starting") + " " + fdate(o.from) + ", " + t("credit card payments have a") + " " + pct + "% " + t("card fee. Paying by bank is always free.")
+        : t("accepted. Paying by bank is always free.")));
+      pay.insertBefore(cn, apx);
+    });
 
     // With several properties, the lists below can show one property at a time.
     var cur = siteOf(siteKey); if (!cur) siteKey = "";

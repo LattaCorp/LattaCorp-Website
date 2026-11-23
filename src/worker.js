@@ -1,6 +1,7 @@
 import { makeVapidKeys, sendPush } from "./push.js";
 import { stripe, stripeMode, verifyStripeSignature, cents, SURCHARGE_VERSION } from "./stripe.js";
 import { readEmail, looksLikeZelle, readZelle, fromBank, invoiceNumbers, findClients } from "./zelle.js";
+import { matchEmail } from "./portal-match.js";
 // Latta Corp website server code (Cloudflare Worker).
 // The static website is served automatically. This file only handles form submissions sent to /api/submit:
 // it emails them to the business through Resend. Settings: TO_EMAIL (wrangler.jsonc) and RESEND_API_KEY (a secret
@@ -348,20 +349,47 @@ function portalText({ heading, lines, code, button, link, small, es, foot }) {
     "Latta Corp of Central Florida · Kissimmee, FL · lattacorpfl.com"].filter((x) => x !== "").join("\n");
 }
 
+// Finds the email on file the person meant (exact, same Gmail inbox, or a small typo). See src/portal-match.js.
+async function portalMatch(env, typed) {
+  const r = await sbRest(env, "rpc/portal_signin_emails", { method: "POST", body: "{}" });
+  if (!r.ok) { console.log("portal match: could not load emails", r.status); return null; }
+  const rows = await r.json();
+  return matchEmail(typed, (rows || []).map((x) => (typeof x === "string" ? x : Object.values(x || {})[0])));
+}
+
 export async function handlePortalCode(request, env) {
   if (!env.SUPABASE_SECRET_KEY || !env.RESEND_API_KEY) return json({ error: "The portal is not set up on the server." }, 500);
   let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
   const email = String((d && d.email) || "").trim().toLowerCase().slice(0, 200);
   const es = String((d && d.lang) || "") === "es";
+  const ip = String(request.headers.get("CF-Connecting-IP") || "").slice(0, 64);
   if (!EMAIL_RE.test(email)) return json({ error: "bad email" }, 400);
-  if (!(await passesTurnstile(env, d.ts_token, request.headers.get("CF-Connecting-IP")))) return json({ error: "verification failed" }, 403);
+  if (!(await passesTurnstile(env, d.ts_token, ip))) return json({ error: "verification failed" }, 403);
 
-  // At most one code every 45 seconds and 5 an hour per email, so nobody can flood an inbox.
+  // One device can try at most 5 emails that aren't on file in 10 minutes, so nobody can run a list of emails through it.
+  if (ip) {
+    const since10 = new Date(Date.now() - 600 * 1000).toISOString();
+    const ipr = await sbRest(env, `portal_signins?select=created_at&ip=eq.${encodeURIComponent(ip)}&sent=eq.false&created_at=gte.${since10}&order=created_at.asc&limit=10`);
+    if (ipr.ok) {
+      const rows = await ipr.json();
+      if (rows.length >= 5) {
+        const mins = Math.max(1, Math.ceil((Date.parse(rows[0].created_at) + 600 * 1000 - Date.now()) / 60000));
+        return json({ ok: false, wait: "device", minutes: mins });
+      }
+    }
+  }
+
+  const m0 = await portalMatch(env, email);
+  const log = (sent, to) => sbRest(env, "portal_signins", { method: "POST", headers: { Prefer: "return=minimal" },
+    body: JSON.stringify({ email, sent, ip: ip || null, sent_to: to && to !== email ? to : null }) });
+  if (!m0) { await log(false); return json({ ok: false, nomatch: true }); }
+  const to = m0.email;
+
+  // At most one code every 45 seconds and 5 an hour per account, so nobody can flood an inbox.
   const since = new Date(Date.now() - 3600 * 1000).toISOString();
-  const rl = await sbRest(env, `portal_signins?select=created_at&email=eq.${encodeURIComponent(email)}&created_at=gte.${since}&order=created_at.desc&limit=10`);
+  const rl = await sbRest(env, `portal_signins?select=created_at&or=(email.eq.%22${encodeURIComponent(to)}%22,sent_to.eq.%22${encodeURIComponent(to)}%22)&sent=eq.true&created_at=gte.${since}&order=created_at.desc&limit=10`);
   if (rl.ok) {
     const rows = await rl.json();
-    // Say so (it doesn't reveal whether the email is a customer: the same limit applies to every email).
     if (rows[0] && Date.now() - Date.parse(rows[0].created_at) < 45000) return json({ ok: true, wait: "seconds" });
     if (rows.length >= 5) {
       const mins = Math.max(1, Math.ceil((Date.parse(rows[rows.length - 1].created_at) + 3600 * 1000 - Date.now()) / 60000));
@@ -369,35 +397,34 @@ export async function handlePortalCode(request, env) {
     }
   }
   let sent = false;
-  const al = await sbRest(env, "rpc/portal_email_allowed", { method: "POST", body: JSON.stringify({ e: email }) });
-  if (al.ok && (await al.json()) === true) {
-    // Make sure this person has a sign-in (created the first time; "already exists" is fine), then make a one-time code.
-    try { await fetch(`${baseUrl(env)}/auth/v1/admin/users`, { method: "POST", headers: adminHeaders(env), body: JSON.stringify({ email, email_confirm: true }) }); } catch {}
-    const gl = await fetch(`${baseUrl(env)}/auth/v1/admin/generate_link`, { method: "POST", headers: adminHeaders(env), body: JSON.stringify({ type: "magiclink", email }) });
-    if (gl.ok) {
-      const g = await gl.json(), pr = g.properties || g;
-      const code = String(pr.email_otp || ""), th = String(pr.hashed_token || "");
-      if (code && th) {
-        const link = `${PORTAL_URL}?th=${encodeURIComponent(th)}&ty=${encodeURIComponent(pr.verification_type || "magiclink")}${es ? "&lang=es" : ""}`;
-        const m = es ? {
-          es, heading: "Su código de acceso", lines: ["Use este código para entrar a su cuenta de cliente de LattaCorp. Vence en 1 hora."], code,
-          button: "O entre con un toque", link,
-          small: "Si usted no pidió este código, puede ignorar este correo. Nadie puede entrar a su cuenta sin él.",
-        } : {
-          heading: "Your sign-in code", lines: ["Use this code to sign in to your LattaCorp client account. It expires in 1 hour."], code,
-          button: "Or sign in with one tap", link,
-          small: "If you didn't ask for this code, you can ignore this email. No one can get into your account without it.",
-        };
-        sent = await sendViaResend(env, {
-          from: AUTO_FROM, to: [email], reply_to: SUPPORT_EMAIL, headers: AUTO_HEADERS,
-          subject: es ? `Su código de acceso de LattaCorp: ${code}` : `Your LattaCorp sign-in code: ${code}`,
-          html: portalEmail(m), text: portalText(m),
-        });
-      }
-    } else console.log("portal code: could not make a code", gl.status, await errText(gl));
-  }
-  await sbRest(env, "portal_signins", { method: "POST", headers: { Prefer: "return=minimal" }, body: JSON.stringify({ email, sent }) });
-  return json({ ok: true });
+  // Make sure this person has a sign-in (created the first time; "already exists" is fine), then make a one-time code.
+  try { await fetch(`${baseUrl(env)}/auth/v1/admin/users`, { method: "POST", headers: adminHeaders(env), body: JSON.stringify({ email: to, email_confirm: true }) }); } catch {}
+  const gl = await fetch(`${baseUrl(env)}/auth/v1/admin/generate_link`, { method: "POST", headers: adminHeaders(env), body: JSON.stringify({ type: "magiclink", email: to }) });
+  if (gl.ok) {
+    const g = await gl.json(), pr = g.properties || g;
+    const code = String(pr.email_otp || ""), th = String(pr.hashed_token || "");
+    if (code && th) {
+      const link = `${PORTAL_URL}?th=${encodeURIComponent(th)}&ty=${encodeURIComponent(pr.verification_type || "magiclink")}${es ? "&lang=es" : ""}`;
+      const m = es ? {
+        es, heading: "Su código de acceso", lines: ["Use este código para entrar a su cuenta de cliente de LattaCorp. Vence en 1 hora."], code,
+        button: "O entre con un toque", link,
+        small: "Si usted no pidió este código, puede ignorar este correo. Nadie puede entrar a su cuenta sin él.",
+      } : {
+        heading: "Your sign-in code", lines: ["Use this code to sign in to your LattaCorp client account. It expires in 1 hour."], code,
+        button: "Or sign in with one tap", link,
+        small: "If you didn't ask for this code, you can ignore this email. No one can get into your account without it.",
+      };
+      sent = await sendViaResend(env, {
+        from: AUTO_FROM, to: [to], reply_to: SUPPORT_EMAIL, headers: AUTO_HEADERS,
+        subject: es ? `Su código de acceso de LattaCorp: ${code}` : `Your LattaCorp sign-in code: ${code}`,
+        html: portalEmail(m), text: portalText(m),
+      });
+    }
+  } else console.log("portal code: could not make a code", gl.status, await errText(gl));
+  await log(sent, to);
+  if (!sent) return json({ error: "could not send" }, 502);
+  // The code is checked against the email on file, so the page needs to know which one it went to.
+  return json({ ok: true, to });
 }
 
 // The signed-in client's own account, asked of the database AS the client (so the database decides access).
@@ -1316,7 +1343,7 @@ export async function handleCard(request, env) {
   let d; try { d = await request.json(); } catch { return json({ error: "bad request" }, 400); }
   const set = await cardSettings(env);
   const x = await cardInvoice(env, d.t);
-  if (d.action === "options") return json({ on: set.on && !x.error, fee: set.fee, pk: set.on ? env.STRIPE_PUBLISHABLE_KEY : null, due: x.due || 0 });
+  if (d.action === "options") return json({ on: set.on && !x.error, fee: set.fee, from: set.feeFrom, later: set.laterFee, pk: set.on ? env.STRIPE_PUBLISHABLE_KEY : null, due: x.due || 0 });
   const noFee = !(set.fee > 0);
   if (!set.on) return json({ error: "Card payments aren't available right now. Please pay by bank, Zelle or cash." }, 503);
   if (x.error) return json({ error: x.error }, 400);

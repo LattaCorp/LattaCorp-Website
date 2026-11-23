@@ -38,6 +38,16 @@
   function say(node, en) { node.textContent = T(en); if (node.firstChild) node.firstChild._o = en; }
   function msg(id, en, ok) { var p = $(id); if (en) say(p, en); else p.textContent = ""; p.hidden = !en; p.classList.toggle("ok", !!ok); }
   var OOPS = "Something went wrong. Please try again, or call or text 407-470-5309.";
+  var SUPPORT = "Support@LattaCorpFL.com";
+  // "That email doesn't match what we have on record..." with the support email as a tap-to-email link.
+  function noMatch(id) {
+    var p = $(id); p.textContent = ""; p.hidden = false; p.classList.remove("ok");
+    var a = document.createElement("a"); a.href = "mailto:" + SUPPORT; a.textContent = SUPPORT;
+    var s1 = document.createElement("span"), s2 = document.createElement("span");
+    say(s1, "The email you entered doesn't match what we have on record. Please check it and try again, or email");
+    say(s2, "for help.");
+    p.appendChild(s1); p.appendChild(document.createTextNode(" ")); p.appendChild(a); p.appendChild(document.createTextNode(" ")); p.appendChild(s2);
+  }
   var BADCODE = "That code didn't work. Check it, or send a new code.";
 
   function showState() {
@@ -64,6 +74,10 @@
       var e;
       if (j && j.wait === "minutes") { e = new Error("limit"); e.msg = T("Too many codes were requested for this email. Please use the newest code we sent, or try again in") + " " + j.minutes + " " + T("minutes") + "."; throw e; }
       if (j && j.wait === "seconds") { e = new Error("limit"); e.msg = T("We just sent a code. Please wait a minute before asking for another."); throw e; }
+      if (j && j.wait === "device") { e = new Error("limit"); e.msg = T("Too many emails were tried from this device. Please try again in") + " " + j.minutes + " " + T("minutes") + "."; throw e; }
+      if (j && j.nomatch) { e = new Error("nomatch"); e.nomatch = true; throw e; }
+      if (j && j.to) store(EMAIL_KEY, j.to); // the email on file the code went to (it's checked against that one)
+      return j || {};
     });
   }
 
@@ -73,10 +87,10 @@
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) { msg("psierr", "Enter a valid email."); return; }
     var b = $("psisend"); b.disabled = true; say(b, "Sending...");
     client().catch(function () {}); // start loading Supabase while the email goes out
-    requestCode(email).then(function () {
-      store(EMAIL_KEY, email); $("psito").textContent = email; msg("psierr", "");
+    requestCode(email).then(function (j) {
+      var to = j.to || email; store(EMAIL_KEY, to); $("psito").textContent = to; msg("psierr", "");
       $("psiemail").hidden = true; $("psicode").hidden = false; msg("psicerr", ""); $("psicd").value = ""; $("psicd").focus();
-    }).catch(function (er) { msg("psierr", (er && er.msg) || OOPS); })
+    }).catch(function (er) { if (er && er.nomatch) { noMatch("psierr"); $("psiem").focus(); } else msg("psierr", (er && er.msg) || OOPS); })
       .then(function () { b.disabled = false; say(b, "Send my code"); });
   });
 
